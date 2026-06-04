@@ -24,9 +24,6 @@
     "extra": {
       "apiUrl": "http://YOUR_MACHINE_IP:3001"
     },
-    "plugins": [
-      "expo-camera",
-      "expo-image-picker"
-    ]
+    "plugins": []
   }
 }
