@@ -2,15 +2,15 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types';
-import { isOnboarded } from '../../store/storage';
+import { supabase } from '../../lib/supabase';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
 
 export default function SplashScreen({ navigation }: Props) {
   useEffect(() => {
     const timer = setTimeout(async () => {
-      const done = await isOnboarded();
-      navigation.replace(done ? 'Main' : 'Welcome');
+      const { data: { session } } = await supabase.auth.getSession();
+      navigation.replace(session ? 'Main' : 'Welcome');
     }, 2200);
     return () => clearTimeout(timer);
   }, []);

@@ -4,8 +4,8 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types';
 import { Colors, Radius, Spacing } from '../../theme';
 import Button from '../../components/Button';
-import { saveProfile, setOnboarded } from '../../store/storage';
-import { uid } from '../../utils/id';
+import { supabase } from '../../lib/supabase';
+import { setOnboarded } from '../../store/storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
 
@@ -15,19 +15,40 @@ export default function SignUpScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   async function handleCreate() {
-    if (!name || !email || !password) { Alert.alert('Please fill in all fields'); return; }
+    setError('');
+    if (!name || !email || !password) { setError('Please fill in all fields'); return; }
+    if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
     if (!agreed) { Alert.alert('Please agree to the Terms & Privacy Policy'); return; }
+
     setLoading(true);
-    await saveProfile({
-      id: uid(), name, email, avatarUri: undefined,
-      dietaryPrefs: [], skillLevel: 'confident',
-      householdSize: 2, preferMetric: false, darkMode: false,
+    const { error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name } },
     });
+
+    if (signUpError) {
+      setLoading(false);
+      setError(signUpError.message);
+      return;
+    }
+
     await setOnboarded();
     setLoading(false);
     navigation.replace('PersonalizationQuiz');
+  }
+
+  async function handleApple() {
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'apple' });
+    if (error) Alert.alert('Apple sign-in failed', error.message);
+  }
+
+  async function handleGoogle() {
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+    if (error) Alert.alert('Google sign-in failed', error.message);
   }
 
   return (
@@ -39,8 +60,8 @@ export default function SignUpScreen({ navigation }: Props) {
       <Text style={styles.sub}>Free forever for saving & cooking.</Text>
 
       <View style={styles.socials}>
-        <Button label="Continue with Apple" variant="outline" onPress={() => {}} style={styles.socialBtn} />
-        <Button label="Continue with Google" variant="outline" onPress={() => {}} style={styles.socialBtn} />
+        <Button label="Continue with Apple" variant="outline" onPress={handleApple} style={styles.socialBtn} />
+        <Button label="Continue with Google" variant="outline" onPress={handleGoogle} style={styles.socialBtn} />
       </View>
 
       <View style={styles.divider}>
@@ -56,7 +77,9 @@ export default function SignUpScreen({ navigation }: Props) {
       <TextInput style={styles.input} placeholder="you@email.com" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
 
       <Text style={[styles.label, { marginTop: 13 }]}>Password</Text>
-      <TextInput style={styles.input} placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
+      <TextInput style={styles.input} placeholder="Password (min 6 chars)" value={password} onChangeText={setPassword} secureTextEntry />
+
+      {error ? <Text style={styles.errorTxt}>{error}</Text> : null}
 
       <TouchableOpacity style={styles.termsRow} onPress={() => setAgreed(a => !a)}>
         <View style={[styles.check, agreed && styles.checkOn]}>
@@ -97,6 +120,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: Colors.line2,
     borderRadius: Radius.md, color: Colors.ink,
   },
+  errorTxt: { color: Colors.error, fontSize: 13, fontWeight: '600', marginTop: 8 },
   termsRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingVertical: 16 },
   check: { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: Colors.line2, alignItems: 'center', justifyContent: 'center' },
   checkOn: { backgroundColor: Colors.accent, borderColor: Colors.accent },
