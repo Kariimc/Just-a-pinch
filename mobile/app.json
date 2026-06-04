@@ -22,7 +22,7 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
-      "apiUrl": "http://YOUR_MACHINE_IP:3001"
+      "apiUrl": "http://localhost:3001"
     },
     "plugins": []
   }
