@@ -9,9 +9,9 @@ import Button from '../../components/Button';
 type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
 
 const SLIDES = [
-  { variant: 'toast' as const, title: 'Save from anywhere', body: "A link, a screenshot, a photo of Grandma's index card — it all becomes a clean, cookable recipe." },
-  { variant: 'greens' as const, title: 'Cook hands-free',   body: 'Step-by-step cooking mode with your screen awake, built-in timers, and voice navigation.' },
-  { variant: 'bread' as const,  title: 'Plan & shop smart', body: 'Build your week, auto-generate a shopping list, and share it with your household in real time.' },
+  { variant: 'toast' as const,  emoji: '📸', title: 'Save from anywhere', body: "A link, a screenshot, a photo of Grandma's index card — it all becomes a clean, cookable recipe." },
+  { variant: 'greens' as const, emoji: '🧑‍🍳', title: 'Cook hands-free',   body: 'Step-by-step cooking mode with your screen awake, built-in timers, and voice navigation.' },
+  { variant: 'bread' as const,  emoji: '🛒', title: 'Plan & shop smart', body: 'Build your week, auto-generate a shopping list, and share it with your household in real time.' },
 ];
 
 const { width } = Dimensions.get('window');
@@ -26,7 +26,9 @@ export default function WelcomeScreen({ navigation }: Props) {
       </TouchableOpacity>
 
       <View style={styles.body}>
-        <FoodPlaceholder variant={SLIDES[index].variant} style={styles.illustration} />
+        <FoodPlaceholder variant={SLIDES[index].variant} style={styles.illustration}>
+          <Text style={styles.illustrationEmoji}>{SLIDES[index].emoji}</Text>
+        </FoodPlaceholder>
         <Text style={styles.title}>{SLIDES[index].title}</Text>
         <Text style={styles.body2}>{SLIDES[index].body}</Text>
       </View>
@@ -59,7 +61,8 @@ const styles = StyleSheet.create({
   skip: { position: 'absolute', top: 52, right: 18, zIndex: 1 },
   skipTxt: { fontWeight: '600', fontSize: 14, color: Colors.ink2 },
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 },
-  illustration: { width: 200, height: 200, borderRadius: 32 },
+  illustration: { width: 200, height: 200, borderRadius: 32, justifyContent: 'center', alignItems: 'center' },
+  illustrationEmoji: { fontSize: 72, textAlign: 'center' },
   title: { fontSize: 26, fontWeight: '600', color: Colors.ink, marginTop: 30, textAlign: 'center', letterSpacing: -0.3 },
   body2: { fontSize: 15, color: Colors.ink2, marginTop: 10, textAlign: 'center', lineHeight: 22, maxWidth: 280 },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingVertical: 6 },

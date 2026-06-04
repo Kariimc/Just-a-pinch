@@ -25,7 +25,7 @@ export default function FoodPlaceholder({ variant, style, children }: Props) {
 const styles = StyleSheet.create({
   base: {
     overflow: 'hidden',
-    justifyContent: 'flex-end',
-    alignItems: 'flex-start',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
