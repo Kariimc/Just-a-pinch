@@ -4,7 +4,8 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types';
 import { Colors, Radius, Spacing } from '../../theme';
 import Button from '../../components/Button';
-import { getProfile, setOnboarded } from '../../store/storage';
+import { supabase } from '../../lib/supabase';
+import { setOnboarded } from '../../store/storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LogIn'>;
 
@@ -13,20 +14,38 @@ export default function LoginScreen({ navigation }: Props) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   async function handleLogin() {
     setError('');
     if (!email || !password) { setError('Please enter email and password'); return; }
     setLoading(true);
-    const profile = await getProfile();
-    await new Promise(r => setTimeout(r, 600));
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    if (profile && profile.email === email) {
-      await setOnboarded();
-      navigation.replace('Main');
-    } else {
+    if (signInError) {
       setError("That password doesn't match. Try again.");
+      return;
     }
+    await setOnboarded();
+    navigation.replace('Main');
+  }
+
+  async function handleForgotPassword() {
+    if (!email) { setError('Enter your email above first'); return; }
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email);
+    if (resetError) { setError(resetError.message); return; }
+    setResetSent(true);
+    Alert.alert('Check your email', 'We sent a password reset link.');
+  }
+
+  async function handleApple() {
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'apple' });
+    if (error) Alert.alert('Apple sign-in failed', error.message);
+  }
+
+  async function handleGoogle() {
+    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+    if (error) Alert.alert('Google sign-in failed', error.message);
   }
 
   return (
@@ -38,8 +57,8 @@ export default function LoginScreen({ navigation }: Props) {
       <Text style={styles.sub}>Pick up right where you left the pot.</Text>
 
       <View style={styles.socials}>
-        <Button label="Continue with Apple" variant="outline" onPress={() => {}} style={{ marginBottom: 0 }} />
-        <Button label="Continue with Google" variant="outline" onPress={() => {}} style={{ marginBottom: 0 }} />
+        <Button label="Continue with Apple" variant="outline" onPress={handleApple} style={{ marginBottom: 0 }} />
+        <Button label="Continue with Google" variant="outline" onPress={handleGoogle} style={{ marginBottom: 0 }} />
       </View>
 
       <View style={styles.divider}>
@@ -56,8 +75,8 @@ export default function LoginScreen({ navigation }: Props) {
       />
       {error ? <Text style={styles.errorTxt}>{error}</Text> : null}
 
-      <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')} style={styles.forgotRow}>
-        <Text style={styles.link}>Forgot password?</Text>
+      <TouchableOpacity onPress={handleForgotPassword} style={styles.forgotRow}>
+        <Text style={styles.link}>{resetSent ? 'Reset email sent ✓' : 'Forgot password?'}</Text>
       </TouchableOpacity>
 
       <Button label="Log In" onPress={handleLogin} loading={loading} />

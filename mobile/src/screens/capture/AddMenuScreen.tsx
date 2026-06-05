@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, TextInput,
-  Modal, ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView, Platform,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ActionSheetIOS,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, Recipe } from '../../types';
-import { Colors, Radius, Spacing } from '../../theme';
-import { importFromUrl } from '../../services/api';
+import { Colors, Radius } from '../../theme';
+import { importFromUrl, ocrImage } from '../../services/api';
 import { saveRecipe } from '../../store/storage';
 import { uid } from '../../utils/id';
 import BottomSheet from '../../components/BottomSheet';
@@ -26,6 +27,8 @@ export default function AddMenuScreen({ navigation }: Props) {
   const [url, setUrl] = useState('');
   const [importing, setImporting] = useState(false);
   const [importStep, setImportStep] = useState<string[]>([]);
+
+  // ── URL import ────────────────────────────────────────────────────────────
 
   async function handleImportUrl() {
     if (!url.trim()) return;
@@ -66,13 +69,90 @@ export default function AddMenuScreen({ navigation }: Props) {
     }
   }
 
+  // ── OCR / Photo import ────────────────────────────────────────────────────
+
+  async function launchOCR(useCamera: boolean) {
+    const permission = useCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert('Permission needed', 'Please allow access in Settings.');
+      return;
+    }
+
+    const result = useCamera
+      ? await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7, base64: true })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.7, base64: true });
+
+    if (result.canceled || !result.assets[0]) return;
+
+    const base64 = result.assets[0].base64;
+    if (!base64) { Alert.alert('Could not read image'); return; }
+
+    setImporting(true);
+    setImportStep(['Reading image…']);
+    try {
+      setImportStep(prev => [...prev, 'Extracting recipe text…']);
+      const data = await ocrImage(base64);
+      setImportStep(prev => [...prev, 'Building recipe…']);
+
+      const recipe: Recipe = {
+        id: uid(),
+        title: data.title ?? 'Scanned recipe',
+        description: data.description,
+        imageColor: 'cream',
+        servings: data.servings ?? 4,
+        prepMinutes: data.prepMinutes ?? 15,
+        cookMinutes: data.cookMinutes ?? 30,
+        ingredients: (data.ingredients ?? []).map(i => ({ ...i, id: uid(), checked: false })),
+        steps: (data.steps ?? []).map((s, idx) => ({ ...s, id: uid(), number: s.number ?? idx + 1 })),
+        tags: data.tags ?? [],
+        collections: [],
+        savedAt: Date.now(),
+        createdAt: Date.now(),
+      };
+
+      await saveRecipe(recipe);
+      setImporting(false);
+      Alert.alert('Scanned!', `"${recipe.title}" is in your library.`, [
+        { text: 'View & edit', onPress: () => navigation.navigate('RecipeEditor', { recipeId: recipe.id }) },
+        { text: 'Done', onPress: () => navigation.goBack() },
+      ]);
+    } catch (e: any) {
+      setImporting(false);
+      Alert.alert('Scan failed', 'Could not read that photo. Try a clearer image.');
+    }
+  }
+
+  function handleOCRTap() {
+    setSheetVisible(false);
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ['Cancel', 'Take Photo', 'Choose from Library'], cancelButtonIndex: 0 },
+        idx => {
+          if (idx === 0) { setSheetVisible(true); return; }
+          launchOCR(idx === 1);
+        }
+      );
+    } else {
+      Alert.alert('Scan recipe', undefined, [
+        { text: 'Take Photo', onPress: () => launchOCR(true) },
+        { text: 'Choose from Library', onPress: () => launchOCR(false) },
+        { text: 'Cancel', style: 'cancel', onPress: () => setSheetVisible(true) },
+      ]);
+    }
+  }
+
   function handleMenuItem(key: string) {
     setSheetVisible(false);
     if (key === 'url') { setUrlMode(true); }
     else if (key === 'ai') { (navigation as any).navigate('AIGenerator'); }
     else if (key === 'manual') { (navigation as any).navigate('RecipeEditor'); }
-    else { Alert.alert('Coming soon', 'Photo scanning will be added in the next update.'); }
+    else if (key === 'ocr') { handleOCRTap(); }
   }
+
+  // ── Loading state ─────────────────────────────────────────────────────────
 
   if (importing) {
     return (
@@ -92,6 +172,8 @@ export default function AddMenuScreen({ navigation }: Props) {
       </View>
     );
   }
+
+  // ── URL input mode ────────────────────────────────────────────────────────
 
   if (urlMode) {
     return (
@@ -123,6 +205,8 @@ export default function AddMenuScreen({ navigation }: Props) {
       </KeyboardAvoidingView>
     );
   }
+
+  // ── Main sheet ────────────────────────────────────────────────────────────
 
   return (
     <View style={styles.container}>

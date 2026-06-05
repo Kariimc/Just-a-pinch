@@ -111,6 +111,7 @@ export type RootStackParamList = {
   RecipeEditor: { recipeId?: string };
   ImportReview: { data: Partial<Recipe> };
   AIGenerator: undefined;
+  Search: undefined;
   CollectionDetail: { collectionId: string };
   AddToMealPlan: { recipeId: string };
   Settings: undefined;

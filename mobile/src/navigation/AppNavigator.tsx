@@ -5,6 +5,7 @@ import { createNativeStackNavigator, NativeStackNavigationProp } from '@react-na
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { RootStackParamList } from '../types';
 import { Colors, Radius } from '../theme';
+import { AuthProvider } from '../context/AuthContext';
 
 // Auth
 import SplashScreen from '../screens/auth/SplashScreen';
@@ -25,6 +26,7 @@ import CookingModeScreen from '../screens/recipe/CookingModeScreen';
 import RecipeEditorScreen from '../screens/capture/RecipeEditorScreen';
 import AddMenuScreen from '../screens/capture/AddMenuScreen';
 import AIGeneratorScreen from '../screens/capture/AIGeneratorScreen';
+import SearchScreen from '../screens/SearchScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -72,25 +74,34 @@ function TabBar() {
   );
 }
 
+function Navigator() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Onboarding" component={SplashScreen} />
+      <Stack.Screen name="Welcome" component={WelcomeScreen} />
+      <Stack.Screen name="SignUp" component={SignUpScreen} />
+      <Stack.Screen name="LogIn" component={LoginScreen} />
+      <Stack.Screen name="ForgotPassword" component={LoginScreen as any} />
+      <Stack.Screen name="PersonalizationQuiz" component={PersonalizationQuizScreen} />
+      <Stack.Screen name="Main" component={TabBar} />
+      <Stack.Screen name="RecipeDetail" component={RecipeDetailScreen} />
+      <Stack.Screen name="CookingMode" component={CookingModeScreen} />
+      <Stack.Screen name="RecipeEditor" component={RecipeEditorScreen} />
+      <Stack.Screen name="AIGenerator" component={AIGeneratorScreen} />
+      <Stack.Screen name="Search" component={SearchScreen} options={{ animation: 'fade_from_bottom' }} />
+      <Stack.Screen name="AddToMealPlan" component={MealPlanScreen} />
+      <Stack.Screen name="Profile" component={HomeScreen} />
+    </Stack.Navigator>
+  );
+}
+
 export default function AppNavigator() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Onboarding" component={SplashScreen} />
-        <Stack.Screen name="Welcome" component={WelcomeScreen} />
-        <Stack.Screen name="SignUp" component={SignUpScreen} />
-        <Stack.Screen name="LogIn" component={LoginScreen} />
-        <Stack.Screen name="ForgotPassword" component={LoginScreen as any} />
-        <Stack.Screen name="PersonalizationQuiz" component={PersonalizationQuizScreen} />
-        <Stack.Screen name="Main" component={TabBar} />
-        <Stack.Screen name="RecipeDetail" component={RecipeDetailScreen} />
-        <Stack.Screen name="CookingMode" component={CookingModeScreen} />
-        <Stack.Screen name="RecipeEditor" component={RecipeEditorScreen} />
-        <Stack.Screen name="AIGenerator" component={AIGeneratorScreen} />
-        <Stack.Screen name="AddToMealPlan" component={MealPlanScreen} />
-        <Stack.Screen name="Profile" component={HomeScreen} />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <AuthProvider>
+      <NavigationContainer>
+        <Navigator />
+      </NavigationContainer>
+    </AuthProvider>
   );
 }
 

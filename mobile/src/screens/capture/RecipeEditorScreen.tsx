@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, KeyboardAvoidingView, Platform,
+  Alert, KeyboardAvoidingView, Platform, Image, ActionSheetIOS,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, Recipe, Ingredient, Step } from '../../types';
-import { Colors, Radius, Spacing } from '../../theme';
+import { Colors, Radius } from '../../theme';
 import { saveRecipe, getRecipe } from '../../store/storage';
+import { uploadRecipeImage } from '../../lib/db';
 import { uid } from '../../utils/id';
 import Button from '../../components/Button';
+import FoodPlaceholder from '../../components/FoodPlaceholder';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RecipeEditor'>;
 
@@ -19,6 +22,8 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
   const [servings, setServings] = useState(4);
   const [prepMin, setPrepMin] = useState(15);
   const [cookMin, setCookMin] = useState(30);
+  const [imageUri, setImageUri] = useState<string | undefined>();
+  const [imageColor, setImageColor] = useState('toast');
   const [ingredients, setIngredients] = useState<Ingredient[]>([
     { id: uid(), quantity: '', unit: '', name: '' },
   ]);
@@ -36,12 +41,48 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
           setServings(r.servings);
           setPrepMin(r.prepMinutes);
           setCookMin(r.cookMinutes);
+          setImageUri(r.imageUri);
+          setImageColor(r.imageColor ?? 'toast');
           setIngredients(r.ingredients.length ? r.ingredients : [{ id: uid(), quantity: '', unit: '', name: '' }]);
           setSteps(r.steps.length ? r.steps : [{ id: uid(), number: 1, text: '' }]);
         }
       });
     }
   }, [editId]);
+
+  async function pickImage(useCamera: boolean) {
+    const permission = useCamera
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      Alert.alert('Permission needed', 'Please allow access in Settings.');
+      return;
+    }
+
+    const result = useCamera
+      ? await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [4, 3], quality: 0.8 })
+      : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [4, 3], quality: 0.8 });
+
+    if (!result.canceled && result.assets[0]) {
+      setImageUri(result.assets[0].uri);
+    }
+  }
+
+  function handleCoverPhotoTap() {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ['Cancel', 'Take Photo', 'Choose from Library'], cancelButtonIndex: 0 },
+        idx => { if (idx === 1) pickImage(true); else if (idx === 2) pickImage(false); }
+      );
+    } else {
+      Alert.alert('Add cover photo', undefined, [
+        { text: 'Take Photo', onPress: () => pickImage(true) },
+        { text: 'Choose from Library', onPress: () => pickImage(false) },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+    }
+  }
 
   function addIngredient() {
     setIngredients(prev => [...prev, { id: uid(), quantity: '', unit: '', name: '' }]);
@@ -70,11 +111,20 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
   async function handleSave() {
     if (!title.trim()) { Alert.alert('Please add a recipe title'); return; }
     setSaving(true);
+
+    const recipeId = editId ?? uid();
+    let finalImageUri = imageUri;
+
+    if (imageUri && imageUri.startsWith('file://')) {
+      finalImageUri = await uploadRecipeImage(imageUri, recipeId);
+    }
+
     const recipe: Recipe = {
-      id: editId ?? uid(),
+      id: recipeId,
       title: title.trim(),
       description: description.trim() || undefined,
-      imageColor: 'toast',
+      imageUri: finalImageUri,
+      imageColor: finalImageUri ? undefined : imageColor,
       servings,
       prepMinutes: prepMin,
       cookMinutes: cookMin,
@@ -104,11 +154,25 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
           </TouchableOpacity>
         </View>
 
-        {/* Cover photo placeholder */}
-        <View style={styles.coverPlaceholder}>
-          <Text style={{ fontSize: 26 }}>📷</Text>
-          <Text style={styles.coverTxt}>Add cover photo</Text>
-        </View>
+        {/* Cover photo */}
+        <TouchableOpacity style={styles.coverPlaceholder} onPress={handleCoverPhotoTap} activeOpacity={0.8}>
+          {imageUri ? (
+            <>
+              <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              <View style={styles.coverOverlay}>
+                <Text style={styles.coverEditTxt}>📷  Change photo</Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <FoodPlaceholder variant={imageColor as any} style={StyleSheet.absoluteFill} />
+              <View style={styles.coverOverlay}>
+                <Text style={{ fontSize: 26 }}>📷</Text>
+                <Text style={styles.coverTxt}>Add cover photo</Text>
+              </View>
+            </>
+          )}
+        </TouchableOpacity>
 
         <TextInput style={styles.titleInput} placeholder="Recipe title" value={title} onChangeText={setTitle} />
         <TextInput style={styles.descInput} placeholder="A short note about this recipe…" value={description} onChangeText={setDescription} multiline numberOfLines={3} />
@@ -124,7 +188,7 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
         <View style={styles.sectionHeader}>
           <Text style={styles.secTitle}>Ingredients</Text>
         </View>
-        {ingredients.map((ing, idx) => (
+        {ingredients.map((ing) => (
           <View key={ing.id} style={styles.ingredientRow}>
             <TextInput style={[styles.ingrInput, { width: 50 }]} placeholder="Qty" value={ing.quantity} onChangeText={v => updateIngredient(ing.id, 'quantity', v)} />
             <TextInput style={[styles.ingrInput, { width: 60 }]} placeholder="Unit" value={ing.unit} onChangeText={v => updateIngredient(ing.id, 'unit', v)} />
@@ -140,7 +204,7 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
 
         {/* Steps */}
         <Text style={styles.secTitle}>Steps</Text>
-        {steps.map((step, idx) => (
+        {steps.map((step) => (
           <View key={step.id} style={styles.stepRow}>
             <View style={styles.stepNum}><Text style={styles.stepNumTxt}>{step.number}</Text></View>
             <TextInput
@@ -187,8 +251,10 @@ const styles = StyleSheet.create({
   cancelTxt: { fontSize: 15, fontWeight: '600', color: Colors.ink3 },
   appbarTitle: { fontSize: 16, fontWeight: '700', color: Colors.ink },
   saveTxt: { fontSize: 15, fontWeight: '700', color: Colors.accentDeep },
-  coverPlaceholder: { height: 120, backgroundColor: Colors.surface2, borderRadius: Radius.lg, borderWidth: 1.5, borderColor: Colors.line2, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  coverTxt: { fontWeight: '600', fontSize: 13.5, color: Colors.ink2 },
+  coverPlaceholder: { height: 160, backgroundColor: Colors.surface2, borderRadius: Radius.lg, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+  coverOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.18)', gap: 6 },
+  coverTxt: { fontWeight: '600', fontSize: 13.5, color: '#fff' },
+  coverEditTxt: { fontWeight: '600', fontSize: 13.5, color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   titleInput: { marginTop: 14, height: 56, backgroundColor: Colors.surface2, borderRadius: Radius.md, paddingHorizontal: 16, fontSize: 19, color: Colors.ink, fontWeight: '600' },
   descInput: { marginTop: 11, minHeight: 64, backgroundColor: Colors.surface2, borderRadius: Radius.md, paddingHorizontal: 16, paddingVertical: 13, fontSize: 15, color: Colors.ink },
   statsRow: { flexDirection: 'row', gap: 9, marginTop: 13 },

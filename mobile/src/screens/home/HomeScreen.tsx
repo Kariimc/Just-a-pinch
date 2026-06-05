@@ -60,7 +60,7 @@ export default function HomeScreen() {
       </View>
 
       {/* Search bar */}
-      <TouchableOpacity style={styles.searchBar} onPress={() => (navigation as any).navigate('RecipeEditor')}>
+      <TouchableOpacity style={styles.searchBar} onPress={() => navigation.navigate('Search')}>
         <Text style={styles.searchTxt}>🔍  Search recipes & ingredients</Text>
       </TouchableOpacity>
 
