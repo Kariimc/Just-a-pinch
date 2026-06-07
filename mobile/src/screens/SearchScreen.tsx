@@ -6,10 +6,11 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, Recipe } from '../types';
-import { Colors, Radius, Spacing } from '../theme';
+import { Colors, Radius, Fonts } from '../theme';
 import { getRecipes } from '../store/storage';
 import RecipeCard from '../components/RecipeCard';
 import Chip from '../components/Chip';
+import Icon from '../components/Icon';
 
 const TAG_FILTERS = ['All', 'Dinner', 'Breakfast', 'Lunch', 'Quick', 'Vegetarian', 'Baking'];
 
@@ -59,7 +60,7 @@ export default function SearchScreen() {
       {/* Search bar */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backTxt}>←</Text>
+          <Icon name="back" size={20} color={Colors.ink} />
         </TouchableOpacity>
         <TextInput
           style={styles.input}
@@ -73,7 +74,7 @@ export default function SearchScreen() {
         />
         {query.length > 0 && (
           <TouchableOpacity onPress={() => setQuery('')} style={styles.clearBtn}>
-            <Text style={styles.clearTxt}>✕</Text>
+            <Icon name="x" size={18} color={Colors.ink3} />
           </TouchableOpacity>
         )}
       </View>
@@ -95,7 +96,7 @@ export default function SearchScreen() {
       {/* Results */}
       {query.length === 0 && tagFilter === 'All' ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🔍</Text>
+          <Icon name="search" size={48} color={Colors.line2} />
           <Text style={styles.emptyTitle}>Search your recipes</Text>
           <Text style={styles.emptySub}>
             {allRecipes.length > 0
@@ -105,7 +106,7 @@ export default function SearchScreen() {
         </View>
       ) : results.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🍽</Text>
+          <Icon name="plate" size={48} color={Colors.line2} />
           <Text style={styles.emptyTitle}>No matches</Text>
           <Text style={styles.emptySub}>Try a different search or import a new recipe.</Text>
         </View>
@@ -148,23 +149,16 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.line,
   },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  backTxt: { fontSize: 22, color: Colors.ink },
   input: {
-    flex: 1,
-    height: 44,
-    backgroundColor: Colors.surface2,
-    borderRadius: Radius.pill,
-    paddingHorizontal: 16,
-    fontSize: 15.5,
-    color: Colors.ink,
+    flex: 1, height: 44,
+    backgroundColor: Colors.surface2, borderRadius: Radius.pill,
+    paddingHorizontal: 16, fontFamily: Fonts.uiRegular, fontSize: 15.5, color: Colors.ink,
   },
   clearBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  clearTxt: { fontSize: 15, color: Colors.ink3 },
   filterRow: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.line },
   listContent: { paddingHorizontal: 18, paddingBottom: 100 },
-  resultCount: { fontSize: 12.5, color: Colors.ink3, fontWeight: '600', marginTop: 12, marginBottom: 8 },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 22, fontWeight: '600', color: Colors.ink },
-  emptySub: { fontSize: 14, color: Colors.ink2, marginTop: 8, textAlign: 'center', paddingHorizontal: 40 },
+  resultCount: { fontFamily: Fonts.uiSemiBold, fontSize: 12.5, color: Colors.ink3, marginTop: 12, marginBottom: 8 },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80, gap: 16 },
+  emptyTitle: { fontFamily: Fonts.displayMedium, fontSize: 22, color: Colors.ink },
+  emptySub: { fontFamily: Fonts.uiRegular, fontSize: 14, color: Colors.ink2, textAlign: 'center', paddingHorizontal: 40 },
 });

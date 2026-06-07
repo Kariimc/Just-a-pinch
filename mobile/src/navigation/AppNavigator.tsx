@@ -4,8 +4,9 @@ import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { RootStackParamList } from '../types';
-import { Colors, Radius } from '../theme';
+import { Colors, Radius, Fonts } from '../theme';
 import { AuthProvider } from '../context/AuthContext';
+import Icon from '../components/Icon';
 
 // Auth
 import SplashScreen from '../screens/auth/SplashScreen';
@@ -45,18 +46,36 @@ function TabBar() {
         tabBarStyle: styles.tabbar,
         tabBarActiveTintColor: Colors.accentDeep,
         tabBarInactiveTintColor: Colors.ink3,
-        tabBarLabelStyle: { fontSize: 10.5, fontWeight: '600', marginTop: 0 },
+        tabBarLabelStyle: {
+          fontSize: 10.5,
+          fontFamily: Fonts.uiSemiBold,
+          marginTop: 1,
+        },
       }}
     >
-      <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarIcon: ({ color }: { color: string }) => <Text style={[styles.tabIcon, { color }]}>🏠</Text>, title: 'Home' }} />
-      <Tab.Screen name="Recipes" component={LibraryScreen} options={{ tabBarIcon: ({ color }: { color: string }) => <Text style={[styles.tabIcon, { color }]}>📚</Text>, title: 'Recipes' }} />
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color }) => <Icon name="home" size={24} color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="Recipes"
+        component={LibraryScreen}
+        options={{
+          title: 'Recipes',
+          tabBarIcon: ({ color }) => <Icon name="book" size={24} color={color} />,
+        }}
+      />
       <Tab.Screen
         name="Add"
         component={AddPlaceholder}
         options={{
           tabBarIcon: () => (
             <View style={styles.plusBtn}>
-              <Text style={{ color: '#fff', fontSize: 24, lineHeight: 28 }}>+</Text>
+              <Icon name="plus" size={26} color="#fff" />
             </View>
           ),
           tabBarLabel: () => null,
@@ -64,12 +83,26 @@ function TabBar() {
         listeners={{
           tabPress: (e) => {
             e.preventDefault();
-            (navigation as any).navigate('RecipeEditor');
+            (navigation as any).navigate('AddMenu');
           },
         }}
       />
-      <Tab.Screen name="Plan" component={MealPlanScreen} options={{ tabBarIcon: ({ color }: { color: string }) => <Text style={[styles.tabIcon, { color }]}>📅</Text>, title: 'Plan' }} />
-      <Tab.Screen name="Shopping" component={ShoppingScreen} options={{ tabBarIcon: ({ color }: { color: string }) => <Text style={[styles.tabIcon, { color }]}>🛒</Text>, title: 'List' }} />
+      <Tab.Screen
+        name="Plan"
+        component={MealPlanScreen}
+        options={{
+          title: 'Plan',
+          tabBarIcon: ({ color }) => <Icon name="calendar" size={24} color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="Shopping"
+        component={ShoppingScreen}
+        options={{
+          title: 'List',
+          tabBarIcon: ({ color }) => <Icon name="cart" size={24} color={color} />,
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -87,6 +120,7 @@ function Navigator() {
       <Stack.Screen name="RecipeDetail" component={RecipeDetailScreen} />
       <Stack.Screen name="CookingMode" component={CookingModeScreen} />
       <Stack.Screen name="RecipeEditor" component={RecipeEditorScreen} />
+      <Stack.Screen name="AddMenu" component={AddMenuScreen} options={{ presentation: 'modal' }} />
       <Stack.Screen name="AIGenerator" component={AIGeneratorScreen} />
       <Stack.Screen name="Search" component={SearchScreen} options={{ animation: 'fade_from_bottom' }} />
       <Stack.Screen name="AddToMealPlan" component={MealPlanScreen} />
@@ -107,14 +141,13 @@ export default function AppNavigator() {
 
 const styles = StyleSheet.create({
   tabbar: {
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: 'rgba(255,255,255,0.92)',
     borderTopWidth: 1,
     borderTopColor: Colors.line,
     height: 72,
     paddingBottom: 8,
     paddingTop: 9,
   },
-  tabIcon: { fontSize: 20 },
   plusBtn: {
     width: 50,
     height: 40,

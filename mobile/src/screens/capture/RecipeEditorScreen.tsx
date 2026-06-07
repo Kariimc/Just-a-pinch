@@ -165,7 +165,7 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
             </>
           ) : (
             <>
-              <FoodPlaceholder variant={imageColor as any} style={StyleSheet.absoluteFill} />
+              <FoodPlaceholder variant={imageColor as any} style={StyleSheet.absoluteFillObject} />
               <View style={styles.coverOverlay}>
                 <Text style={{ fontSize: 26 }}>📷</Text>
                 <Text style={styles.coverTxt}>Add cover photo</Text>

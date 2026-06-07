@@ -31,9 +31,17 @@ export const Colors = {
   transparent: 'transparent',
 };
 
+// Font family names as loaded by expo-font
 export const Fonts = {
-  display: 'serif', // replaced by loaded font in app
-  ui: 'System',
+  displayRegular: 'Newsreader_400Regular',
+  displayRegularItalic: 'Newsreader_400Regular_Italic',
+  displayMedium: 'Newsreader_500Medium',
+  displayMediumItalic: 'Newsreader_500Medium_Italic',
+  displaySemiBold: 'Newsreader_600SemiBold',
+  uiRegular: 'HankenGrotesk_400Regular',
+  uiMedium: 'HankenGrotesk_500Medium',
+  uiSemiBold: 'HankenGrotesk_600SemiBold',
+  uiBold: 'HankenGrotesk_700Bold',
 };
 
 export const Radius = {
@@ -60,6 +68,20 @@ export const Shadow = {
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 3,
+  },
+  cardSoft: {
+    shadowColor: '#14100A',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 5,
+  },
+  fab: {
+    shadowColor: '#2E9E57',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.45,
+    shadowRadius: 14,
+    elevation: 8,
   },
 };
 

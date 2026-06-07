@@ -4,7 +4,8 @@ import {
   Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Colors, Radius } from '../../theme';
+import { Colors, Radius, Fonts } from '../../theme';
+import Icon from '../../components/Icon';
 import { getShoppingItems, saveShoppingItems, toggleShoppingItem } from '../../store/storage';
 import { ShoppingItem } from '../../types';
 import { uid } from '../../utils/id';
@@ -66,7 +67,7 @@ export default function ShoppingScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Shopping</Text>
           <TouchableOpacity style={styles.iconBtn} onPress={clearChecked}>
-            <Text style={styles.iconTxt}>✓ Clear</Text>
+            <Text style={styles.clearTxt}>Clear done</Text>
           </TouchableOpacity>
         </View>
 
@@ -93,15 +94,15 @@ export default function ShoppingScreen() {
                 {catItems.map(item => (
                   <TouchableOpacity key={item.id} style={styles.itemRow} onPress={() => toggle(item.id)}>
                     <View style={[styles.check, item.checked && styles.checkOn]}>
-                      {item.checked && <Text style={{ color: '#fff', fontSize: 11 }}>✓</Text>}
+                      {item.checked && <Icon name="check" size={15} color="#fff" />}
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.itemTxt, item.checked && styles.itemDone]}>
-                        <Text style={{ fontWeight: '700' }}>{item.quantity} {item.unit}</Text> {item.name}
+                        <Text style={styles.itemQty}>{item.quantity} {item.unit}</Text>{'  '}{item.name}
                       </Text>
                     </View>
                     {item.checked && (
-                      <View style={styles.haveBadge}><Text style={styles.haveTxt}>✓</Text></View>
+                      <View style={styles.haveBadge}><Text style={styles.haveTxt}>In cart</Text></View>
                     )}
                   </TouchableOpacity>
                 ))}
@@ -121,7 +122,7 @@ export default function ShoppingScreen() {
             onSubmitEditing={addManual}
           />
           <TouchableOpacity style={styles.micBtn} onPress={addManual}>
-            <Text style={{ fontSize: 18, color: '#fff' }}>+</Text>
+            <Icon name="plus" size={22} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -131,27 +132,28 @@ export default function ShoppingScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.paper, paddingHorizontal: 22, paddingTop: 14 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  title: { fontSize: 28, fontWeight: '600', color: Colors.ink, letterSpacing: -0.3 },
-  iconBtn: { paddingHorizontal: 12, height: 36, borderRadius: Radius.pill, backgroundColor: Colors.surface2, alignItems: 'center', justifyContent: 'center' },
-  iconTxt: { fontSize: 13, fontWeight: '700', color: Colors.ink2 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
+  title: { fontFamily: Fonts.displayMedium, fontSize: 30, letterSpacing: -0.3, color: Colors.ink },
+  iconBtn: { paddingHorizontal: 14, height: 36, borderRadius: Radius.pill, backgroundColor: Colors.surface2, alignItems: 'center', justifyContent: 'center' },
+  clearTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 13, color: Colors.ink2 },
   progressRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 6 },
   progressTrack: { flex: 1, height: 6, borderRadius: 99, backgroundColor: Colors.surface2, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: Colors.accent, borderRadius: 99 },
-  progressTxt: { fontSize: 12.5, fontWeight: '700', color: Colors.ink2, whiteSpace: 'nowrap' } as any,
+  progressTxt: { fontFamily: Fonts.uiBold, fontSize: 12.5, color: Colors.ink2 },
   content: { paddingBottom: 120 },
-  catLabel: { fontSize: 16, fontWeight: '700', color: Colors.ink, marginTop: 18, marginBottom: 4 },
+  catLabel: { fontFamily: Fonts.uiBold, fontSize: 16, color: Colors.ink, marginTop: 18, marginBottom: 4 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: Colors.line },
   check: { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: Colors.line2, alignItems: 'center', justifyContent: 'center' },
   checkOn: { backgroundColor: Colors.accent, borderColor: Colors.accent },
-  itemTxt: { fontSize: 15, color: Colors.ink },
+  itemTxt: { fontFamily: Fonts.uiRegular, fontSize: 15.5, color: Colors.ink, lineHeight: 21 },
+  itemQty: { fontFamily: Fonts.uiBold },
   itemDone: { color: Colors.ink3, textDecorationLine: 'line-through' },
-  haveBadge: { backgroundColor: Colors.accentSoft, paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.pill },
-  haveTxt: { fontSize: 10.5, fontWeight: '700', color: Colors.accentInk },
+  haveBadge: { backgroundColor: Colors.accentSoft, paddingHorizontal: 9, paddingVertical: 3, borderRadius: Radius.pill },
+  haveTxt: { fontFamily: Fonts.uiBold, fontSize: 10.5, color: Colors.accentInk },
   addBar: { borderTopWidth: 1, borderTopColor: Colors.line, paddingVertical: 11, flexDirection: 'row', gap: 10, alignItems: 'center', backgroundColor: Colors.paper },
-  addInput: { flex: 1, height: 46, backgroundColor: Colors.surface2, borderRadius: Radius.md, paddingHorizontal: 16, fontSize: 15, color: Colors.ink },
+  addInput: { flex: 1, height: 46, backgroundColor: Colors.surface2, borderRadius: Radius.md, paddingHorizontal: 16, fontFamily: Fonts.uiRegular, fontSize: 15, color: Colors.ink },
   micBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
   empty: { alignItems: 'center', paddingTop: 60 },
-  emptyTitle: { fontSize: 22, fontWeight: '600', color: Colors.ink },
-  emptySub: { fontSize: 14, color: Colors.ink2, marginTop: 8 },
+  emptyTitle: { fontFamily: Fonts.displayMedium, fontSize: 22, color: Colors.ink },
+  emptySub: { fontFamily: Fonts.uiRegular, fontSize: 14, color: Colors.ink2, marginTop: 8 },
 });
