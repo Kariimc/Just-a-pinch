@@ -21,7 +21,8 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "baseUrl": "/just-a-pinch"
     },
     "extra": {
       "apiUrl": "http://YOUR_MACHINE_IP:3001",
