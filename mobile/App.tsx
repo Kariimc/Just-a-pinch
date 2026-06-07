@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, Platform } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -39,7 +39,8 @@ export default function App() {
     }
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
+  // On web the splash overlay blocks everything; render immediately and let fonts swap in
+  if (!fontsLoaded && !fontError && Platform.OS !== 'web') return null;
 
   return (
     <>
