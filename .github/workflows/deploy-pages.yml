@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main, claude/backend-setup-next-MyNnx]
+    branches: [main, claude/backend-setup-next-MyNnx, claude/adoring-ptolemy-dP4sY]
     paths:
       - 'mobile/**'
   workflow_dispatch:

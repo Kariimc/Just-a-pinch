@@ -3,10 +3,11 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert } fr
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, MealPlanEntry, Recipe } from '../../types';
-import { Colors, Radius } from '../../theme';
+import { Colors, Radius, Fonts } from '../../theme';
 import { getMealPlan, getRecipes, deleteMealEntry } from '../../store/storage';
 import { dateKey, weekDays, dayLabel } from '../../utils/id';
 import FoodPlaceholder from '../../components/FoodPlaceholder';
+import Icon from '../../components/Icon';
 
 const MEAL_TYPES: MealPlanEntry['mealType'][] = ['breakfast', 'lunch', 'dinner'];
 
@@ -45,7 +46,7 @@ export default function MealPlanScreen() {
           <Text style={styles.title}>{today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {days[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.iconBtn}><Text style={styles.iconTxt}>🛒</Text></TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn}><Icon name="cart" size={20} color={Colors.ink} /></TouchableOpacity>
         </View>
       </View>
 
@@ -104,7 +105,7 @@ export default function MealPlanScreen() {
                     <Text style={styles.mealTitle} numberOfLines={1}>{recipe.title}</Text>
                     <Text style={styles.mealSub}>{recipe.prepMinutes + recipe.cookMinutes} min · serves {entry?.servings}</Text>
                   </View>
-                  <Text style={{ color: Colors.ink3, fontSize: 16 }}>⋮</Text>
+                  <Icon name="moreV" size={20} color={Colors.ink3} />
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity style={styles.emptySlot} onPress={() => navigation.navigate('AddToMealPlan', { recipeId: '' })}>
@@ -122,29 +123,28 @@ export default function MealPlanScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.paper, paddingHorizontal: 22, paddingTop: 14 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 },
-  subTxt: { fontSize: 13.5, color: Colors.ink2 },
-  title: { fontSize: 28, fontWeight: '600', color: Colors.ink, letterSpacing: -0.3 },
+  subTxt: { fontFamily: Fonts.uiRegular, fontSize: 13.5, color: Colors.ink2 },
+  title: { fontFamily: Fonts.displayMedium, fontSize: 30, letterSpacing: -0.3, color: Colors.ink },
   headerActions: { flexDirection: 'row', gap: 9 },
   iconBtn: { width: 44, height: 44, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.line, alignItems: 'center', justifyContent: 'center' },
-  iconTxt: { fontSize: 18 },
   dayStrip: { marginBottom: 18 },
   dayPill: { width: 46, height: 68, borderRadius: Radius.md, backgroundColor: Colors.surface2, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   dayPillToday: { backgroundColor: Colors.accent },
   dayPillSelected: { backgroundColor: Colors.accentSoft, borderWidth: 1, borderColor: Colors.accentDeep },
-  dayLabel: { fontSize: 11, fontWeight: '700', color: Colors.ink2 },
-  dayNum: { fontSize: 19, fontWeight: '600', color: Colors.ink },
+  dayLabel: { fontFamily: Fonts.uiBold, fontSize: 11, color: Colors.ink2 },
+  dayNum: { fontFamily: Fonts.uiSemiBold, fontSize: 19, color: Colors.ink },
   dayLabelLight: { color: '#fff' },
   dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: Colors.accent, marginTop: 2 },
   dotWhite: { backgroundColor: '#fff' },
   content: { paddingBottom: 100 },
   dayHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 16 },
-  dayTitle: { fontSize: 19, fontWeight: '700', color: Colors.ink },
-  autoFill: { fontSize: 12.5, fontWeight: '700', color: Colors.accentDeep },
-  mealLabel: { fontSize: 11.5, fontWeight: '700', letterSpacing: 0.04, color: Colors.ink3, marginTop: 16, marginBottom: 7 },
+  dayTitle: { fontFamily: Fonts.uiBold, fontSize: 19, color: Colors.ink },
+  autoFill: { fontFamily: Fonts.uiBold, fontSize: 12.5, color: Colors.accentDeep },
+  mealLabel: { fontFamily: Fonts.uiBold, fontSize: 11.5, letterSpacing: 0.04, color: Colors.ink3, marginTop: 16, marginBottom: 7 },
   mealCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 11, backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.line },
   mealThumb: { width: 50, height: 50, borderRadius: Radius.sm },
-  mealTitle: { fontWeight: '600', fontSize: 14.5, color: Colors.ink },
-  mealSub: { fontSize: 12.5, color: Colors.ink3, marginTop: 1 },
+  mealTitle: { fontFamily: Fonts.uiSemiBold, fontSize: 14.5, color: Colors.ink },
+  mealSub: { fontFamily: Fonts.uiRegular, fontSize: 12.5, color: Colors.ink3, marginTop: 1 },
   emptySlot: { height: 56, borderWidth: 1.5, borderColor: Colors.line2, borderStyle: 'dashed', borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center' },
-  emptySlotTxt: { fontSize: 13.5, fontWeight: '600', color: Colors.ink3 },
+  emptySlotTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 13.5, color: Colors.ink3 },
 });

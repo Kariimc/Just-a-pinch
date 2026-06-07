@@ -6,19 +6,20 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, Recipe } from '../../types';
-import { Colors, Radius } from '../../theme';
+import { Colors, Radius, Fonts } from '../../theme';
 import { importFromUrl, ocrImage } from '../../services/api';
 import { saveRecipe } from '../../store/storage';
 import { uid } from '../../utils/id';
 import BottomSheet from '../../components/BottomSheet';
+import Icon, { IconName } from '../../components/Icon';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'RecipeEditor'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'AddMenu'>;
 
-const MENU_ITEMS = [
-  { icon: '🔗', title: 'Import from link', sub: 'Paste any recipe URL', key: 'url' },
-  { icon: '📷', title: 'Scan a photo or card', sub: 'Camera or photo library · OCR', key: 'ocr' },
-  { icon: '✏️', title: 'Create manually', sub: 'Type it in yourself', key: 'manual' },
-  { icon: '✨', title: 'Generate with AI', sub: 'Describe it, we\'ll write it', key: 'ai' },
+const MENU_ITEMS: { icon: IconName; title: string; sub: string; key: string; ai?: boolean }[] = [
+  { icon: 'link',    title: 'Import from link',   sub: 'Paste any recipe URL',           key: 'url' },
+  { icon: 'camera',  title: 'Scan a photo or card', sub: 'Camera or photo library · OCR', key: 'ocr' },
+  { icon: 'pencil',  title: 'Create manually',     sub: 'Type it in yourself',            key: 'manual' },
+  { icon: 'sparkle', title: 'Generate with AI',    sub: "Describe it, we'll write it",    key: 'ai', ai: true },
 ];
 
 export default function AddMenuScreen({ navigation }: Props) {
@@ -28,8 +29,6 @@ export default function AddMenuScreen({ navigation }: Props) {
   const [importing, setImporting] = useState(false);
   const [importStep, setImportStep] = useState<string[]>([]);
 
-  // ── URL import ────────────────────────────────────────────────────────────
-
   async function handleImportUrl() {
     if (!url.trim()) return;
     setImporting(true);
@@ -38,25 +37,15 @@ export default function AddMenuScreen({ navigation }: Props) {
       setImportStep(prev => [...prev, 'Parsing ingredients…']);
       const data = await importFromUrl(url.trim());
       setImportStep(prev => [...prev, 'Building recipe…']);
-
       const recipe: Recipe = {
-        id: uid(),
-        title: data.title,
-        description: data.description,
-        imageUri: data.imageUrl,
-        imageColor: 'tomato',
-        servings: data.servings,
-        prepMinutes: data.prepMinutes,
-        cookMinutes: data.cookMinutes,
+        id: uid(), title: data.title, description: data.description,
+        imageUri: data.imageUrl, imageColor: 'tomato',
+        servings: data.servings, prepMinutes: data.prepMinutes, cookMinutes: data.cookMinutes,
         ingredients: data.ingredients.map(i => ({ ...i, id: uid(), checked: false })),
         steps: data.steps.map(s => ({ ...s, id: uid() })),
-        tags: data.tags ?? [],
-        collections: [],
-        sourceUrl: data.sourceUrl,
-        savedAt: Date.now(),
-        createdAt: Date.now(),
+        tags: data.tags ?? [], collections: [], sourceUrl: data.sourceUrl,
+        savedAt: Date.now(), createdAt: Date.now(),
       };
-
       await saveRecipe(recipe);
       setImporting(false);
       Alert.alert('Saved!', `"${recipe.title}" is in your library.`, [
@@ -69,24 +58,17 @@ export default function AddMenuScreen({ navigation }: Props) {
     }
   }
 
-  // ── OCR / Photo import ────────────────────────────────────────────────────
-
   async function launchOCR(useCamera: boolean) {
-    const permission = useCamera
+    const perm = useCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (!permission.granted) {
-      Alert.alert('Permission needed', 'Please allow access in Settings.');
-      return;
-    }
+    if (!perm.granted) { Alert.alert('Permission needed', 'Please allow access in Settings.'); return; }
 
     const result = useCamera
       ? await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7, base64: true })
       : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.7, base64: true });
 
     if (result.canceled || !result.assets[0]) return;
-
     const base64 = result.assets[0].base64;
     if (!base64) { Alert.alert('Could not read image'); return; }
 
@@ -96,30 +78,22 @@ export default function AddMenuScreen({ navigation }: Props) {
       setImportStep(prev => [...prev, 'Extracting recipe text…']);
       const data = await ocrImage(base64);
       setImportStep(prev => [...prev, 'Building recipe…']);
-
       const recipe: Recipe = {
-        id: uid(),
-        title: data.title ?? 'Scanned recipe',
-        description: data.description,
-        imageColor: 'cream',
-        servings: data.servings ?? 4,
-        prepMinutes: data.prepMinutes ?? 15,
-        cookMinutes: data.cookMinutes ?? 30,
+        id: uid(), title: data.title ?? 'Scanned recipe', description: data.description,
+        imageColor: 'cream', servings: data.servings ?? 4,
+        prepMinutes: data.prepMinutes ?? 15, cookMinutes: data.cookMinutes ?? 30,
         ingredients: (data.ingredients ?? []).map(i => ({ ...i, id: uid(), checked: false })),
         steps: (data.steps ?? []).map((s, idx) => ({ ...s, id: uid(), number: s.number ?? idx + 1 })),
-        tags: data.tags ?? [],
-        collections: [],
-        savedAt: Date.now(),
-        createdAt: Date.now(),
+        tags: data.tags ?? [], collections: [],
+        savedAt: Date.now(), createdAt: Date.now(),
       };
-
       await saveRecipe(recipe);
       setImporting(false);
       Alert.alert('Scanned!', `"${recipe.title}" is in your library.`, [
         { text: 'View & edit', onPress: () => navigation.navigate('RecipeEditor', { recipeId: recipe.id }) },
         { text: 'Done', onPress: () => navigation.goBack() },
       ]);
-    } catch (e: any) {
+    } catch {
       setImporting(false);
       Alert.alert('Scan failed', 'Could not read that photo. Try a clearer image.');
     }
@@ -130,10 +104,7 @@ export default function AddMenuScreen({ navigation }: Props) {
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         { options: ['Cancel', 'Take Photo', 'Choose from Library'], cancelButtonIndex: 0 },
-        idx => {
-          if (idx === 0) { setSheetVisible(true); return; }
-          launchOCR(idx === 1);
-        }
+        idx => { if (idx === 0) { setSheetVisible(true); return; } launchOCR(idx === 1); }
       );
     } else {
       Alert.alert('Scan recipe', undefined, [
@@ -146,14 +117,13 @@ export default function AddMenuScreen({ navigation }: Props) {
 
   function handleMenuItem(key: string) {
     setSheetVisible(false);
-    if (key === 'url') { setUrlMode(true); }
-    else if (key === 'ai') { (navigation as any).navigate('AIGenerator'); }
-    else if (key === 'manual') { (navigation as any).navigate('RecipeEditor'); }
-    else if (key === 'ocr') { handleOCRTap(); }
+    if (key === 'url') setUrlMode(true);
+    else if (key === 'ai') (navigation as any).navigate('AIGenerator');
+    else if (key === 'manual') (navigation as any).navigate('RecipeEditor');
+    else if (key === 'ocr') handleOCRTap();
   }
 
-  // ── Loading state ─────────────────────────────────────────────────────────
-
+  // Import progress
   if (importing) {
     return (
       <View style={styles.loadingContainer}>
@@ -164,7 +134,9 @@ export default function AddMenuScreen({ navigation }: Props) {
         <View style={{ marginTop: 22, gap: 11 }}>
           {importStep.map((s, i) => (
             <View key={i} style={styles.checkRow}>
-              <View style={styles.checkDone}><Text style={{ color: '#fff', fontSize: 11 }}>✓</Text></View>
+              <View style={styles.checkDone}>
+                <Icon name="check" size={13} color="#fff" />
+              </View>
               <Text style={styles.checkTxt}>{s}</Text>
             </View>
           ))}
@@ -173,20 +145,23 @@ export default function AddMenuScreen({ navigation }: Props) {
     );
   }
 
-  // ── URL input mode ────────────────────────────────────────────────────────
-
+  // URL input mode
   if (urlMode) {
     return (
       <KeyboardAvoidingView style={styles.urlContainer} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.urlHeader}>
-          <TouchableOpacity onPress={() => { setUrlMode(false); setSheetVisible(true); }}>
-            <Text style={styles.cancelTxt}>← Back</Text>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => { setUrlMode(false); setSheetVisible(true); }}
+          >
+            <Icon name="back" size={20} color={Colors.ink} />
           </TouchableOpacity>
           <Text style={styles.urlTitle}>Import from link</Text>
         </View>
         <TextInput
           style={styles.urlInput}
           placeholder="Paste a recipe URL…"
+          placeholderTextColor={Colors.ink3}
           value={url}
           onChangeText={setUrl}
           autoCapitalize="none"
@@ -206,22 +181,21 @@ export default function AddMenuScreen({ navigation }: Props) {
     );
   }
 
-  // ── Main sheet ────────────────────────────────────────────────────────────
-
+  // Main action sheet
   return (
     <View style={styles.container}>
       <BottomSheet visible={sheetVisible} onClose={() => navigation.goBack()}>
         <Text style={styles.sheetTitle}>Add a recipe</Text>
         {MENU_ITEMS.map(item => (
           <TouchableOpacity key={item.key} style={styles.menuRow} onPress={() => handleMenuItem(item.key)}>
-            <View style={[styles.menuIcon, item.key === 'ai' && styles.menuIconAI]}>
-              <Text style={styles.menuEmoji}>{item.icon}</Text>
+            <View style={[styles.menuIconWrap, item.ai && styles.menuIconWrapAI]}>
+              <Icon name={item.icon} size={22} color={item.ai ? '#fff' : Colors.ink2} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.menuTitle}>{item.title}</Text>
               <Text style={styles.menuSub}>{item.sub}</Text>
             </View>
-            <Text style={{ color: Colors.ink3, fontSize: 16 }}>›</Text>
+            <Icon name="fwd" size={20} color={Colors.ink3} />
           </TouchableOpacity>
         ))}
       </BottomSheet>
@@ -231,26 +205,42 @@ export default function AddMenuScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
-  sheetTitle: { fontSize: 19, fontWeight: '700', color: Colors.ink, marginBottom: 6 },
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.line },
-  menuIcon: { width: 44, height: 44, borderRadius: Radius.sm, backgroundColor: Colors.surface2, alignItems: 'center', justifyContent: 'center' },
-  menuIconAI: { backgroundColor: Colors.accent },
-  menuEmoji: { fontSize: 20 },
-  menuTitle: { fontWeight: '700', fontSize: 15, color: Colors.ink },
-  menuSub: { fontSize: 12.5, color: Colors.ink3, marginTop: 1 },
+  sheetTitle: { fontFamily: Fonts.uiBold, fontSize: 19, color: Colors.ink, marginBottom: 6 },
+  menuRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.line,
+  },
+  menuIconWrap: {
+    width: 44, height: 44, borderRadius: Radius.sm,
+    backgroundColor: Colors.surface2, alignItems: 'center', justifyContent: 'center',
+  },
+  menuIconWrapAI: { backgroundColor: Colors.accent },
+  menuTitle: { fontFamily: Fonts.uiBold, fontSize: 15, color: Colors.ink },
+  menuSub: { fontFamily: Fonts.uiRegular, fontSize: 12.5, color: Colors.ink3, marginTop: 1 },
+
+  // URL mode
   urlContainer: { flex: 1, backgroundColor: Colors.paper, padding: 22, paddingTop: 56 },
   urlHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 24 },
-  cancelTxt: { fontSize: 16, color: Colors.ink2 },
-  urlTitle: { fontSize: 19, fontWeight: '700', color: Colors.ink },
-  urlInput: { height: 52, backgroundColor: Colors.surface2, borderRadius: Radius.md, paddingHorizontal: 16, fontSize: 16, color: Colors.ink },
+  iconBtn: {
+    width: 44, height: 44, borderRadius: Radius.pill,
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.line,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  urlTitle: { fontFamily: Fonts.uiBold, fontSize: 19, color: Colors.ink },
+  urlInput: {
+    height: 52, backgroundColor: Colors.surface2, borderRadius: Radius.md,
+    paddingHorizontal: 16, fontFamily: Fonts.uiRegular, fontSize: 16, color: Colors.ink,
+  },
   importBtn: { marginTop: 16, height: 54, backgroundColor: Colors.accent, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
   importBtnDisabled: { opacity: 0.5 },
-  importBtnTxt: { fontWeight: '600', fontSize: 16, color: '#fff' },
+  importBtnTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 16, color: '#fff' },
+
+  // Loading state
   loadingContainer: { flex: 1, backgroundColor: Colors.paper, padding: 22, paddingTop: 80, alignItems: 'center' },
-  urlPreview: { fontSize: 14, color: Colors.ink2, maxWidth: '90%' },
-  loadingTitle: { fontSize: 21, fontWeight: '600', color: Colors.ink, marginTop: 20, letterSpacing: -0.2 },
-  loadingSub: { fontSize: 14, color: Colors.ink2, marginTop: 8, textAlign: 'center' },
+  urlPreview: { fontFamily: Fonts.uiRegular, fontSize: 14, color: Colors.ink2, maxWidth: '90%' },
+  loadingTitle: { fontFamily: Fonts.displayMedium, fontSize: 21, color: Colors.ink, marginTop: 20, letterSpacing: -0.2 },
+  loadingSub: { fontFamily: Fonts.uiRegular, fontSize: 14, color: Colors.ink2, marginTop: 8, textAlign: 'center' },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   checkDone: { width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
-  checkTxt: { fontSize: 14, fontWeight: '600', color: Colors.ink },
+  checkTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 14, color: Colors.ink },
 });

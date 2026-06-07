@@ -4,11 +4,12 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, Recipe } from '../../types';
-import { Colors, Radius, Spacing } from '../../theme';
-import { getRecipe, saveRecipe, getShoppingItems, saveShoppingItems } from '../../store/storage';
+import { Colors, Radius, Fonts, Shadow } from '../../theme';
+import { getRecipe, getShoppingItems, saveShoppingItems } from '../../store/storage';
 import { formatTime, scaleQuantity, uid } from '../../utils/id';
 import FoodPlaceholder from '../../components/FoodPlaceholder';
 import Button from '../../components/Button';
+import Icon from '../../components/Icon';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RecipeDetail'>;
 type Tab = 'ingredients' | 'method' | 'nutrition';
@@ -52,60 +53,80 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
     });
   }
 
-  if (!recipe) return <View style={styles.loading}><Text>Loading…</Text></View>;
+  if (!recipe) {
+    return (
+      <View style={styles.loading}>
+        <Text style={{ fontFamily: Fonts.uiRegular, color: Colors.ink2 }}>Loading…</Text>
+      </View>
+    );
+  }
 
   const totalMin = recipe.prepMinutes + recipe.cookMinutes;
 
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Hero */}
+        {/* Hero photo */}
         <View style={{ height: 248 }}>
           {recipe.imageUri
-            ? <Image source={{ uri: recipe.imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-            : <FoodPlaceholder variant={recipe.imageColor as any} style={StyleSheet.absoluteFill} />}
+            ? <Image source={{ uri: recipe.imageUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
+            : <FoodPlaceholder variant={recipe.imageColor as any} style={StyleSheet.absoluteFillObject} />}
           <View style={styles.heroOverlay}>
             <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
-              <Text style={styles.iconBtnTxt}>←</Text>
+              <Icon name="back" size={20} color={Colors.ink} />
             </TouchableOpacity>
             <View style={{ flexDirection: 'row', gap: 9 }}>
-              <TouchableOpacity style={styles.iconBtn}><Text style={styles.iconBtnTxt}>🔖</Text></TouchableOpacity>
-              <TouchableOpacity style={styles.iconBtn}><Text style={styles.iconBtnTxt}>⋯</Text></TouchableOpacity>
+              <TouchableOpacity style={styles.iconBtn}>
+                <Icon name="bookmark" size={20} color={Colors.ink} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconBtn}>
+                <Icon name="more" size={20} color={Colors.ink} />
+              </TouchableOpacity>
             </View>
           </View>
         </View>
 
         <View style={styles.body}>
+          {/* Eyebrow / collection name */}
           <Text style={styles.eyebrow}>{recipe.collections[0] ?? 'My recipes'}</Text>
           <Text style={styles.title}>{recipe.title}</Text>
+
+          {/* Meta row */}
           <View style={styles.metaRow}>
-            {recipe.rating ? <Text style={styles.rating}>★ {recipe.rating}</Text> : null}
-            {recipe.cookedCount ? <Text style={styles.meta}>· {recipe.cookedCount} cooks</Text> : null}
-            {recipe.sourceUrl ? <Text style={styles.meta}>· from web</Text> : null}
+            {recipe.rating ? (
+              <Text style={styles.rating}>★ {recipe.rating}</Text>
+            ) : null}
+            {recipe.cookedCount ? (
+              <Text style={styles.meta}>· {recipe.cookedCount} cooks</Text>
+            ) : null}
+            {recipe.sourceUrl ? (
+              <Text style={styles.meta}>· from web</Text>
+            ) : null}
           </View>
 
-          {/* Stats */}
-          <View style={styles.statsCard}>
+          {/* Stats cluster */}
+          <View style={[styles.statsCard, Shadow.card]}>
             <StatItem label="Prep" value={formatTime(recipe.prepMinutes)} />
             <StatItem label="Cook" value={formatTime(recipe.cookMinutes)} />
             <StatItem label="Total" value={formatTime(totalMin)} />
             <StatItem label="Cal" value={recipe.nutrition ? String(recipe.nutrition.calories) : '—'} />
           </View>
 
-          {/* Servings + Unit */}
+          {/* Servings stepper + unit toggle */}
           <View style={styles.controls}>
             <View style={styles.stepperRow}>
               <Text style={styles.controlLabel}>Servings</Text>
               <View style={styles.stepper}>
                 <TouchableOpacity style={styles.stepBtn} onPress={() => setServings(s => Math.max(1, s - 1))}>
-                  <Text style={styles.stepBtnTxt}>−</Text>
+                  <Icon name="minus" size={18} color={Colors.ink} />
                 </TouchableOpacity>
                 <Text style={styles.stepVal}>{servings}</Text>
                 <TouchableOpacity style={styles.stepBtn} onPress={() => setServings(s => s + 1)}>
-                  <Text style={styles.stepBtnTxt}>+</Text>
+                  <Icon name="plus" size={18} color={Colors.ink} />
                 </TouchableOpacity>
               </View>
             </View>
+            {/* Unit segmented control */}
             <View style={styles.seg}>
               <TouchableOpacity style={[styles.segBtn, unit === 'us' && styles.segActive]} onPress={() => setUnit('us')}>
                 <Text style={[styles.segTxt, unit === 'us' && styles.segActiveTxt]}>US</Text>
@@ -118,49 +139,68 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
 
           {/* Tabs */}
           <View style={styles.tabs}>
-            {(['ingredients','method','nutrition'] as Tab[]).map(t => (
+            {(['ingredients', 'method', 'nutrition'] as Tab[]).map(t => (
               <TouchableOpacity key={t} style={[styles.tabItem, tab === t && styles.tabActive]} onPress={() => setTab(t)}>
-                <Text style={[styles.tabTxt, tab === t && styles.tabActiveTxt]}>{t.charAt(0).toUpperCase() + t.slice(1)}</Text>
+                <Text style={[styles.tabTxt, tab === t && styles.tabActiveTxt]}>
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
 
+          {/* Ingredients tab */}
           {tab === 'ingredients' && (
             <View>
               <View style={styles.ingrHeader}>
                 <Text style={styles.secTitle}>{recipe.ingredients.length} ingredients</Text>
-                <Text style={styles.scaled}>Scaled for {servings}</Text>
+                <Text style={styles.scaledLabel}>Scaled for {servings}</Text>
               </View>
               {recipe.ingredients.map(ing => (
                 <TouchableOpacity key={ing.id} style={styles.ingrRow} onPress={() => toggleIngr(ing.id)}>
                   <View style={[styles.check, checkedIngr.has(ing.id) && styles.checkOn]}>
-                    {checkedIngr.has(ing.id) && <Text style={{ color: '#fff', fontSize: 11 }}>✓</Text>}
+                    {checkedIngr.has(ing.id) && <Icon name="check" size={15} color="#fff" />}
                   </View>
                   <Text style={[styles.ingrTxt, checkedIngr.has(ing.id) && styles.ingrDone]}>
-                    <Text style={{ fontWeight: '700' }}>{scaleQuantity(ing.quantity, recipe.servings, servings)} {ing.unit}</Text> {ing.name}
+                    <Text style={styles.ingrQty}>
+                      {scaleQuantity(ing.quantity, recipe.servings, servings)} {ing.unit}
+                    </Text>
+                    {'  '}{ing.name}
                   </Text>
                 </TouchableOpacity>
               ))}
-              <Button label="🛒  Add all to shopping list" variant="ghost" onPress={addToShoppingList} style={{ marginTop: 14 }} />
+              <Button
+                label="Add all to shopping list"
+                variant="ghost"
+                onPress={addToShoppingList}
+                style={{ marginTop: 14 }}
+                leadingIcon={<Icon name="cart" size={18} color={Colors.ink} />}
+              />
             </View>
           )}
 
+          {/* Method tab */}
           {tab === 'method' && (
             <View>
               {recipe.steps.map(step => (
                 <View key={step.id} style={styles.stepRow}>
-                  <View style={styles.stepNum}><Text style={styles.stepNumTxt}>{step.number}</Text></View>
+                  <View style={styles.stepNum}>
+                    <Text style={styles.stepNumTxt}>{step.number}</Text>
+                  </View>
                   <Text style={styles.stepTxt}>{step.text}</Text>
                 </View>
               ))}
             </View>
           )}
 
+          {/* Nutrition tab */}
           {tab === 'nutrition' && recipe.nutrition && (
             <View style={styles.nutritionCard}>
               <View style={styles.calRow}>
                 <Text style={styles.calLabel}>Per serving</Text>
-                <Text style={styles.calVal}>{recipe.nutrition.calories} <Text style={styles.calUnit}>kcal</Text></Text>
+                <Text style={styles.calVal}>
+                  {recipe.nutrition.calories}{' '}
+                  <Text style={styles.calUnit}>kcal</Text>
+                </Text>
               </View>
               <NutrBar label="Carbs" value={recipe.nutrition.carbs} max={80} color={Colors.accent} />
               <NutrBar label="Protein" value={recipe.nutrition.protein} max={60} color={Colors.accentDeep} />
@@ -168,6 +208,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
             </View>
           )}
 
+          {/* Notes */}
           {recipe.notes ? (
             <View style={styles.notesCard}>
               <Text style={styles.notesTxt}>"{recipe.notes}"</Text>
@@ -176,9 +217,13 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
         </View>
       </ScrollView>
 
-      {/* Sticky CTA */}
+      {/* Sticky Start Cooking CTA */}
       <View style={styles.stickyBar}>
-        <Button label="🔥  Start Cooking" onPress={() => navigation.navigate('CookingMode', { recipeId })} />
+        <Button
+          label="Start Cooking"
+          onPress={() => navigation.navigate('CookingMode', { recipeId })}
+          leadingIcon={<Icon name="flame" size={18} color="#fff" />}
+        />
       </View>
     </View>
   );
@@ -210,57 +255,126 @@ function NutrBar({ label, value, max, color }: { label: string; value: number; m
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.paper },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  heroOverlay: { position: 'absolute', top: 52, left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between' },
-  iconBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.9)', alignItems: 'center', justifyContent: 'center' },
-  iconBtnTxt: { fontSize: 18 },
+  heroOverlay: {
+    position: 'absolute', top: 52, left: 16, right: 16,
+    flexDirection: 'row', justifyContent: 'space-between',
+  },
+  iconBtn: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: Colors.line,
+  },
   body: { padding: 18, paddingTop: 16 },
-  eyebrow: { fontSize: 11.5, fontWeight: '700', letterSpacing: 0.14, textTransform: 'uppercase', color: Colors.accentDeep },
-  title: { fontSize: 28, fontWeight: '600', color: Colors.ink, marginTop: 8, lineHeight: 33 },
+  eyebrow: {
+    fontFamily: Fonts.uiBold, fontSize: 11.5, letterSpacing: 1.6,
+    textTransform: 'uppercase', color: Colors.accentDeep,
+  },
+  title: {
+    fontFamily: Fonts.displayMedium, fontSize: 28,
+    lineHeight: 31.4, color: Colors.ink, marginTop: 8,
+  },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
-  rating: { color: Colors.accentDeep, fontWeight: '700', fontSize: 13.5 },
-  meta: { fontSize: 13.5, color: Colors.ink2 },
-  statsCard: { flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.line, marginTop: 16, overflow: 'hidden' },
-  statItem: { flex: 1, alignItems: 'center', paddingVertical: 13, borderLeftWidth: 1, borderLeftColor: Colors.line },
-  statVal: { fontWeight: '700', fontSize: 15, color: Colors.ink },
-  statKey: { fontSize: 11, color: Colors.ink2, marginTop: 1 },
+  rating: { fontFamily: Fonts.uiBold, color: Colors.accentDeep, fontSize: 13.5 },
+  meta: { fontFamily: Fonts.uiRegular, fontSize: 13.5, color: Colors.ink2 },
+
+  // Stats cluster
+  statsCard: {
+    flexDirection: 'row', backgroundColor: Colors.surface,
+    borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.line,
+    marginTop: 16, overflow: 'hidden',
+  },
+  statItem: {
+    flex: 1, alignItems: 'center', paddingVertical: 13,
+    borderLeftWidth: 1, borderLeftColor: Colors.line,
+  },
+  statVal: { fontFamily: Fonts.uiBold, fontSize: 15, color: Colors.ink },
+  statKey: { fontFamily: Fonts.uiRegular, fontSize: 11, color: Colors.ink2, marginTop: 1 },
+
+  // Controls row
   controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 },
-  controlLabel: { fontWeight: '700', fontSize: 14.5, color: Colors.ink, marginRight: 11 },
+  controlLabel: { fontFamily: Fonts.uiBold, fontSize: 14.5, color: Colors.ink, marginRight: 11 },
   stepperRow: { flexDirection: 'row', alignItems: 'center' },
-  stepper: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: Colors.line2, borderRadius: Radius.pill, overflow: 'hidden' },
+  stepper: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderColor: Colors.line2,
+    borderRadius: Radius.pill, overflow: 'hidden',
+  },
   stepBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
-  stepBtnTxt: { fontSize: 19, color: Colors.ink },
-  stepVal: { minWidth: 46, textAlign: 'center', fontWeight: '700', fontSize: 15, color: Colors.ink },
+  stepVal: { fontFamily: Fonts.uiBold, minWidth: 46, textAlign: 'center', fontSize: 15, color: Colors.ink },
+
+  // Unit segmented control
   seg: { flexDirection: 'row', backgroundColor: Colors.surface2, borderRadius: Radius.pill, padding: 4, gap: 2 },
   segBtn: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: Radius.pill },
   segActive: { backgroundColor: Colors.surface },
-  segTxt: { fontWeight: '600', fontSize: 13.5, color: Colors.ink2 },
+  segTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 13.5, color: Colors.ink2 },
   segActiveTxt: { color: Colors.ink },
-  tabs: { flexDirection: 'row', backgroundColor: Colors.surface2, borderRadius: Radius.pill, padding: 4, marginTop: 18, gap: 2 },
+
+  // Tabs
+  tabs: {
+    flexDirection: 'row', backgroundColor: Colors.surface2,
+    borderRadius: Radius.pill, padding: 4, marginTop: 18, gap: 2,
+  },
   tabItem: { flex: 1, paddingVertical: 7, borderRadius: Radius.pill, alignItems: 'center' },
   tabActive: { backgroundColor: Colors.surface },
-  tabTxt: { fontWeight: '600', fontSize: 13.5, color: Colors.ink2 },
+  tabTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 13.5, color: Colors.ink2 },
   tabActiveTxt: { color: Colors.ink },
+
+  // Ingredients
   ingrHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 18 },
-  secTitle: { fontSize: 19, fontWeight: '700', color: Colors.ink },
-  scaled: { fontSize: 12.5, fontWeight: '700', color: Colors.accentDeep },
-  ingrRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: Colors.line },
-  check: { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: Colors.line2, alignItems: 'center', justifyContent: 'center' },
+  secTitle: { fontFamily: Fonts.uiBold, fontSize: 19, letterSpacing: -0.2, color: Colors.ink },
+  scaledLabel: { fontFamily: Fonts.uiBold, fontSize: 12.5, color: Colors.accentDeep },
+  ingrRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 13,
+    paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: Colors.line,
+  },
+  check: {
+    width: 24, height: 24, borderRadius: 7, borderWidth: 2,
+    borderColor: Colors.line2, alignItems: 'center', justifyContent: 'center',
+  },
   checkOn: { backgroundColor: Colors.accent, borderColor: Colors.accent },
-  ingrTxt: { flex: 1, fontSize: 15, color: Colors.ink },
+  ingrTxt: { fontFamily: Fonts.uiRegular, flex: 1, fontSize: 15.5, color: Colors.ink, lineHeight: 21 },
+  ingrQty: { fontFamily: Fonts.uiBold },
   ingrDone: { color: Colors.ink3, textDecorationLine: 'line-through' },
-  stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 13, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: Colors.line },
-  stepNum: { width: 30, height: 30, borderRadius: 15, backgroundColor: Colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
-  stepNumTxt: { fontWeight: '700', fontSize: 14, color: Colors.accentInk },
-  stepTxt: { flex: 1, fontSize: 14.5, color: Colors.ink, lineHeight: 22 },
-  nutritionCard: { marginTop: 16, backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.line, padding: 16 },
+
+  // Method steps
+  stepRow: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 13,
+    paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: Colors.line,
+  },
+  stepNum: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: Colors.accentSoft, alignItems: 'center', justifyContent: 'center',
+  },
+  stepNumTxt: { fontFamily: Fonts.uiBold, fontSize: 14, color: Colors.accentInk },
+  stepTxt: { fontFamily: Fonts.uiRegular, flex: 1, fontSize: 15.5, color: Colors.ink, lineHeight: 22 },
+
+  // Nutrition
+  nutritionCard: {
+    marginTop: 16, backgroundColor: Colors.surface,
+    borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.line, padding: 16,
+  },
   calRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  calLabel: { fontWeight: '700', fontSize: 15, color: Colors.ink },
-  calVal: { fontSize: 30, fontWeight: '600', color: Colors.ink },
-  calUnit: { fontSize: 15, color: Colors.ink2 },
-  nutrLabel: { fontSize: 13.5, fontWeight: '600', color: Colors.ink },
+  calLabel: { fontFamily: Fonts.uiBold, fontSize: 15, color: Colors.ink },
+  calVal: { fontFamily: Fonts.displayMedium, fontSize: 30, color: Colors.ink },
+  calUnit: { fontFamily: Fonts.uiRegular, fontSize: 15, color: Colors.ink2 },
+  nutrLabel: { fontFamily: Fonts.uiSemiBold, fontSize: 13.5, color: Colors.ink },
   nutrTrack: { height: 6, borderRadius: 99, backgroundColor: Colors.surface2, marginTop: 5, overflow: 'hidden' },
   nutrFill: { height: '100%', borderRadius: 99 },
-  notesCard: { marginTop: 18, padding: 15, backgroundColor: '#FFF9EC', borderWidth: 1, borderColor: '#F0E2C0', borderRadius: Radius.lg },
-  notesTxt: { fontStyle: 'italic', fontSize: 15.5, color: '#5C4A1E', lineHeight: 23 },
-  stickyBar: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12, paddingHorizontal: 18, backgroundColor: 'rgba(255,255,255,0.93)', borderTopWidth: 1, borderTopColor: Colors.line },
+
+  // Notes
+  notesCard: {
+    marginTop: 18, padding: 15,
+    backgroundColor: '#FFF9EC', borderWidth: 1,
+    borderColor: '#F0E2C0', borderRadius: Radius.lg,
+  },
+  notesTxt: { fontFamily: Fonts.displayRegularItalic, fontSize: 15.5, color: '#5C4A1E', lineHeight: 23 },
+
+  // Sticky bar
+  stickyBar: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    padding: 12, paddingHorizontal: 18,
+    backgroundColor: 'rgba(250,246,239,0.96)',
+    borderTopWidth: 1, borderTopColor: Colors.line,
+  },
 });

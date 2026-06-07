@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ViewStyle } from 'react-native';
-import { Colors, Radius } from '../theme';
+import { Colors, Radius, Fonts } from '../theme';
 
 interface Props {
   label: string;
@@ -49,8 +49,8 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   label: {
+    fontFamily: Fonts.uiMedium,
     fontSize: 13.5,
-    fontWeight: '500',
     color: Colors.ink,
   },
   activeLabel: { color: Colors.white },
