@@ -18,8 +18,17 @@ export async function dbGetRecipe(id: string): Promise<Recipe | null> {
     .select('*')
     .eq('id', id)
     .single();
-  if (error) return null;
-  return rowToRecipe(data);
+  if (!error && data) return rowToRecipe(data);
+
+  // Fall back to featured recipes
+  const { data: featured } = await supabase
+    .from('featured_recipes')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (featured) return featuredRowToRecipe(featured);
+
+  return null;
 }
 
 export async function dbSaveRecipe(recipe: Recipe): Promise<void> {
@@ -147,6 +156,20 @@ export async function uploadRecipeImage(localUri: string, recipeId: string): Pro
   }
 }
 
+// ── Featured Recipes ───────────────────────────────────────────────────────────
+
+export async function dbGetFeaturedRecipes(): Promise<Recipe[]> {
+  const today = new Date().toISOString().split('T')[0];
+  const { data, error } = await supabase
+    .from('featured_recipes')
+    .select('*')
+    .gte('featured_date', today)
+    .order('created_at', { ascending: false })
+    .limit(12);
+  if (error) throw error;
+  return (data ?? []).map(featuredRowToRecipe);
+}
+
 // ── Row mappers ────────────────────────────────────────────────────────────────
 
 function recipeToRow(r: Recipe) {
@@ -246,5 +269,29 @@ function rowFromShoppingItem(i: ShoppingItem) {
     checked: i.checked,
     recipe_ids: i.recipeIds ?? [],
     is_manual: i.isManual ?? false,
+  };
+}
+
+function featuredRowToRecipe(row: Record<string, any>): Recipe {
+  const ts = new Date(row.created_at ?? Date.now()).getTime();
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description ?? undefined,
+    imageUri: row.image_uri ?? undefined,
+    imageColor: row.image_color ?? 'toast',
+    servings: row.servings,
+    prepMinutes: row.prep_minutes,
+    cookMinutes: row.cook_minutes,
+    ingredients: row.ingredients ?? [],
+    steps: row.steps ?? [],
+    tags: row.tags ?? [],
+    collections: [],
+    nutrition: row.nutrition ?? undefined,
+    difficulty: row.difficulty ?? undefined,
+    savedAt: ts,
+    createdAt: ts,
+    isSaved: false,
+    isFamily: false,
   };
 }

@@ -7,7 +7,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, Recipe } from '../../types';
 import { Colors, Radius, Fonts, Shadow } from '../../theme';
-import { getRecipes, getProfile } from '../../store/storage';
+import { getRecipes, getProfile, getFeaturedRecipes } from '../../store/storage';
 import RecipeCard from '../../components/RecipeCard';
 import Chip from '../../components/Chip';
 import FoodPlaceholder from '../../components/FoodPlaceholder';
@@ -18,14 +18,16 @@ const QUICK_FILTERS = ['Quick & Easy', 'Vegetarian', '5 Ingredients', 'Family fa
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [featured, setFeatured] = useState<Recipe[]>([]);
   const [userName, setUserName] = useState('');
   const [activeFilter, setActiveFilter] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
   async function load() {
-    const [r, p] = await Promise.all([getRecipes(), getProfile()]);
+    const [r, p, f] = await Promise.all([getRecipes(), getProfile(), getFeaturedRecipes()]);
     setRecipes(r);
     setUserName(p?.name?.split(' ')[0] ?? 'Chef');
+    setFeatured(f);
   }
 
   useFocusEffect(useCallback(() => { load(); }, []));
@@ -125,6 +127,29 @@ export default function HomeScreen() {
         </View>
         <Icon name="fwd" size={20} color={Colors.accentDeep} />
       </TouchableOpacity>
+
+      {/* Today's Picks */}
+      {featured.length > 0 && (
+        <>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.secTitle}>Today's picks</Text>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 13 }}>
+              {featured.map(r => (
+                <View key={r.id} style={{ width: 215 }}>
+                  <RecipeCard
+                    recipe={r}
+                    onPress={() => navigation.navigate('RecipeDetail', { recipeId: r.id })}
+                    variant="horizontal"
+                  />
+                </View>
+              ))}
+              <View style={{ width: 8 }} />
+            </View>
+          </ScrollView>
+        </>
+      )}
 
       {/* Recently added */}
       {recent.length > 0 && (
