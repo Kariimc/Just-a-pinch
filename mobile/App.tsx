@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { useEffect, Component, ReactNode } from 'react';
+import { Platform, View, Text, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
@@ -21,6 +21,28 @@ import {
 
 SplashScreen.preventAutoHideAsync();
 
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    if (this.state.error) {
+      const err = this.state.error as Error;
+      return (
+        <View style={{ flex: 1, backgroundColor: '#1a1a1a', padding: 20, paddingTop: 60 }}>
+          <Text style={{ color: '#ff6b6b', fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>
+            Crash Diagnostic
+          </Text>
+          <ScrollView>
+            <Text style={{ color: '#fff', fontSize: 13, marginBottom: 8 }}>{err.message}</Text>
+            <Text style={{ color: '#aaa', fontSize: 11 }}>{err.stack}</Text>
+          </ScrollView>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
     Newsreader_400Regular,
@@ -40,13 +62,12 @@ export default function App() {
     }
   }, [fontsLoaded, fontError]);
 
-  // On web the splash overlay blocks everything; render immediately and let fonts swap in
   if (!fontsLoaded && !fontError && Platform.OS !== 'web') return null;
 
   return (
-    <>
+    <ErrorBoundary>
       <StatusBar style="auto" />
       <AppNavigator />
-    </>
+    </ErrorBoundary>
   );
 }
