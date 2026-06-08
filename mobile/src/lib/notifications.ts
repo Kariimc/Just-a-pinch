@@ -5,13 +5,14 @@ if (Platform.OS !== 'web') {
   try {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
-        shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
         shouldPlaySound: true,
         shouldSetBadge: false,
       }),
     });
   } catch {
-    // Native notification module not available on this platform/configuration
+    // Native notification module not available
   }
 }
 
