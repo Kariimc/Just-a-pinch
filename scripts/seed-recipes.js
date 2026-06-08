@@ -61,7 +61,7 @@ Rules:
 - Return ONLY the JSON object`;
 }
 
-async function callGemini(prompt) {
+async function callGemini(prompt, attempt = 1) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_KEY}`;
   const res = await fetch(url, {
     method: 'POST',
@@ -72,8 +72,22 @@ async function callGemini(prompt) {
     }),
   });
   if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`Gemini API error ${res.status}: ${err}`);
+    const errText = await res.text();
+    if (res.status === 429 && attempt <= 3) {
+      let retryMs = 60000;
+      try {
+        const retryInfo = JSON.parse(errText).error?.details?.find(d =>
+          d['@type']?.includes('RetryInfo')
+        );
+        if (retryInfo?.retryDelay) {
+          retryMs = (parseInt(retryInfo.retryDelay) + 5) * 1000;
+        }
+      } catch {}
+      console.log(`Rate limited (429). Pausing ${retryMs / 1000}s before retry (attempt ${attempt}/3)...`);
+      await sleep(retryMs);
+      return callGemini(prompt, attempt + 1);
+    }
+    throw new Error(`Gemini API error ${res.status}: ${errText}`);
   }
   const data = await res.json();
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
