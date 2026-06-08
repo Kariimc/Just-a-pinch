@@ -28,6 +28,7 @@ import RecipeEditorScreen from '../screens/capture/RecipeEditorScreen';
 import AddMenuScreen from '../screens/capture/AddMenuScreen';
 import AIGeneratorScreen from '../screens/capture/AIGeneratorScreen';
 import SearchScreen from '../screens/SearchScreen';
+import SettingsScreen from '../screens/settings/SettingsScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -125,6 +126,7 @@ function Navigator() {
       <Stack.Screen name="Search" component={SearchScreen} options={{ animation: 'fade_from_bottom' }} />
       <Stack.Screen name="AddToMealPlan" component={MealPlanScreen} />
       <Stack.Screen name="Profile" component={HomeScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
     </Stack.Navigator>
   );
 }

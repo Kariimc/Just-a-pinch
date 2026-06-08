@@ -9,6 +9,7 @@ import Icon from '../../components/Icon';
 import { getShoppingItems, saveShoppingItems, toggleShoppingItem } from '../../store/storage';
 import { ShoppingItem } from '../../types';
 import { uid } from '../../utils/id';
+import { hapticLight } from '../../lib/haptics';
 
 const CATEGORIES = ['Produce', 'Dairy & eggs', 'Meat & fish', 'Pantry', 'Bakery', 'Other'];
 
@@ -21,6 +22,7 @@ export default function ShoppingScreen() {
   }, []));
 
   async function toggle(id: string) {
+    hapticLight();
     await toggleShoppingItem(id);
     const updated = items.map(i => i.id === id ? { ...i, checked: !i.checked } : i);
     setItems(updated);

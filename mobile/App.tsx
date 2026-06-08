@@ -1,4 +1,5 @@
-import { useEffect, Platform } from 'react';
+import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
