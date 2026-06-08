@@ -55,7 +55,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.avatar}
-            onPress={() => (navigation as any).navigate('Profile')}
+            onPress={() => navigation.navigate('Settings')}
           >
             <Text style={styles.avatarTxt}>{userName?.[0]?.toUpperCase() ?? 'M'}</Text>
           </TouchableOpacity>

@@ -5,6 +5,7 @@ import { useKeepAwake } from 'expo-keep-awake';
 import { RootStackParamList, Recipe, Step } from '../../types';
 import { Colors, Radius } from '../../theme';
 import { getRecipe } from '../../store/storage';
+import { hapticStep, hapticSuccess } from '../../lib/haptics';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CookingMode'>;
 
@@ -117,11 +118,11 @@ export default function CookingModeScreen({ route, navigation }: Props) {
           <Text style={styles.backBtnTxt}>←</Text>
         </TouchableOpacity>
         {stepIndex < steps.length - 1 ? (
-          <TouchableOpacity style={styles.nextBtn} onPress={() => setStepIndex(i => i + 1)}>
+          <TouchableOpacity style={styles.nextBtn} onPress={() => { hapticStep(); setStepIndex(i => i + 1); }}>
             <Text style={styles.nextBtnTxt}>Next step →</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.nextBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.nextBtn} onPress={() => { hapticSuccess(); navigation.goBack(); }}>
             <Text style={styles.nextBtnTxt}>Done! 🎉</Text>
           </TouchableOpacity>
         )}

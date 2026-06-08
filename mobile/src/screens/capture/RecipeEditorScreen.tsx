@@ -12,6 +12,7 @@ import { uploadRecipeImage } from '../../lib/db';
 import { uid } from '../../utils/id';
 import Button from '../../components/Button';
 import FoodPlaceholder from '../../components/FoodPlaceholder';
+import { hapticSuccess } from '../../lib/haptics';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RecipeEditor'>;
 
@@ -136,6 +137,7 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
       createdAt: Date.now(),
     };
     await saveRecipe(recipe);
+    hapticSuccess();
     setSaving(false);
     navigation.navigate('RecipeDetail', { recipeId: recipe.id });
   }
