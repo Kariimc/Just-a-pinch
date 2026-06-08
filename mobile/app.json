@@ -34,6 +34,15 @@
       "supabaseUrl": "https://qdlfiewspjgbucszezja.supabase.co",
       "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkbGZpZXdzcGpnYnVjc3plemphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDA0NDUsImV4cCI6MjA5NjE3NjQ0NX0.I9Vtn_B7LTf850syL2sxmy_lMMwpunga72ZWyai_xYM"
     },
-    "plugins": []
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#2E9E57",
+          "sounds": []
+        }
+      ]
+    ]
   }
 }
