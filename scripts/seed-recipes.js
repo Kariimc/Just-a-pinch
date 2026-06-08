@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Daily recipe seeder — calls Gemini 1.5 Flash, inserts into featured_recipes via Supabase REST.
+// Daily recipe seeder — calls Gemini 2.0 Flash Lite, inserts into featured_recipes via Supabase REST.
 // Requires env: GEMINI_API_KEY, SUPABASE_SERVICE_ROLE_KEY
 // Optional env: SUPABASE_URL (defaults to project URL)
 
@@ -51,7 +51,7 @@ Rules:
 - Return ONLY the JSON array`;
 
 async function callGemini() {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_KEY}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
