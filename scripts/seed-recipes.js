@@ -12,34 +12,45 @@ if (!GEMINI_KEY || !SUPABASE_SERVICE_KEY) {
   process.exit(1);
 }
 
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 const today = new Date().toISOString().split('T')[0];
 const month = new Date().toLocaleDateString('en-US', { month: 'long' });
 
-const PROMPT = `Generate 6 diverse, restaurant-quality recipes for a recipe app.
-Today is ${today} (${month}). Make them seasonally appropriate.
+// One slot per API call — keeps per-request token count low and ensures variety.
+const RECIPE_SLOTS = [
+  'a hearty dinner (any cuisine)',
+  'a quick breakfast or brunch dish',
+  'a light lunch or fresh salad',
+  'a comforting soup, stew, or one-pot meal',
+  'a baked good, snack, or dessert',
+  'an international or fusion dish from a non-Western cuisine',
+];
 
-Return a JSON array with exactly this structure — no markdown fences, no extra text, just the raw JSON array:
-[
-  {
-    "title": "Recipe Name",
-    "description": "One or two enticing sentences about this dish.",
-    "servings": 4,
-    "prepMinutes": 15,
-    "cookMinutes": 30,
-    "difficulty": "easy",
-    "tags": ["dinner", "italian", "comfort"],
-    "imageColor": "toast",
-    "ingredients": [
-      {"id": "i1", "quantity": "2", "unit": "cups", "name": "all-purpose flour"},
-      {"id": "i2", "quantity": "1", "unit": "tbsp", "name": "olive oil"}
-    ],
-    "steps": [
-      {"id": "s1", "number": 1, "text": "Detailed description of step one. At least two sentences."},
-      {"id": "s2", "number": 2, "text": "Step two description.", "timerSeconds": 300}
-    ],
-    "nutrition": {"calories": 450, "carbs": 55, "protein": 22, "fat": 14}
-  }
-]
+function buildPrompt(slot) {
+  return `Generate exactly 1 restaurant-quality recipe for a recipe app — specifically: ${slot}.
+Today is ${today} (${month}). Make it seasonally appropriate.
+
+Return a single JSON object with exactly this structure — no markdown fences, no extra text, just the raw JSON object:
+{
+  "title": "Recipe Name",
+  "description": "One or two enticing sentences about this dish.",
+  "servings": 4,
+  "prepMinutes": 15,
+  "cookMinutes": 30,
+  "difficulty": "easy",
+  "tags": ["dinner", "italian", "comfort"],
+  "imageColor": "toast",
+  "ingredients": [
+    {"id": "i1", "quantity": "2", "unit": "cups", "name": "all-purpose flour"},
+    {"id": "i2", "quantity": "1", "unit": "tbsp", "name": "olive oil"}
+  ],
+  "steps": [
+    {"id": "s1", "number": 1, "text": "Detailed description of step one. At least two sentences."},
+    {"id": "s2", "number": 2, "text": "Step two description.", "timerSeconds": 300}
+  ],
+  "nutrition": {"calories": 450, "carbs": 55, "protein": 22, "fat": 14}
+}
 
 Rules:
 - difficulty: "easy" | "medium" | "hard"
@@ -47,17 +58,17 @@ Rules:
 - tags: 2–5 from [breakfast, lunch, dinner, snack, baking, vegetarian, vegan, quick, family, comfort, italian, asian, mexican, mediterranean, healthy]
 - ingredients: 5–14 items with realistic quantities and units (cups, tbsp, tsp, oz, g, ml, cloves, slices, etc.)
 - steps: 4–10 steps, each at least 2 sentences; add timerSeconds for any step that has a timed cook/rest
-- Vary the 6 recipes: different cuisines, meal types, and difficulty levels
-- Return ONLY the JSON array`;
+- Return ONLY the JSON object`;
+}
 
-async function callGemini() {
+async function callGemini(prompt) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${GEMINI_KEY}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: PROMPT }] }],
-      generationConfig: { temperature: 0.9, maxOutputTokens: 8192 },
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.9, maxOutputTokens: 2048 },
     }),
   });
   if (!res.ok) {
@@ -70,9 +81,9 @@ async function callGemini() {
   return text;
 }
 
-function parseRecipes(raw) {
-  const match = raw.match(/\[[\s\S]*\]/);
-  if (!match) throw new Error(`No JSON array found in response:\n${raw.slice(0, 400)}`);
+function parseRecipe(raw) {
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error(`No JSON object found in response:\n${raw.slice(0, 400)}`);
   try {
     return JSON.parse(match[0]);
   } catch (e) {
@@ -137,13 +148,19 @@ async function deleteOldRecipes(keepDays = 7) {
 async function main() {
   console.log(`Seeding recipes for ${today} (${month})...`);
 
-  const raw = await callGemini();
-  console.log('Gemini response received, parsing...');
+  const recipes = [];
+  for (const [index, slot] of RECIPE_SLOTS.entries()) {
+    console.log(`Generating recipe ${index + 1} of ${RECIPE_SLOTS.length}: ${slot}...`);
+    const raw = await callGemini(buildPrompt(slot));
+    const recipe = parseRecipe(raw);
+    recipes.push(recipe);
 
-  const recipes = parseRecipes(raw);
-  if (!Array.isArray(recipes) || recipes.length === 0) {
-    throw new Error('Gemini returned no recipes');
+    if (index < RECIPE_SLOTS.length - 1) {
+      console.log(`Pausing 3 s before next request to stay within rate limits...`);
+      await sleep(3000);
+    }
   }
+
   console.log(`Parsed ${recipes.length} recipes`);
 
   const rows = recipes.map(toRow);
