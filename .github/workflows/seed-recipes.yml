@@ -1,0 +1,24 @@
+name: Seed Daily Recipes
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 6 AM UTC every day
+  workflow_dispatch:        # Allow manual trigger from Actions tab
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Seed recipes via Gemini
+        run: node scripts/seed-recipes.js
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
