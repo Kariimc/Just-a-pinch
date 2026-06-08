@@ -6,6 +6,7 @@ import {
   dbGetMealPlan, dbSaveMealEntry, dbDeleteMealEntry,
   dbGetShoppingItems, dbSaveShoppingItems, dbToggleShoppingItem,
   dbGetProfile, dbSaveProfile,
+  dbGetFeaturedRecipes,
 } from '../lib/db';
 
 const KEYS = {
@@ -198,6 +199,16 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
     try { await dbSaveProfile(profile); } catch { /* fall through */ }
   }
   await set(KEYS.profile, profile);
+}
+
+// ── Featured Recipes ──────────────────────────────────────────────────────────
+
+export async function getFeaturedRecipes(): Promise<Recipe[]> {
+  try {
+    return await dbGetFeaturedRecipes();
+  } catch {
+    return [];
+  }
 }
 
 // ── Onboarding flag ───────────────────────────────────────────────────────────
