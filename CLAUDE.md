@@ -1,17 +1,17 @@
 # Just a Pinch — Agent Handoff
 
 ## What this project is
-A warm, editorial recipe app for iOS, Android, and web. Stack: Expo ~54 managed workflow, React Navigation 7, Supabase (auth + storage), TypeScript.
+A warm, editorial recipe app for iOS, Android, and web. Stack: **Expo ~56 managed workflow**, React Navigation 7, Supabase (auth + storage), TypeScript.
 
-- **Live web preview**: https://kariimc.github.io/Just-a-pinch/
 - **Repo**: https://github.com/Kariimc/Just-a-pinch
-- **Stable branch**: `main` — this is the source of truth. All feature work branches off here.
+- **Stable branch**: `main` — source of truth. All feature work branches off here.
+- **Web preview**: blocked — repo is private, GitHub Pages requires public repo or paid plan.
 
 ---
 
 ## THE DESIGN IS LOCKED
 
-Do not redesign, restyle, reorder, or "improve" any existing screen. Do not change spacing, font sizes, colors, border radii, or component layouts unless the user explicitly requests it and describes the exact change. The visual design was built from a locked design handoff and must be reproduced exactly.
+Do not redesign, restyle, reorder, or "improve" any existing screen. Do not change spacing, font sizes, colors, border radii, or component layouts unless the user explicitly requests it and describes the exact change.
 
 **Permitted**: adding new screens, new data, new logic, new navigation routes, wiring up real Supabase data to existing UI placeholders.
 
@@ -19,20 +19,85 @@ Do not redesign, restyle, reorder, or "improve" any existing screen. Do not chan
 
 ---
 
+## Current SDK state (critical — read before touching packages)
+
+The project runs **Expo SDK 56** with **React Native 0.81.5**. A previous misconfiguration had `expo@54` paired with RN 0.81.5, which caused an immediate native crash on Android on every launch. This was fixed in this session.
+
+**Do not downgrade any of these — they must all stay aligned:**
+
+```json
+"expo": "~56.0.0",
+"react-native": "0.81.5",
+"react": "19.1.0",
+"expo-modules-core": "~56.x  (installed by expo automatically)",
+"@expo/metro-runtime": "^56.0.13"
+```
+
+All `expo-*` packages are at their `~56.x` versions. Do not mix SDK versions.
+
+When adding a new expo package, always use `npx expo install <package>` — it resolves the SDK-compatible version automatically.
+
+---
+
+## What was built this session (Section 1 checklist)
+
+### New files added
+| File | Purpose |
+|---|---|
+| `mobile/src/lib/haptics.ts` | Platform-safe haptic helpers: `hapticLight`, `hapticMedium`, `hapticStep`, `hapticSuccess` |
+| `mobile/src/lib/notifications.ts` | Daily reminder scheduling: `requestNotificationPermission`, `scheduleDailyReminder`, `cancelDailyReminder` |
+| `mobile/src/store/settingsStorage.ts` | AsyncStorage wrapper for `AppSettings` (notificationsEnabled, hour, minute) |
+| `mobile/src/screens/settings/SettingsScreen.tsx` | Settings screen — notification toggle, time picker, minute chips |
+
+### Files modified
+| File | Change |
+|---|---|
+| `mobile/App.tsx` | Added `ErrorBoundary` component (diagnostic — safe to remove later) |
+| `mobile/app.json` | Added `expo-notifications` plugin entry; added EAS `projectId` |
+| `mobile/src/navigation/AppNavigator.tsx` | Added `Settings` route → `SettingsScreen` |
+| `mobile/src/screens/home/HomeScreen.tsx` | Avatar taps navigate to `Settings` |
+| `mobile/src/screens/recipe/CookingModeScreen.tsx` | `hapticStep` on next step, `hapticSuccess` on done |
+| `mobile/src/screens/capture/RecipeEditorScreen.tsx` | `hapticSuccess` after save |
+| `mobile/src/screens/shopping/ShoppingScreen.tsx` | `hapticLight` on item toggle |
+| `mobile/package.json` | Upgraded expo 54→56, all expo-* packages, react-native-svg 15.8→15.15.5, added hermes-compiler |
+
+---
+
+## Known issues resolved this session
+
+| Issue | Root cause | Fix |
+|---|---|---|
+| App crashed immediately on Android | `expo@54` native modules built for RN 0.76, shipped with RN 0.81.5 JS | Upgraded all packages to Expo SDK 56 |
+| Metro bundle failed | `react-native-svg@15.8` imported Node.js `buffer` module | Upgraded to `react-native-svg@15.15.5` |
+| EAS build failed (Gradle 504) | `--clear-cache` forced Gradle download from unavailable CDN | Removed `--clear-cache` flag |
+| Notification API mismatch | SDK 56 renamed `shouldShowAlert` → `shouldShowBanner` + `shouldShowList` | Updated `notifications.ts` |
+| EAS Gradle phase failed | `@expo/metro-config@56.0.13` unconditionally resolves `hermes-compiler/package.json` before trying bundled hermesc; crash before bundle produced | Added `hermes-compiler` to `package.json` |
+
+---
+
+## Pending / open items
+
+- **Android APK**: Build #45 triggered by hermes-compiler fix (PR #17). Verify the APK opens before declaring Section 1 complete.
+- **ErrorBoundary in App.tsx**: Diagnostic component left in place. Remove it once the APK is confirmed working.
+- **GitHub Pages (web preview)**: Blocked — the repo is private. Options: (a) make repo public in GitHub Settings → Danger Zone, or (b) upgrade GitHub plan. No code change needed.
+- **iOS testing**: Section 1 haptics and notifications untested on iOS. Need physical device or TestFlight build.
+
+---
+
 ## Git workflow
 
 - **All new features** → branch off `main`, name it `feature/short-description`
-- **Small fixes** (typo, crash, one-line tweak) → commit directly to `main`
-- **Never push to `main` without the user confirming** — always say "ready to commit" or "ready to open a PR" and wait
-- After a PR merges to `main`, GitHub Actions auto-deploys to Pages within ~2 min
+- **Fixes** → branch off `main`, open PR, merge — do not push directly to `main` (branch protection is on)
+- **Never merge to `main` without user confirming**
+- Pushing via `git push` will fail (403) — use the GitHub MCP tools (`mcp__github__push_files`, `mcp__github__create_pull_request`, `mcp__github__merge_pull_request`) to push and merge
 
 ---
 
 ## Project structure
 ```
 mobile/                   ← Expo app root
-  App.tsx                 ← Loads fonts, hides splash, renders AppNavigator
-  app.json                ← experiments.baseUrl = "/Just-a-pinch" (critical for Pages)
+  App.tsx                 ← Loads fonts, hides splash, ErrorBoundary, renders AppNavigator
+  app.json                ← experiments.baseUrl = "/Just-a-pinch"; expo-notifications plugin; EAS projectId
   src/
     components/
       Icon.tsx            ← 50+ custom SVG icons (react-native-svg). Add icons here only.
@@ -49,6 +114,7 @@ mobile/                   ← Expo app root
       library/            ← LibraryScreen
       plan/               ← MealPlanScreen
       shopping/           ← ShoppingScreen
+      settings/           ← SettingsScreen (NEW)
       SearchScreen.tsx
     navigation/
       AppNavigator.tsx    ← Stack + Tab navigator; wraps AuthProvider
@@ -57,8 +123,11 @@ mobile/                   ← Expo app root
     lib/
       supabase.ts         ← Supabase client (reads from app.json extra)
       db.ts               ← DB helpers (uploadRecipeImage, etc.)
+      haptics.ts          ← Platform-safe haptic wrappers (NEW)
+      notifications.ts    ← Daily reminder scheduling (NEW)
     store/
       storage.ts          ← AsyncStorage wrappers (getRecipes, saveRecipe, getProfile, etc.)
+      settingsStorage.ts  ← AppSettings persistence (NEW)
     theme/
       index.ts            ← ALL design tokens live here. Never hardcode values.
     types/
@@ -67,7 +136,7 @@ mobile/                   ← Expo app root
       id.ts               ← uid() helper
 .github/workflows/
   deploy-pages.yml        ← Triggers on push to main when mobile/** changes
-  build-android.yml       ← EAS Android APK build
+  build-android.yml       ← EAS Android APK build (workflow_dispatch or push to main)
 ```
 
 ---
@@ -100,6 +169,7 @@ Fonts.uiSemiBold           = 'HankenGrotesk_600SemiBold'
 Fonts.uiBold               = 'HankenGrotesk_700Bold'
 
 Radius.xs = 8 | .sm = 12 | .md = 16 | .lg = 22 | .xl = 30 | .pill = 999
+Spacing.xs = 4 | .sm = 8 | .md = 14 | .lg = 22 | .xl = 32
 ```
 
 ---
@@ -112,7 +182,8 @@ Radius.xs = 8 | .sm = 12 | .md = 16 | .lg = 22 | .xl = 30 | .pill = 999
 4. **All colors via `Colors.*`** — no hardcoded hex values anywhere
 5. **Type-check before committing** — run `npx tsc --noEmit` from `mobile/` and fix all errors
 6. **Don't add features beyond what's asked** — no "while I'm here" cleanup or refactors
-7. **Don't change existing screen layouts** — new screens can follow the same patterns, but don't touch existing ones unless instructed
+7. **Don't change existing screen layouts** — new screens follow existing patterns only
+8. **Expo SDK 56 only** — do not change the `expo` package version or mix SDK versions
 
 ---
 
@@ -124,7 +195,7 @@ Radius.xs = 8 | .sm = 12 | .md = 16 | .lg = 22 | .xl = 30 | .pill = 999
 4. Register screen in `AppNavigator.tsx`
 5. Use only existing components and tokens — do not invent new design patterns
 6. Run `npx tsc --noEmit` — zero errors required
-7. Tell the user: "Ready to open a PR" — do not push without confirmation
+7. Push via MCP tools, open PR, tell user "Ready to merge" — never auto-merge
 
 ---
 
@@ -136,11 +207,12 @@ Radius.xs = 8 | .sm = 12 | .md = 16 | .lg = 22 | .xl = 30 | .pill = 999
 
 ---
 
-## GitHub Pages deployment
-- Workflow: `.github/workflows/deploy-pages.yml`
-- Triggers on push to `main` when `mobile/**` files change
-- `experiments.baseUrl: "/Just-a-pinch"` in `app.json` is critical — do not remove it
-- Pages source must be set to "GitHub Actions" in repo Settings → Pages
+## EAS / Android build
+- EAS project ID: `be46212c-555a-4f61-8c1c-07224d7e4807` (in `app.json` extra.eas.projectId)
+- Build profile: `preview` → outputs `.apk` sideload file
+- Trigger: push to `main` or `workflow_dispatch` in GitHub Actions
+- APK artifact available for 7 days under the `Build Android APK` Actions run
+- `EXPO_TOKEN` and `SUPABASE_ANON_KEY` must be set as GitHub repository secrets
 
 ---
 
