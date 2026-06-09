@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Just a Pinch",
+    "slug": "just-a-pinch",
+    "owner": "kariimc",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.justapinch.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "experiments": {
+      "baseUrl": "/Just-a-pinch"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "be46212c-555a-4f61-8c1c-07224d7e4807"
+      },
+      "apiUrl": "http://YOUR_MACHINE_IP:3001",
+      "supabaseUrl": "https://qdlfiewspjgbucszezja.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkbGZpZXdzcGpnYnVjc3plemphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDA0NDUsImV4cCI6MjA5NjE3NjQ0NX0.I9Vtn_B7LTf850syL2sxmy_lMMwpunga72ZWyai_xYM"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#2E9E57",
+          "sounds": []
+        }
+      ]
+    ]
+  }
+}
