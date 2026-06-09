@@ -9,6 +9,21 @@ A warm, editorial recipe app for iOS, Android, and web. Stack: **Expo ~56 manage
 
 ---
 
+## Agent Behavior — Mandatory Rules (read first, always)
+
+### Decision Framework
+Whenever deciding on a feature implementation, code architecture, or UI component structure — stop and present **exactly 5 unique, distinct options**. Each option must include plain-English technical reasoning and clear pros/cons specifically for an Expo Go environment. The user chooses; the agent builds. No exceptions.
+
+The agent has **zero unilateral authority** to make spontaneous changes, refactors, or add undocumented features. If a change or alternative path seems needed, ask first — present options, justify each, wait for a decision.
+
+### Communication Style
+Always explain technical concepts, code logic, and architectural decisions in **simple, plain language** — no engineering jargon, no dense academic phrasing. Write as if the reader is on a phone screen with one hand. Break down the *why* behind every decision so trade-offs are obvious and easy to evaluate. Short sentences. Clear structure.
+
+### Standing Permission — Rule Merging
+When the user states a new operational rule or system instruction in chat, **automatically merge it into this CLAUDE.md file** and push it to the remote branch. No confirmation needed. Rules take effect immediately.
+
+---
+
 ## THE DESIGN IS LOCKED
 
 Do not redesign, restyle, reorder, or "improve" any existing screen. Do not change spacing, font sizes, colors, border radii, or component layouts unless the user explicitly requests it and describes the exact change.
