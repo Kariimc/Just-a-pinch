@@ -2,8 +2,8 @@
   "app": "ReciMe",
   "currentPhase": 0,
   "lastUpdated": "2026-06-09",
-  "lastTask": "Project pivot complete. All blueprinting and motion system locked. Ready to scaffold.",
-  "nextTask": "Begin Phase 1 — scaffold Expo Router structure, install all packages, configure NativeWind v4.",
+  "lastTask": "Added mandatory agent behavior rules to CLAUDE.md: Decision Framework (5 options for every architectural decision), Communication Style (plain language, phone-readable), Standing Permission (auto-merge new rules). Fixed recurring git sync pattern: after every MCP push, run git fetch origin <branch> && git reset --hard origin/<branch>.",
+  "nextTask": "Begin Phase 1 — scaffold Expo Router file structure, install all packages (NativeWind v4, FlashList, Reanimated V3, RNGH v2, @gorhom/bottom-sheet), create src/theme/motion.ts and src/theme/index.ts, wire navigation shell.",
   "phases": [
     {
       "id": 1,
