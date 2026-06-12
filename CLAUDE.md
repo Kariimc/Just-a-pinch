@@ -42,10 +42,18 @@ Supabase dashboard's Auth → URL Configuration allowlist (app scheme is
 - `claude-proxy` edge function is deployed at v5 with `verify_jwt: true` and
   vision support (photo OCR sends a base64 image block).
 - `recipe-api` edge function (source in `supabase/functions/recipe-api/`)
-  deployed at v1 with `verify_jwt: true` — the app's anon key satisfies the
-  JWT check, so capture works signed-out too. Uses the same project-wide
-  `ANTHROPIC_API_KEY` secret as claude-proxy. This replaced the LAN-IP
+  deployed at v3 with `verify_jwt: true` — the app's anon key satisfies the
+  JWT check, so capture works signed-out too. This replaced the LAN-IP
   Express backend (Android blocked it as CLEARTEXT; see 2026-06-12 device QA).
+  v3 also hosts `instacartLink` (shopping list → Instacart cart page via the
+  Instacart Developer Platform API).
+- **BLOCKER (2026-06-12): no `ANTHROPIC_API_KEY` secret is set on the
+  project** — confirmed via edge-function logs (v2's missing-key guard
+  503s in ~70ms). Every AI capture path fails until the user adds it in
+  Supabase → Edge Functions → Secrets. claude-proxy reads the same name and
+  has therefore never worked either. `INSTACART_API_KEY` is likewise unset
+  (Instacart button falls back to a search URL until it's added;
+  `INSTACART_ENV=development` switches to the sandbox host for dev keys).
 - A leftover `recipe-scraper` edge function (verify_jwt: false, old data
   shape from the deleted app revision) is still deployed but unused —
   candidate for deletion next infra pass.
