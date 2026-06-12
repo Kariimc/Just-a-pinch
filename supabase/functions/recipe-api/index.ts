@@ -220,11 +220,97 @@ function htmlToText(html: string): string {
     .slice(0, 9000);
 }
 
-function extractOgImage(html: string): string | undefined {
-  const tag =
-    html.match(/<meta[^>]+property=["']og:image["'][^>]*>/i)?.[0] ??
-    html.match(/<meta[^>]+name=["']og:image["'][^>]*>/i)?.[0];
-  return tag?.match(/content=["']([^"']+)["']/i)?.[1] || undefined;
+// Best image for a recipe page, smartest source first:
+//   1. schema.org Recipe JSON-LD `image` — the actual dish, high-res, on
+//      virtually every real recipe site (AllRecipes, NYT Cooking, etc.)
+//   2. og:image  3. twitter:image  4. <link rel="image_src">
+// Returns an absolute URL (relative/protocol-relative refs are resolved
+// against the page URL), or undefined so the caller can fall back to Pexels.
+function extractImage(html: string, pageUrl: string): string | undefined {
+  const candidate =
+    imageFromJsonLd(html) ??
+    metaContent(html, 'og:image') ??
+    metaContent(html, 'og:image:url') ??
+    metaContent(html, 'og:image:secure_url') ??
+    metaContent(html, 'twitter:image') ??
+    metaContent(html, 'twitter:image:src') ??
+    linkHref(html, 'image_src');
+  if (!candidate) return undefined;
+  try {
+    return new URL(candidate, pageUrl).href;
+  } catch {
+    return candidate;
+  }
+}
+
+// <meta property|name="key" content="..."> in either attribute order.
+function metaContent(html: string, key: string): string | undefined {
+  const re = new RegExp(`<meta[^>]+(?:property|name)=["']${key}["'][^>]*>`, 'i');
+  const tag = html.match(re)?.[0];
+  const val = tag?.match(/content=["']([^"']+)["']/i)?.[1];
+  return val ? decodeEntities(val) : undefined;
+}
+
+// <link rel="key" href="...">
+function linkHref(html: string, rel: string): string | undefined {
+  const re = new RegExp(`<link[^>]+rel=["']${rel}["'][^>]*>`, 'i');
+  const tag = html.match(re)?.[0];
+  const val = tag?.match(/href=["']([^"']+)["']/i)?.[1];
+  return val ? decodeEntities(val) : undefined;
+}
+
+function decodeEntities(s: string): string {
+  return s.replace(/&amp;/gi, '&').replace(/&#x2F;/gi, '/').replace(/&#47;/g, '/').trim();
+}
+
+// Pull the dish image out of any schema.org Recipe node (handles a top-level
+// object, an array, or an @graph; image as a string, array, or ImageObject).
+function imageFromJsonLd(html: string): string | undefined {
+  const blocks = html.matchAll(
+    /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+  );
+  for (const m of blocks) {
+    let data: unknown;
+    try { data = JSON.parse(m[1].trim()); } catch { continue; }
+    const recipe = findRecipeNode(data);
+    const img = recipe && pickImageValue((recipe as Record<string, unknown>).image);
+    if (img) return img;
+  }
+  return undefined;
+}
+
+function findRecipeNode(data: unknown): Record<string, unknown> | undefined {
+  const nodes = Array.isArray(data) ? data : [data];
+  for (const n of nodes) {
+    if (!n || typeof n !== 'object') continue;
+    const obj = n as Record<string, unknown>;
+    if (Array.isArray(obj['@graph'])) {
+      const found = findRecipeNode(obj['@graph']);
+      if (found) return found;
+    }
+    const type = obj['@type'];
+    const isRecipe = Array.isArray(type)
+      ? type.some(t => String(t).toLowerCase() === 'recipe')
+      : String(type).toLowerCase() === 'recipe';
+    if (isRecipe) return obj;
+  }
+  return undefined;
+}
+
+function pickImageValue(image: unknown): string | undefined {
+  if (typeof image === 'string') return image.trim() || undefined;
+  if (Array.isArray(image)) {
+    for (const it of image) {
+      const v = pickImageValue(it);
+      if (v) return v;
+    }
+    return undefined;
+  }
+  if (image && typeof image === 'object') {
+    const url = (image as Record<string, unknown>).url;
+    return typeof url === 'string' ? url.trim() || undefined : undefined;
+  }
+  return undefined;
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
@@ -265,7 +351,7 @@ async function importUrl(url?: string) {
   }
 
   const pageText = htmlToText(html);
-  const imageUrl = extractOgImage(html);
+  const imageUrl = extractImage(html, url);
 
   const system = `You are a recipe parser. Extract the recipe from the provided page text and return ONLY valid JSON with this exact structure:
 ${RECIPE_SHAPE}
@@ -273,7 +359,7 @@ If you cannot find a value, use a sensible default. Return only JSON, no other t
 
   const raw = await callClaude(system, `URL: ${url}\n\nPage text:\n${pageText}`);
   const recipe = parseRecipeJSON(raw);
-  // Prefer the page's own og:image; fall back to a stock food photo.
+  // Prefer the page's own photo (JSON-LD/og/twitter); else a stock food photo.
   const photo = imageUrl ?? await fetchFoodPhoto(recipe.title, recipe.tags);
   return json({ ...recipe, sourceUrl: url, imageUrl: photo });
 }

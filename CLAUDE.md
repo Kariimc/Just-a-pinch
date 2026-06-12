@@ -42,15 +42,17 @@ Supabase dashboard's Auth → URL Configuration allowlist (app scheme is
 - `claude-proxy` edge function is deployed at v5 with `verify_jwt: true` and
   vision support (photo OCR sends a base64 image block).
 - `recipe-api` edge function (source in `supabase/functions/recipe-api/`)
-  deployed at v8 with `verify_jwt: true` — the app's anon key satisfies the
+  deployed at v10 with `verify_jwt: true` — the app's anon key satisfies the
   JWT check, so capture works signed-out too. This replaced the LAN-IP
   Express backend (Android blocked it as CLEARTEXT; see 2026-06-12 device QA).
   Also hosts `instacartLink` (shopping list → Instacart cart page via the
-  Instacart Developer Platform API). v8 adds Pexels stock-photo lookup:
-  recipes with no image of their own (AI-generated, pasted, scanned, or a URL
-  with no og:image) get a real food photo keyed off the dish name via
-  `fetchFoodPhoto` — graceful no-op to the gradient placeholder when
-  `PEXELS_API_KEY` is unset.
+  Instacart Developer Platform API). Image handling: URL import uses a smart
+  extraction chain (`extractImage`) — schema.org Recipe JSON-LD image →
+  og:image → twitter:image → `<link rel=image_src>`, resolved to absolute
+  URLs. Recipes with no image of their own (AI-generated, pasted, scanned, or
+  a URL where the chain finds nothing) fall back to a real Pexels food photo
+  keyed off the dish name (`fetchFoodPhoto`) — itself a graceful no-op to the
+  gradient placeholder when `PEXELS_API_KEY` is unset.
 - **BLOCKER (2026-06-12): no `ANTHROPIC_API_KEY` secret is set on the
   project** — confirmed via edge-function logs (v2's missing-key guard
   503s in ~70ms). Every AI capture path fails until the user adds it in
