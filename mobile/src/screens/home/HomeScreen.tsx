@@ -250,8 +250,13 @@ export default function HomeScreen() {
           <Icon name="people" size={22} color="#fff" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.communityTitle}>Community Recipes</Text>
-          <Text style={styles.communitySub}>See what the Just a Pinch family is cooking</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.communityTitle}>Community Recipes</Text>
+            <View style={styles.comingSoonChip}>
+              <Text style={styles.comingSoonTxt}>Soon</Text>
+            </View>
+          </View>
+          <Text style={styles.communitySub}>Share, discover, and rate — launching soon</Text>
         </View>
         <Icon name="fwd" size={20} color={Colors.accentDeep} />
       </Tappable>
@@ -416,6 +421,11 @@ const styles = StyleSheet.create({
   },
   communityTitle: { fontFamily: Fonts.uiBold, fontSize: 15.5, color: Colors.ink },
   communitySub: { fontFamily: Fonts.uiRegular, fontSize: 13, color: Colors.ink2, marginTop: 2 },
+  comingSoonChip: {
+    paddingHorizontal: 7, paddingVertical: 2,
+    backgroundColor: '#F5A62320', borderRadius: Radius.pill,
+  },
+  comingSoonTxt: { fontFamily: Fonts.uiBold, fontSize: 10, color: '#C88A00', letterSpacing: 0.3 },
   familyCard: { marginTop: 12, borderRadius: Radius.lg, overflow: 'hidden', height: 150 },
   familyOverlay: {
     ...StyleSheet.absoluteFill,

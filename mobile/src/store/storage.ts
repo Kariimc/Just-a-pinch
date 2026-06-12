@@ -73,9 +73,10 @@ export async function getRecipe(id: string): Promise<Recipe | null> {
 }
 
 export async function saveRecipe(recipe: Recipe): Promise<void> {
-  if (await authed()) {
-    try { await dbSaveRecipe(recipe); } catch { /* fall through to local */ }
-  }
+  // Skip the getSession() check — getSession() can return null on web before
+  // the SDK hydrates from localStorage, even when the user is authenticated.
+  // dbSaveRecipe calls getUser() (server-authoritative) and throws if not auth'd.
+  try { await dbSaveRecipe(recipe); } catch { /* not signed in or offline */ }
   const all = (await get<Recipe[]>(KEYS.recipes)) ?? [];
   const idx = all.findIndex(r => r.id === recipe.id);
   if (idx >= 0) all[idx] = recipe;
@@ -127,9 +128,7 @@ export async function getMealPlan(): Promise<MealPlanEntry[]> {
 }
 
 export async function saveMealEntry(entry: MealPlanEntry): Promise<void> {
-  if (await authed()) {
-    try { await dbSaveMealEntry(entry); } catch { /* fall through */ }
-  }
+  try { await dbSaveMealEntry(entry); } catch { /* not signed in or offline */ }
   const all = (await get<MealPlanEntry[]>(KEYS.mealPlan)) ?? [];
   const idx = all.findIndex(e => e.id === entry.id);
   if (idx >= 0) all[idx] = entry;
@@ -162,9 +161,7 @@ export async function getShoppingItems(): Promise<ShoppingItem[]> {
 }
 
 export async function saveShoppingItems(items: ShoppingItem[]): Promise<void> {
-  if (await authed()) {
-    try { await dbSaveShoppingItems(items); } catch { /* fall through */ }
-  }
+  try { await dbSaveShoppingItems(items); } catch { /* not signed in or offline */ }
   await set(KEYS.shopping, items);
 }
 

@@ -1,222 +1,25 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
-  ListRenderItemInfo, ActivityIndicator, RefreshControl,
-} from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList, Recipe } from '../../types';
-import { Colors, Fonts, FoodColors, Radius, Shadow } from '../../theme';
-import {
-  CommunityRecipe,
-  getTopWeekRecipes,
-  getAllRecipes,
-  rateRecipe,
-  getMyRatings,
-} from '../../lib/community';
-import { saveRecipe } from '../../store/storage';
-import { showToast } from '../../components/Toast';
-import FoodPlaceholder from '../../components/FoodPlaceholder';
+import { RootStackParamList } from '../../types';
+import { Colors, Fonts, Radius, Shadow } from '../../theme';
 import Icon from '../../components/Icon';
 import Tappable from '../../components/Tappable';
-import EmptyState from '../../components/EmptyState';
-import { uid } from '../../utils/id';
+import Sheen from '../../components/Sheen';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Community'>;
-type Tab = 'week' | 'all';
 
-const FOOD_VARIANTS = Object.keys(FoodColors) as Array<keyof typeof FoodColors>;
-
-function foodVariant(id: string): keyof typeof FoodColors {
-  let hash = 0;
-  for (const c of id) hash = (hash * 31 + c.charCodeAt(0)) & 0xffff;
-  return FOOD_VARIANTS[hash % FOOD_VARIANTS.length];
-}
-
-function timeAgo(ts: number): string {
-  const diff = Date.now() - ts;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 2) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  return `${Math.floor(days / 7)}w ago`;
-}
-
-function StarRow({
-  avg,
-  count,
-  myRating,
-  onRate,
-}: {
-  avg: number;
-  count: number;
-  myRating?: number;
-  onRate: (stars: number) => void;
-}) {
-  const filled = myRating ?? Math.round(avg);
-  return (
-    <View style={starStyles.row}>
-      {[1, 2, 3, 4, 5].map(s => (
-        <TouchableOpacity
-          key={s}
-          onPress={() => onRate(s)}
-          hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-        >
-          <Text style={[starStyles.star, { color: s <= filled ? '#F5A623' : Colors.line2 }]}>
-            {s <= filled ? '★' : '☆'}
-          </Text>
-        </TouchableOpacity>
-      ))}
-      <Text style={starStyles.label}>
-        {avg > 0 ? avg.toFixed(1) : ''}{count > 0 ? ` (${count})` : myRating ? '' : ' · Tap to rate'}
-      </Text>
-    </View>
-  );
-}
-
-const starStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 3 },
-  star: { fontSize: 15 },
-  label: { fontFamily: Fonts.uiRegular, fontSize: 11, color: Colors.ink3, marginLeft: 3 },
-});
-
-interface CardProps {
-  item: CommunityRecipe;
-  myRating?: number;
-  onRate: (id: string, stars: number) => void;
-  onSave: (item: CommunityRecipe) => void;
-}
-
-function CommunityCard({ item, myRating, onRate, onSave }: CardProps) {
-  return (
-    <View style={[styles.card, Shadow.card]}>
-      <FoodPlaceholder variant={foodVariant(item.id)} style={styles.thumb} />
-      <View style={styles.body}>
-        <Text style={styles.recipeTitle} numberOfLines={2}>{item.recipe.title}</Text>
-        <Text style={styles.byLine} numberOfLines={1}>
-          by {item.authorName} · {timeAgo(item.sharedAt)}
-        </Text>
-        <StarRow
-          avg={item.avgRating}
-          count={item.ratingCount}
-          myRating={myRating}
-          onRate={stars => onRate(item.id, stars)}
-        />
-        <Tappable style={styles.saveBtn} scaleTo={0.92} haptic onPress={() => onSave(item)}>
-          <Icon name="bookmark" size={12} color={Colors.accentDeep} />
-          <Text style={styles.saveBtnText}>Save to Library</Text>
-        </Tappable>
-      </View>
-    </View>
-  );
-}
+const PREVIEW_ITEMS = [
+  { title: 'Grandma’s Sunday Roast', author: 'Maria K.', stars: 5 },
+  { title: 'Crispy Korean Fried Chicken', author: 'James L.', stars: 5 },
+  { title: 'Summer Peach Galette', author: 'Sofia R.', stars: 4 },
+  { title: 'One-Pan Shakshuka', author: 'David M.', stars: 5 },
+];
 
 export default function CommunityScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const [tab, setTab] = useState<Tab>('week');
-  const [weekItems, setWeekItems] = useState<CommunityRecipe[]>([]);
-  const [allItems, setAllItems] = useState<CommunityRecipe[]>([]);
-  const [myRatings, setMyRatings] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const pageRef = useRef(0);
-  const hasMoreRef = useRef(true);
-
-  const items: CommunityRecipe[] = tab === 'week' ? weekItems : allItems;
-
-  async function loadInitial() {
-    setLoading(true);
-    try {
-      const [week, all] = await Promise.all([getTopWeekRecipes(), getAllRecipes(0)]);
-      setWeekItems(week);
-      setAllItems(all);
-      pageRef.current = 0;
-      hasMoreRef.current = all.length === 20;
-      const ids = [...new Set([...week, ...all].map(r => r.id))];
-      const ratings = await getMyRatings(ids);
-      setMyRatings(ratings);
-    } catch {
-      showToast('Could not load community recipes', 'wifi');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useFocusEffect(useCallback(() => { loadInitial(); }, []));
-
-  async function loadMore() {
-    if (tab !== 'all' || loadingMore || !hasMoreRef.current) return;
-    setLoadingMore(true);
-    try {
-      pageRef.current++;
-      const more = await getAllRecipes(pageRef.current);
-      setAllItems(prev => [...prev, ...more]);
-      hasMoreRef.current = more.length === 20;
-      const ids = more.map(r => r.id);
-      const ratings = await getMyRatings(ids);
-      setMyRatings(prev => ({ ...prev, ...ratings }));
-    } catch { /* swallow */ }
-    finally { setLoadingMore(false); }
-  }
-
-  async function handleRate(id: string, stars: number) {
-    const prevMyRating = myRatings[id];
-    setMyRatings(prev => ({ ...prev, [id]: stars }));
-    // Optimistic avg update
-    const applyOptimistic = (list: CommunityRecipe[]): CommunityRecipe[] =>
-      list.map(r => {
-        if (r.id !== id) return r;
-        let count = r.ratingCount;
-        let sum = r.avgRating * count;
-        if (prevMyRating) { sum -= prevMyRating; } else { count += 1; }
-        sum += stars;
-        return { ...r, avgRating: count > 0 ? sum / count : 0, ratingCount: count };
-      });
-    setWeekItems(applyOptimistic);
-    setAllItems(applyOptimistic);
-    try {
-      await rateRecipe(id, stars);
-    } catch {
-      showToast('Could not save rating', 'wifi');
-      // revert
-      setMyRatings(prev => {
-        const next = { ...prev };
-        if (prevMyRating) next[id] = prevMyRating;
-        else delete next[id];
-        return next;
-      });
-    }
-  }
-
-  async function handleSave(item: CommunityRecipe) {
-    const recipe: Recipe = {
-      ...item.recipe,
-      id: uid(),
-      savedAt: Date.now(),
-      createdAt: Date.now(),
-      isSaved: true,
-    };
-    try {
-      await saveRecipe(recipe);
-      showToast(`"${item.recipe.title}" saved to your library`, 'bookmark');
-    } catch {
-      showToast('Could not save recipe', 'wifi');
-    }
-  }
-
-  const renderItem = ({ item }: ListRenderItemInfo<CommunityRecipe>) => (
-    <CommunityCard
-      item={item}
-      myRating={myRatings[item.id]}
-      onRate={handleRate}
-      onSave={handleSave}
-    />
-  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -225,113 +28,117 @@ export default function CommunityScreen({ navigation }: Props) {
         <Tappable onPress={() => navigation.goBack()} style={styles.backBtn} scaleTo={0.88} haptic>
           <Icon name="back" size={22} color={Colors.ink} />
         </Tappable>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Community</Text>
-          <Text style={styles.subtitle}>What everyone's cooking</Text>
-        </View>
       </View>
 
-      {/* Segmented control */}
-      <View style={styles.segWrap}>
-        <View style={styles.seg}>
-          {(['week', 'all'] as Tab[]).map(t => (
-            <Tappable
-              key={t}
-              style={[styles.segBtn, tab === t && styles.segBtnActive]}
-              scaleTo={0.95}
-              onPress={() => setTab(t)}
-            >
-              <Text style={[styles.segTxt, tab === t && styles.segTxtActive]}>
-                {t === 'week' ? 'This Week' : 'Browse All'}
-              </Text>
-            </Tappable>
+      <Animated.View entering={FadeInDown.delay(60).springify().damping(26).stiffness(220)} style={styles.body}>
+        {/* Hero */}
+        <View style={styles.heroIconWrap}>
+          <Icon name="people" size={38} color={Colors.accentDeep} />
+        </View>
+        <Text style={styles.heading}>Community Recipes</Text>
+        <Text style={styles.sub}>
+          Share your favorites, discover what the Just a Pinch family is cooking,
+          and rate the week’s top dishes.
+        </Text>
+
+        {/* Coming soon badge */}
+        <View style={styles.badge}>
+          <View style={styles.badgeDot} />
+          <Text style={styles.badgeTxt}>Coming Soon</Text>
+        </View>
+
+        {/* Blurred preview cards */}
+        <View style={styles.previewList}>
+          {PREVIEW_ITEMS.map((item, i) => (
+            <View key={i} style={[styles.previewCard, Shadow.card]}>
+              <View style={styles.previewThumb} />
+              <View style={styles.previewBody}>
+                <View style={styles.previewTitleBar} />
+                <View style={styles.previewByLine} />
+                <Text style={styles.previewStars}>{'★'.repeat(item.stars)}</Text>
+              </View>
+            </View>
           ))}
+          {/* Fade-out mask */}
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <View style={styles.fadeOut} />
+          </View>
         </View>
-      </View>
 
-      {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={Colors.accent} size="large" />
-        </View>
-      ) : (
-        <FlatList
-          data={items}
-          keyExtractor={item => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24 }]}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={async () => { setRefreshing(true); await loadInitial(); setRefreshing(false); }}
-              tintColor={Colors.accent}
-            />
-          }
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.3}
-          ListFooterComponent={
-            loadingMore
-              ? <ActivityIndicator color={Colors.accent} style={{ marginVertical: 16 }} />
-              : null
-          }
-          ListEmptyComponent={
-            <EmptyState
-              icon="people"
-              title={tab === 'week' ? 'Nothing shared yet this week' : 'No community recipes yet'}
-              message={
-                tab === 'week'
-                  ? 'Share a recipe from your library and be the first!'
-                  : 'Open any recipe, tap ··· → Share to Community.'
-              }
-              style={{ marginTop: 48 }}
-            />
-          }
-        />
-      )}
+        {/* Subscribe CTA */}
+        <Tappable
+          style={[styles.ctaBtn, Shadow.cardSoft]}
+          scaleTo={0.96}
+          haptic
+          onPress={() => navigation.navigate('Paywall', { source: 'settings' })}
+        >
+          <Icon name="sparkle" size={18} color="#fff" />
+          <Text style={styles.ctaTxt}>Get Early Access</Text>
+          <Sheen radius={Radius.lg} delayMs={600} peak={0.55} />
+        </Tappable>
+        <Text style={styles.ctaSub}>Subscribers unlock Community when it launches.</Text>
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.paper },
-  header: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 16, paddingVertical: 12, gap: 10,
-  },
+  header: { paddingHorizontal: 16, paddingBottom: 4 },
   backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  title: {
-    fontFamily: Fonts.displaySemiBold, fontSize: 24,
-    color: Colors.ink, letterSpacing: -0.5,
+
+  body: { flex: 1, alignItems: 'center', paddingHorizontal: 28, paddingTop: 24 },
+
+  heroIconWrap: {
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: Colors.accentSoft,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 20,
   },
-  subtitle: { fontFamily: Fonts.uiRegular, fontSize: 13, color: Colors.ink3, marginTop: 1 },
-  segWrap: { paddingHorizontal: 16, paddingBottom: 10 },
-  seg: {
-    flexDirection: 'row', backgroundColor: Colors.surface2,
-    borderRadius: Radius.md, padding: 3,
+  heading: {
+    fontFamily: Fonts.displaySemiBold, fontSize: 28, color: Colors.ink,
+    letterSpacing: -0.6, textAlign: 'center',
   },
-  segBtn: { flex: 1, paddingVertical: 8, borderRadius: Radius.sm, alignItems: 'center' },
-  segBtnActive: { backgroundColor: Colors.surface, ...Shadow.card },
-  segTxt: { fontFamily: Fonts.uiMedium, fontSize: 14, color: Colors.ink3 },
-  segTxtActive: { fontFamily: Fonts.uiBold, color: Colors.ink },
-  list: { paddingHorizontal: 16, paddingTop: 4, gap: 12 },
-  card: {
+  sub: {
+    fontFamily: Fonts.uiRegular, fontSize: 15, color: Colors.ink2,
+    textAlign: 'center', lineHeight: 22, marginTop: 10, maxWidth: 320,
+  },
+
+  badge: {
+    flexDirection: 'row', alignItems: 'center', gap: 7,
+    marginTop: 18, paddingHorizontal: 14, paddingVertical: 6,
+    backgroundColor: Colors.surface2, borderRadius: Radius.pill,
+  },
+  badgeDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#F5A623' },
+  badgeTxt: { fontFamily: Fonts.uiBold, fontSize: 12.5, color: Colors.ink2, letterSpacing: 0.4 },
+
+  previewList: {
+    width: '100%', marginTop: 24, gap: 10, overflow: 'hidden', maxHeight: 220,
+  },
+  previewCard: {
     flexDirection: 'row', backgroundColor: Colors.surface,
-    borderRadius: Radius.md, overflow: 'hidden',
+    borderRadius: Radius.md, overflow: 'hidden', opacity: 0.55,
   },
-  thumb: { width: 90, alignSelf: 'stretch' },
-  body: {
-    flex: 1, paddingVertical: 11, paddingLeft: 12, paddingRight: 13,
-    gap: 1, justifyContent: 'center',
+  previewThumb: { width: 72, height: 72, backgroundColor: Colors.line2 },
+  previewBody: { flex: 1, padding: 12, gap: 6, justifyContent: 'center' },
+  previewTitleBar: { height: 13, borderRadius: 6, backgroundColor: Colors.line, width: '75%' },
+  previewByLine: { height: 10, borderRadius: 5, backgroundColor: Colors.line, width: '45%' },
+  previewStars: { fontSize: 12, color: '#F5A623', marginTop: 2 },
+  fadeOut: {
+    position: 'absolute', bottom: 0, left: 0, right: 0, height: 120,
+    // Simple white gradient overlay via backgroundColor with opacity
+    backgroundColor: Colors.paper, opacity: 0.85,
   },
-  recipeTitle: {
-    fontFamily: Fonts.displayMedium, fontSize: 15.5, color: Colors.ink,
-    letterSpacing: -0.2, lineHeight: 21,
+
+  ctaBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 9,
+    marginTop: 22, paddingHorizontal: 28, paddingVertical: 16,
+    backgroundColor: Colors.accent, borderRadius: Radius.lg,
+    alignSelf: 'stretch', justifyContent: 'center',
   },
-  byLine: { fontFamily: Fonts.uiRegular, fontSize: 11.5, color: Colors.ink3 },
-  saveBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8,
-    alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5,
-    backgroundColor: Colors.accentSoft, borderRadius: Radius.pill,
+  ctaTxt: { fontFamily: Fonts.uiBold, fontSize: 16.5, color: '#fff' },
+  ctaSub: {
+    fontFamily: Fonts.uiRegular, fontSize: 12.5, color: Colors.ink3,
+    textAlign: 'center', marginTop: 12,
   },
-  saveBtnText: { fontFamily: Fonts.uiBold, fontSize: 11.5, color: Colors.accentDeep },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });
