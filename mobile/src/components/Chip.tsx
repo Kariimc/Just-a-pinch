@@ -1,5 +1,6 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ViewStyle } from 'react-native';
+import { Text, StyleSheet, ViewStyle } from 'react-native';
+import Tappable from './Tappable';
 import { Colors, Radius, Fonts } from '../theme';
 
 interface Props {
@@ -12,7 +13,7 @@ interface Props {
 
 export default function Chip({ label, active, soft, onPress, style }: Props) {
   return (
-    <TouchableOpacity
+    <Tappable
       style={[
         styles.chip,
         active && styles.active,
@@ -20,12 +21,12 @@ export default function Chip({ label, active, soft, onPress, style }: Props) {
         style,
       ]}
       onPress={onPress}
-      activeOpacity={0.7}
+      scaleTo={0.93}
     >
       <Text style={[styles.label, active && styles.activeLabel, soft && styles.softLabel]}>
         {label}
       </Text>
-    </TouchableOpacity>
+    </Tappable>
   );
 }
 

@@ -9,15 +9,13 @@ export function formatTime(minutes: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-export function scaleQuantity(qty: string, from: number, to: number): string {
-  const num = parseFloat(qty);
-  if (isNaN(num)) return qty;
-  const scaled = (num * to) / from;
-  return Number.isInteger(scaled) ? String(scaled) : scaled.toFixed(1).replace(/\.0$/, '');
-}
+export { scaleQuantity } from './units';
 
+// Local-timezone YYYY-MM-DD (toISOString would shift evening dates to tomorrow in UTC).
 export function dateKey(d: Date): string {
-  return d.toISOString().split('T')[0];
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
 }
 
 export function weekDays(fromDate: Date): Date[] {

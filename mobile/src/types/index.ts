@@ -103,22 +103,19 @@ export type RootStackParamList = {
   Welcome: undefined;
   SignUp: undefined;
   LogIn: undefined;
-  ForgotPassword: undefined;
+  ResetPassword: undefined;
   PersonalizationQuiz: undefined;
   Main: undefined;
   RecipeDetail: { recipeId: string };
   CookingMode: { recipeId: string };
   RecipeEditor: { recipeId?: string };
   AddMenu: undefined;
-  ImportReview: { data: Partial<Recipe> };
   AIGenerator: undefined;
-  Search: undefined;
-  CollectionDetail: { collectionId: string };
+  Search: { initialQuery?: string } | undefined;
   AddToMealPlan: { recipeId: string };
   Settings: undefined;
-  Profile: undefined;
-  Timers: undefined;
-  Accessibility: undefined;
+  Badges: undefined;
+  Paywall: { source?: 'onboarding' | 'settings' } | undefined;
 };
 
 export type TabParamList = {

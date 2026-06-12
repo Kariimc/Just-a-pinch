@@ -3,7 +3,8 @@ import {
   View, Text, TextInput, ScrollView, TouchableOpacity,
   StyleSheet, FlatList,
 } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, Recipe } from '../types';
 import { Colors, Radius, Fonts } from '../theme';
@@ -26,7 +27,9 @@ function scoreRecipe(recipe: Recipe, query: string): number {
 
 export default function SearchScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [query, setQuery] = useState('');
+  const route = useRoute<RouteProp<RootStackParamList, 'Search'>>();
+  const insets = useSafeAreaInsets();
+  const [query, setQuery] = useState(route.params?.initialQuery ?? '');
   const [tagFilter, setTagFilter] = useState('All');
   const [allRecipes, setAllRecipes] = useState<Recipe[]>([]);
   const [results, setResults] = useState<Recipe[]>([]);
@@ -58,7 +61,7 @@ export default function SearchScreen() {
   return (
     <View style={styles.container}>
       {/* Search bar */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Icon name="back" size={20} color={Colors.ink} />
         </TouchableOpacity>
@@ -142,7 +145,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     paddingHorizontal: 14,
-    paddingTop: 56,
     paddingBottom: 12,
     backgroundColor: Colors.paper,
     borderBottomWidth: 1,

@@ -1,19 +1,32 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  Alert, KeyboardAvoidingView, Platform,
+  Alert, KeyboardAvoidingView, Platform, LayoutAnimation, UIManager,
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors, Radius, Fonts } from '../../theme';
 import Icon from '../../components/Icon';
+import AnimatedCheck from '../../components/AnimatedCheck';
+import EmptyState from '../../components/EmptyState';
+import { showToast } from '../../components/Toast';
 import { getShoppingItems, saveShoppingItems, toggleShoppingItem } from '../../store/storage';
-import { ShoppingItem } from '../../types';
+import { bumpBadgeStat } from '../../store/badges';
+import { RootStackParamList, ShoppingItem } from '../../types';
 import { uid } from '../../utils/id';
-import { hapticLight } from '../../lib/haptics';
+import { categorizeIngredient } from '../../utils/units';
+import { hapticLight, hapticSuccess } from '../../lib/haptics';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const CATEGORIES = ['Produce', 'Dairy & eggs', 'Meat & fish', 'Pantry', 'Bakery', 'Other'];
 
 export default function ShoppingScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [newItem, setNewItem] = useState('');
 
@@ -26,27 +39,36 @@ export default function ShoppingScreen() {
     await toggleShoppingItem(id);
     const updated = items.map(i => i.id === id ? { ...i, checked: !i.checked } : i);
     setItems(updated);
+    if (updated.find(i => i.id === id)?.checked) bumpBadgeStat('itemsChecked');
   }
 
   async function addManual() {
     if (!newItem.trim()) return;
+    const name = newItem.trim();
     const item: ShoppingItem = {
-      id: uid(), name: newItem.trim(), quantity: '1', unit: '',
-      category: 'Other', checked: false, isManual: true,
+      id: uid(), name, quantity: '1', unit: '',
+      category: categorizeIngredient(name), checked: false, isManual: true,
     };
     const updated = [...items, item];
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     await saveShoppingItems(updated);
     setItems(updated);
     setNewItem('');
+    hapticLight();
   }
 
   async function clearChecked() {
-    Alert.alert('Clear checked', 'Remove all checked items?', [
+    const checkedCount = items.filter(i => i.checked).length;
+    if (!checkedCount) { showToast('Nothing checked off yet', 'info'); return; }
+    Alert.alert('Clear checked', `Remove ${checkedCount} checked item${checkedCount === 1 ? '' : 's'}?`, [
       { text: 'Cancel' },
       { text: 'Clear', style: 'destructive', onPress: async () => {
         const updated = items.filter(i => !i.checked);
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
         await saveShoppingItems(updated);
         setItems(updated);
+        hapticSuccess();
+        showToast('Checked items cleared', 'trash');
       }},
     ]);
   }
@@ -65,7 +87,7 @@ export default function ShoppingScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.container}>
+      <View style={[styles.container, { paddingTop: insets.top + 6 }]}>
         <View style={styles.header}>
           <Text style={styles.title}>Shopping</Text>
           <TouchableOpacity style={styles.iconBtn} onPress={clearChecked}>
@@ -85,19 +107,20 @@ export default function ShoppingScreen() {
 
         <ScrollView contentContainerStyle={styles.content}>
           {Object.keys(byCategory).length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>List is empty</Text>
-              <Text style={styles.emptySub}>Add items below, or add from a recipe.</Text>
-            </View>
+            <EmptyState
+              icon="cart"
+              title="List is empty"
+              message="Add items below, send a recipe's ingredients here, or generate a list from your meal plan."
+              ctaLabel="Open meal plan"
+              onPress={() => (navigation as any).navigate('Plan')}
+            />
           ) : (
             Object.entries(byCategory).map(([cat, catItems]) => (
               <View key={cat}>
                 <Text style={styles.catLabel}>{cat}</Text>
                 {catItems.map(item => (
                   <TouchableOpacity key={item.id} style={styles.itemRow} onPress={() => toggle(item.id)}>
-                    <View style={[styles.check, item.checked && styles.checkOn]}>
-                      {item.checked && <Icon name="check" size={15} color="#fff" />}
-                    </View>
+                    <AnimatedCheck checked={item.checked} />
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.itemTxt, item.checked && styles.itemDone]}>
                         <Text style={styles.itemQty}>{item.quantity} {item.unit}</Text>{'  '}{item.name}

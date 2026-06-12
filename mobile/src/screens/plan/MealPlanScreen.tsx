@@ -1,29 +1,67 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList, MealPlanEntry, Recipe } from '../../types';
+import { RootStackParamList, MealPlanEntry, Recipe, ShoppingItem } from '../../types';
 import { Colors, Radius, Fonts } from '../../theme';
-import { getMealPlan, getRecipes, deleteMealEntry } from '../../store/storage';
-import { dateKey, weekDays, dayLabel } from '../../utils/id';
+import {
+  getMealPlan, getRecipes, deleteMealEntry, saveMealEntry,
+  getShoppingItems, saveShoppingItems, getProfile,
+} from '../../store/storage';
+import { dateKey, weekDays, dayLabel, uid, formatTime } from '../../utils/id';
+import { parseQuantity, formatQuantity, categorizeIngredient } from '../../utils/units';
 import FoodPlaceholder from '../../components/FoodPlaceholder';
+import BottomSheet from '../../components/BottomSheet';
+import EmptyState from '../../components/EmptyState';
 import Icon from '../../components/Icon';
+import { showToast } from '../../components/Toast';
+import { hapticLight, hapticSuccess } from '../../lib/haptics';
 
 const MEAL_TYPES: MealPlanEntry['mealType'][] = ['breakfast', 'lunch', 'dinner'];
 
 export default function MealPlanScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'AddToMealPlan'>>();
+  const insets = useSafeAreaInsets();
+  const presetRecipeId = route.name === 'AddToMealPlan' ? route.params?.recipeId : undefined;
+
   const [entries, setEntries] = useState<MealPlanEntry[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [selectedDay, setSelectedDay] = useState(new Date());
+  const [defaultServings, setDefaultServings] = useState(2);
+
+  // Picker sheet state
+  const [pickerVisible, setPickerVisible] = useState(false);
+  const [pickerMeal, setPickerMeal] = useState<MealPlanEntry['mealType']>('dinner');
+  const [pickerRecipe, setPickerRecipe] = useState<Recipe | null>(null);
+  const [pickerServings, setPickerServings] = useState(2);
+  const [pickerDay, setPickerDay] = useState(new Date());
+
   const today = new Date();
   const days = weekDays(today);
 
-  useFocusEffect(useCallback(() => {
-    Promise.all([getMealPlan(), getRecipes()]).then(([e, r]) => {
-      setEntries(e); setRecipes(r);
-    });
-  }, []));
+  async function load() {
+    const [e, r, p] = await Promise.all([getMealPlan(), getRecipes(), getProfile()]);
+    setEntries(e);
+    setRecipes(r);
+    if (p?.householdSize) setDefaultServings(p.householdSize);
+  }
+
+  useFocusEffect(useCallback(() => { load(); }, []));
+
+  // Arriving via "Add to plan" from a recipe: open the picker for that recipe.
+  useEffect(() => {
+    if (!presetRecipeId || recipes.length === 0) return;
+    const r = recipes.find(x => x.id === presetRecipeId);
+    if (r) {
+      setPickerRecipe(r);
+      setPickerServings(r.servings);
+      setPickerDay(new Date());
+      setPickerMeal('dinner');
+      setPickerVisible(true);
+    }
+  }, [presetRecipeId, recipes.length]);
 
   function getRecipe(id: string) {
     return recipes.find(r => r.id === id);
@@ -34,47 +72,150 @@ export default function MealPlanScreen() {
     return entries.filter(e => e.date === key);
   }
 
+  function openPickerForSlot(mealType: MealPlanEntry['mealType']) {
+    setPickerMeal(mealType);
+    setPickerRecipe(null);
+    setPickerServings(defaultServings);
+    setPickerDay(selectedDay);
+    setPickerVisible(true);
+  }
+
+  async function confirmAdd() {
+    if (!pickerRecipe) return;
+    const entry: MealPlanEntry = {
+      id: uid(),
+      recipeId: pickerRecipe.id,
+      date: dateKey(pickerDay),
+      mealType: pickerMeal,
+      servings: pickerServings,
+    };
+    await saveMealEntry(entry);
+    hapticSuccess();
+    setPickerVisible(false);
+    setPickerRecipe(null);
+    await load();
+    showToast(`${pickerRecipe.title} planned for ${pickerMeal}`);
+    if (presetRecipeId) navigation.goBack();
+  }
+
+  async function autoFillWeek() {
+    const pool = recipes.length ? recipes : [];
+    if (!pool.length) { showToast('Add some recipes first', 'info'); return; }
+    const dinnerPool = pool.filter(r => r.tags.includes('dinner'));
+    const usable = dinnerPool.length >= 3 ? dinnerPool : pool;
+    let added = 0;
+    for (const d of days) {
+      const key = dateKey(d);
+      const hasDinner = entries.some(e => e.date === key && e.mealType === 'dinner');
+      if (hasDinner) continue;
+      const pick = usable[Math.floor(Math.random() * usable.length)];
+      await saveMealEntry({
+        id: uid(), recipeId: pick.id, date: key, mealType: 'dinner', servings: defaultServings,
+      });
+      added++;
+    }
+    await load();
+    hapticSuccess();
+    showToast(added ? `Planned ${added} dinner${added === 1 ? '' : 's'} this week` : 'Week is already full');
+  }
+
+  async function generateShoppingList() {
+    const weekKeys = new Set(days.map(dateKey));
+    const weekEntries = entries.filter(e => weekKeys.has(e.date));
+    if (!weekEntries.length) { showToast('Nothing planned this week yet', 'info'); return; }
+
+    const existing = await getShoppingItems();
+    const merged = new Map<string, ShoppingItem>();
+
+    for (const entry of weekEntries) {
+      const recipe = getRecipe(entry.recipeId);
+      if (!recipe) continue;
+      for (const ing of recipe.ingredients) {
+        const scale = recipe.servings > 0 ? entry.servings / recipe.servings : 1;
+        const amount = parseQuantity(ing.quantity);
+        const mapKey = `${ing.name.trim().toLowerCase()}|${ing.unit.trim().toLowerCase()}`;
+        const prev = merged.get(mapKey);
+        if (prev) {
+          const prevAmount = parseQuantity(prev.quantity);
+          if (prevAmount !== null && amount !== null) {
+            prev.quantity = formatQuantity(prevAmount + amount * scale);
+          }
+          if (!prev.recipeIds?.includes(recipe.id)) prev.recipeIds?.push(recipe.id);
+        } else {
+          merged.set(mapKey, {
+            id: uid(),
+            name: ing.name,
+            quantity: amount !== null ? formatQuantity(amount * scale) : ing.quantity,
+            unit: ing.unit,
+            category: categorizeIngredient(ing.name),
+            checked: false,
+            recipeIds: [recipe.id],
+          });
+        }
+      }
+    }
+
+    const newItems = [...merged.values()];
+    await saveShoppingItems([...existing, ...newItems]);
+    hapticSuccess();
+    showToast(`${newItems.length} ingredients added to your list`, 'cart');
+  }
+
   const label = selectedDay.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   const selectedKey = dateKey(selectedDay);
   const todayKey = dateKey(today);
+  const pickerDayKey = dateKey(pickerDay);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 6 }]}>
       <View style={styles.header}>
-        <View>
-          <Text style={styles.subTxt}>This week</Text>
-          <Text style={styles.title}>{today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {days[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          {presetRecipeId != null && (
+            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
+              <Icon name="back" size={20} color={Colors.ink} />
+            </TouchableOpacity>
+          )}
+          <View>
+            <Text style={styles.subTxt}>This week</Text>
+            <Text style={styles.title}>{today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {days[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+          </View>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.iconBtn}><Icon name="cart" size={20} color={Colors.ink} /></TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={generateShoppingList}>
+            <Icon name="cart" size={20} color={Colors.ink} />
+          </TouchableOpacity>
         </View>
       </View>
 
       {/* Day strip */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayStrip}>
-        {days.map(d => {
-          const k = dateKey(d);
-          const isToday = k === todayKey;
-          const isSelected = k === dateKey(selectedDay);
-          const hasMeals = getDayEntries(d).length > 0;
-          return (
-            <TouchableOpacity
-              key={k}
-              style={[styles.dayPill, isToday && styles.dayPillToday, isSelected && !isToday && styles.dayPillSelected]}
-              onPress={() => setSelectedDay(d)}
-            >
-              <Text style={[styles.dayLabel, (isToday || isSelected) && styles.dayLabelLight]}>{dayLabel(d)}</Text>
-              <Text style={[styles.dayNum, (isToday || isSelected) && styles.dayLabelLight]}>{d.getDate()}</Text>
-              {hasMeals && <View style={[styles.dot, isToday && styles.dotWhite]} />}
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      <View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dayStrip}>
+          {days.map(d => {
+            const k = dateKey(d);
+            const isToday = k === todayKey;
+            const isSelected = k === dateKey(selectedDay);
+            const hasMeals = getDayEntries(d).length > 0;
+            return (
+              <TouchableOpacity
+                key={k}
+                style={[styles.dayPill, isToday && styles.dayPillToday, isSelected && !isToday && styles.dayPillSelected]}
+                onPress={() => { hapticLight(); setSelectedDay(d); }}
+              >
+                <Text style={[styles.dayLabel, isToday && styles.dayLabelLight]}>{dayLabel(d)}</Text>
+                <Text style={[styles.dayNum, isToday && styles.dayLabelLight]}>{d.getDate()}</Text>
+                {hasMeals && <View style={[styles.dot, isToday && styles.dotWhite]} />}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.dayHeader}>
           <Text style={styles.dayTitle}>{label}</Text>
-          <TouchableOpacity><Text style={styles.autoFill}>Auto-fill week</Text></TouchableOpacity>
+          <TouchableOpacity onPress={autoFillWeek}>
+            <Text style={styles.autoFill}>Auto-fill week</Text>
+          </TouchableOpacity>
         </View>
 
         {MEAL_TYPES.map(mealType => {
@@ -92,8 +233,8 @@ export default function MealPlanScreen() {
                       { text: 'Cancel' },
                       { text: 'Remove', style: 'destructive', onPress: async () => {
                         await deleteMealEntry(entry!.id);
-                        const e = await getMealPlan();
-                        setEntries(e);
+                        await load();
+                        showToast('Removed from plan', 'trash');
                       }},
                     ]);
                   }}
@@ -103,31 +244,136 @@ export default function MealPlanScreen() {
                     : <FoodPlaceholder variant={recipe.imageColor as any} style={styles.mealThumb} />}
                   <View style={{ flex: 1 }}>
                     <Text style={styles.mealTitle} numberOfLines={1}>{recipe.title}</Text>
-                    <Text style={styles.mealSub}>{recipe.prepMinutes + recipe.cookMinutes} min · serves {entry?.servings}</Text>
+                    <Text style={styles.mealSub}>{formatTime(recipe.prepMinutes + recipe.cookMinutes)} · serves {entry?.servings}</Text>
                   </View>
                   <Icon name="moreV" size={20} color={Colors.ink3} />
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity style={styles.emptySlot} onPress={() => navigation.navigate('AddToMealPlan', { recipeId: '' })}>
+                <TouchableOpacity style={styles.emptySlot} onPress={() => openPickerForSlot(mealType)}>
                   <Text style={styles.emptySlotTxt}>+ Add {mealType}</Text>
                 </TouchableOpacity>
               )}
             </View>
           );
         })}
+
+        {recipes.length === 0 && (
+          <EmptyState
+            icon="calendar"
+            title="Plan your week"
+            message="Save a few recipes first, then drop them into breakfast, lunch, and dinner slots."
+            ctaLabel="Add a recipe"
+            onPress={() => navigation.navigate('AddMenu')}
+            style={{ paddingVertical: 24 }}
+          />
+        )}
       </ScrollView>
+
+      {/* Add-to-plan sheet */}
+      <BottomSheet visible={pickerVisible} onClose={() => { setPickerVisible(false); if (presetRecipeId) navigation.goBack(); }}>
+        {pickerRecipe ? (
+          <>
+            <Text style={styles.sheetTitle}>Add to plan</Text>
+            <View style={styles.sheetRecipeRow}>
+              {pickerRecipe.imageUri
+                ? <Image source={{ uri: pickerRecipe.imageUri }} style={styles.mealThumb} />
+                : <FoodPlaceholder variant={pickerRecipe.imageColor as any} style={styles.mealThumb} />}
+              <Text style={styles.sheetRecipeTitle} numberOfLines={2}>{pickerRecipe.title}</Text>
+            </View>
+
+            <Text style={styles.sheetLabel}>DAY</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {days.map(d => {
+                  const k = dateKey(d);
+                  const on = k === pickerDayKey;
+                  return (
+                    <TouchableOpacity
+                      key={k}
+                      style={[styles.sheetDayPill, on && styles.sheetDayPillOn]}
+                      onPress={() => setPickerDay(d)}
+                    >
+                      <Text style={[styles.sheetDayTxt, on && styles.sheetDayTxtOn]}>{dayLabel(d)} {d.getDate()}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            <Text style={styles.sheetLabel}>MEAL</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {MEAL_TYPES.map(m => (
+                <TouchableOpacity
+                  key={m}
+                  style={[styles.sheetDayPill, pickerMeal === m && styles.sheetDayPillOn]}
+                  onPress={() => setPickerMeal(m)}
+                >
+                  <Text style={[styles.sheetDayTxt, pickerMeal === m && styles.sheetDayTxtOn]}>
+                    {m.charAt(0).toUpperCase() + m.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.sheetServingsRow}>
+              <Text style={styles.sheetServingsLabel}>Servings</Text>
+              <View style={styles.stepper}>
+                <TouchableOpacity style={styles.stepBtn} onPress={() => setPickerServings(s => Math.max(1, s - 1))}>
+                  <Icon name="minus" size={16} color={Colors.ink} />
+                </TouchableOpacity>
+                <Text style={styles.stepVal}>{pickerServings}</Text>
+                <TouchableOpacity style={styles.stepBtn} onPress={() => setPickerServings(s => s + 1)}>
+                  <Icon name="plus" size={16} color={Colors.ink} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity style={styles.confirmBtn} onPress={confirmAdd}>
+              <Text style={styles.confirmTxt}>Add to {pickerMeal}</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Text style={styles.sheetTitle}>
+              Pick a recipe for {pickerMeal} · {dayLabel(pickerDay)} {pickerDay.getDate()}
+            </Text>
+            {recipes.length === 0 ? (
+              <Text style={styles.sheetEmpty}>No recipes in your library yet.</Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 380 }}>
+                {recipes.map(r => (
+                  <TouchableOpacity
+                    key={r.id}
+                    style={styles.pickRow}
+                    onPress={() => { setPickerRecipe(r); setPickerServings(defaultServings); }}
+                  >
+                    {r.imageUri
+                      ? <Image source={{ uri: r.imageUri }} style={styles.pickThumb} />
+                      : <FoodPlaceholder variant={r.imageColor as any} style={styles.pickThumb} />}
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.mealTitle} numberOfLines={1}>{r.title}</Text>
+                      <Text style={styles.mealSub}>{formatTime(r.prepMinutes + r.cookMinutes)} · serves {r.servings}</Text>
+                    </View>
+                    <Icon name="fwd" size={18} color={Colors.ink3} />
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </>
+        )}
+      </BottomSheet>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.paper, paddingHorizontal: 22, paddingTop: 14 },
+  container: { flex: 1, backgroundColor: Colors.paper, paddingHorizontal: 22 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 },
   subTxt: { fontFamily: Fonts.uiRegular, fontSize: 13.5, color: Colors.ink2 },
   title: { fontFamily: Fonts.displayMedium, fontSize: 30, letterSpacing: -0.3, color: Colors.ink },
   headerActions: { flexDirection: 'row', gap: 9 },
   iconBtn: { width: 44, height: 44, borderRadius: Radius.pill, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.line, alignItems: 'center', justifyContent: 'center' },
-  dayStrip: { marginBottom: 18 },
+  dayStrip: { marginBottom: 18, flexGrow: 0 },
   dayPill: { width: 46, height: 68, borderRadius: Radius.md, backgroundColor: Colors.surface2, alignItems: 'center', justifyContent: 'center', marginRight: 8 },
   dayPillToday: { backgroundColor: Colors.accent },
   dayPillSelected: { backgroundColor: Colors.accentSoft, borderWidth: 1, borderColor: Colors.accentDeep },
@@ -147,4 +393,24 @@ const styles = StyleSheet.create({
   mealSub: { fontFamily: Fonts.uiRegular, fontSize: 12.5, color: Colors.ink3, marginTop: 1 },
   emptySlot: { height: 56, borderWidth: 1.5, borderColor: Colors.line2, borderStyle: 'dashed', borderRadius: Radius.lg, alignItems: 'center', justifyContent: 'center' },
   emptySlotTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 13.5, color: Colors.ink3 },
+
+  // Sheet
+  sheetTitle: { fontFamily: Fonts.uiBold, fontSize: 18, color: Colors.ink, marginBottom: 12 },
+  sheetRecipeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 6 },
+  sheetRecipeTitle: { fontFamily: Fonts.displayMedium, fontSize: 18, color: Colors.ink, flex: 1 },
+  sheetLabel: { fontFamily: Fonts.uiBold, fontSize: 11.5, letterSpacing: 0.6, color: Colors.ink3, marginTop: 16, marginBottom: 8 },
+  sheetDayPill: { paddingHorizontal: 14, height: 38, borderRadius: Radius.pill, backgroundColor: Colors.surface2, alignItems: 'center', justifyContent: 'center' },
+  sheetDayPillOn: { backgroundColor: Colors.accent },
+  sheetDayTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 13, color: Colors.ink2 },
+  sheetDayTxtOn: { color: '#fff' },
+  sheetServingsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 },
+  sheetServingsLabel: { fontFamily: Fonts.uiBold, fontSize: 14.5, color: Colors.ink },
+  stepper: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: Colors.line2, borderRadius: Radius.pill, overflow: 'hidden' },
+  stepBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
+  stepVal: { fontFamily: Fonts.uiBold, minWidth: 42, textAlign: 'center', fontSize: 15, color: Colors.ink },
+  confirmBtn: { marginTop: 20, height: 52, backgroundColor: Colors.accent, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
+  confirmTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 16, color: '#fff' },
+  sheetEmpty: { fontFamily: Fonts.uiRegular, fontSize: 14, color: Colors.ink2, paddingVertical: 16 },
+  pickRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.line },
+  pickThumb: { width: 44, height: 44, borderRadius: Radius.sm },
 });

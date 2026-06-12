@@ -1,15 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert,
+  ActionSheetIOS, Platform, Share,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  useSharedValue, useAnimatedStyle, useAnimatedScrollHandler,
+  withSpring, withSequence, interpolate, Extrapolation,
+} from 'react-native-reanimated';
+import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, Recipe } from '../../types';
 import { Colors, Radius, Fonts, Shadow } from '../../theme';
-import { getRecipe, getShoppingItems, saveShoppingItems } from '../../store/storage';
+import { getRecipe, getShoppingItems, saveShoppingItems, saveRecipe, deleteRecipe, getProfile } from '../../store/storage';
 import { formatTime, scaleQuantity, uid } from '../../utils/id';
+import { convertUnits, categorizeIngredient } from '../../utils/units';
 import FoodPlaceholder from '../../components/FoodPlaceholder';
 import Button from '../../components/Button';
 import Icon from '../../components/Icon';
+import Skeleton from '../../components/Skeleton';
+import AnimatedCheck from '../../components/AnimatedCheck';
+import { showToast } from '../../components/Toast';
+import { Springs } from '../../theme/motion';
+import { hapticLight, hapticSuccess } from '../../lib/haptics';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RecipeDetail'>;
 type Tab = 'ingredients' | 'method' | 'nutrition';
@@ -17,17 +30,47 @@ type Unit = 'us' | 'metric';
 
 export default function RecipeDetailScreen({ route, navigation }: Props) {
   const { recipeId } = route.params;
+  const insets = useSafeAreaInsets();
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [tab, setTab] = useState<Tab>('ingredients');
   const [servings, setServings] = useState(4);
   const [unit, setUnit] = useState<Unit>('us');
   const [checkedIngr, setCheckedIngr] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    getRecipe(recipeId).then(r => {
-      if (r) { setRecipe(r); setServings(r.servings); }
+  const scrollY = useSharedValue(0);
+  const bookmarkScale = useSharedValue(1);
+  const servingsScale = useSharedValue(1);
+
+  const onScroll = useAnimatedScrollHandler(e => { scrollY.value = e.contentOffset.y; });
+
+  // Hero parallax: scrolls at 45% speed, stretches past 1x on overscroll pull.
+  const heroStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: interpolate(scrollY.value, [-300, 0, 248], [-150, 0, 112], Extrapolation.CLAMP) },
+      { scale: interpolate(scrollY.value, [-300, 0], [2.2, 1], Extrapolation.CLAMP) },
+    ],
+  }));
+  const bookmarkStyle = useAnimatedStyle(() => ({ transform: [{ scale: bookmarkScale.value }] }));
+  const servingsStyle = useAnimatedStyle(() => ({ transform: [{ scale: servingsScale.value }] }));
+
+  function bumpServings(delta: number) {
+    hapticLight();
+    setServings(s => Math.max(1, s + delta));
+    servingsScale.value = withSequence(withSpring(1.18, Springs.pop), withSpring(1, Springs.press));
+  }
+
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    Promise.all([getRecipe(recipeId), getProfile()]).then(([r, p]) => {
+      if (!active) return;
+      if (r) {
+        setRecipe(r);
+        setServings(prev => (prev === 4 ? r.servings : prev));
+      }
+      if (p?.preferMetric) setUnit('metric');
     });
-  }, [recipeId]);
+    return () => { active = false; };
+  }, [recipeId]));
 
   async function addToShoppingList() {
     if (!recipe) return;
@@ -37,54 +80,121 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
       name: ing.name,
       quantity: scaleQuantity(ing.quantity, recipe.servings, servings),
       unit: ing.unit,
-      category: 'Uncategorised',
+      category: categorizeIngredient(ing.name),
       checked: false,
       recipeIds: [recipe.id],
     }));
     await saveShoppingItems([...existing, ...newItems]);
-    Alert.alert('Added!', `${newItems.length} ingredients added to your shopping list.`);
+    hapticSuccess();
+    showToast(`${newItems.length} ingredients added to your list`, 'cart');
   }
 
-  function toggleIngr(id: string) {
-    setCheckedIngr(prev => {
-      const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
+  async function toggleSaved() {
+    if (!recipe) return;
+    hapticLight();
+    bookmarkScale.value = withSequence(withSpring(1.3, Springs.pop), withSpring(1, Springs.glide));
+    const updated = { ...recipe, isSaved: !recipe.isSaved };
+    setRecipe(updated);
+    await saveRecipe(updated);
+    showToast(updated.isSaved ? 'Saved to your library' : 'Removed from saved', 'bookmark');
+  }
+
+  function confirmDelete() {
+    if (!recipe) return;
+    Alert.alert('Delete recipe', `Delete "${recipe.title}" forever?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          await deleteRecipe(recipe.id);
+          showToast('Recipe deleted', 'trash');
+          navigation.goBack();
+        },
+      },
+    ]);
+  }
+
+  async function shareRecipe() {
+    if (!recipe) return;
+    const lines = [
+      recipe.title,
+      '',
+      `Serves ${recipe.servings} · ${formatTime(recipe.prepMinutes + recipe.cookMinutes)}`,
+      '',
+      'Ingredients:',
+      ...recipe.ingredients.map(i => `• ${[i.quantity, i.unit, i.name].filter(Boolean).join(' ')}`),
+    ];
+    if (recipe.sourceUrl) lines.push('', recipe.sourceUrl);
+    try {
+      await Share.share({ message: lines.join('\n'), title: recipe.title });
+    } catch {
+      // user dismissed the share sheet
+    }
+  }
+
+  function openMenu() {
+    if (!recipe) return;
+    const actions = [
+      { label: 'Edit recipe', fn: () => navigation.navigate('RecipeEditor', { recipeId: recipe.id }) },
+      { label: 'Add to meal plan', fn: () => navigation.navigate('AddToMealPlan', { recipeId: recipe.id }) },
+      { label: 'Share', fn: shareRecipe },
+      { label: 'Delete', fn: confirmDelete, destructive: true },
+    ];
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: ['Cancel', ...actions.map(a => a.label)],
+          cancelButtonIndex: 0,
+          destructiveButtonIndex: actions.findIndex(a => a.destructive) + 1,
+        },
+        idx => { if (idx > 0) actions[idx - 1].fn(); },
+      );
+    } else {
+      Alert.alert(recipe.title, undefined, [
+        ...actions.map(a => ({
+          text: a.label,
+          style: (a.destructive ? 'destructive' : 'default') as 'destructive' | 'default',
+          onPress: a.fn,
+        })),
+        { text: 'Cancel', style: 'cancel' as const },
+      ]);
+    }
   }
 
   if (!recipe) {
     return (
-      <View style={styles.loading}>
-        <Text style={{ fontFamily: Fonts.uiRegular, color: Colors.ink2 }}>Loading…</Text>
+      <View style={styles.container}>
+        <Skeleton width="100%" height={248} radius={0} />
+        <View style={styles.body}>
+          <Skeleton width={120} height={12} />
+          <Skeleton width="85%" height={26} style={{ marginTop: 12 }} />
+          <Skeleton width="100%" height={64} radius={16} style={{ marginTop: 18 }} />
+          <Skeleton width="100%" height={44} radius={999} style={{ marginTop: 18 }} />
+          <Skeleton width="100%" height={16} style={{ marginTop: 22 }} />
+          <Skeleton width="92%" height={16} style={{ marginTop: 12 }} />
+          <Skeleton width="96%" height={16} style={{ marginTop: 12 }} />
+        </View>
       </View>
     );
   }
 
   const totalMin = recipe.prepMinutes + recipe.cookMinutes;
 
+  function displayIngredient(qty: string, ingUnit: string) {
+    const scaled = scaleQuantity(qty, recipe!.servings, servings);
+    const converted = convertUnits(scaled, ingUnit, unit);
+    return `${converted.qty} ${converted.unit}`.trim();
+  }
+
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Hero photo */}
-        <View style={{ height: 248 }}>
+      <Animated.ScrollView contentContainerStyle={{ paddingBottom: 100 }} onScroll={onScroll} scrollEventThrottle={16}>
+        {/* Hero photo — parallax + overscroll stretch */}
+        <Animated.View style={[{ height: 248 }, heroStyle]}>
           {recipe.imageUri
-            ? <Image source={{ uri: recipe.imageUri }} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-            : <FoodPlaceholder variant={recipe.imageColor as any} style={StyleSheet.absoluteFillObject} />}
-          <View style={styles.heroOverlay}>
-            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
-              <Icon name="back" size={20} color={Colors.ink} />
-            </TouchableOpacity>
-            <View style={{ flexDirection: 'row', gap: 9 }}>
-              <TouchableOpacity style={styles.iconBtn}>
-                <Icon name="bookmark" size={20} color={Colors.ink} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.iconBtn}>
-                <Icon name="more" size={20} color={Colors.ink} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+            ? <Image source={{ uri: recipe.imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            : <FoodPlaceholder variant={recipe.imageColor as any} style={StyleSheet.absoluteFill} />}
+        </Animated.View>
 
         <View style={styles.body}>
           {/* Eyebrow / collection name */}
@@ -117,11 +227,11 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
             <View style={styles.stepperRow}>
               <Text style={styles.controlLabel}>Servings</Text>
               <View style={styles.stepper}>
-                <TouchableOpacity style={styles.stepBtn} onPress={() => setServings(s => Math.max(1, s - 1))}>
+                <TouchableOpacity style={styles.stepBtn} onPress={() => bumpServings(-1)}>
                   <Icon name="minus" size={18} color={Colors.ink} />
                 </TouchableOpacity>
-                <Text style={styles.stepVal}>{servings}</Text>
-                <TouchableOpacity style={styles.stepBtn} onPress={() => setServings(s => s + 1)}>
+                <Animated.Text style={[styles.stepVal, servingsStyle]}>{servings}</Animated.Text>
+                <TouchableOpacity style={styles.stepBtn} onPress={() => bumpServings(1)}>
                   <Icon name="plus" size={18} color={Colors.ink} />
                 </TouchableOpacity>
               </View>
@@ -156,14 +266,17 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
                 <Text style={styles.scaledLabel}>Scaled for {servings}</Text>
               </View>
               {recipe.ingredients.map(ing => (
-                <TouchableOpacity key={ing.id} style={styles.ingrRow} onPress={() => toggleIngr(ing.id)}>
-                  <View style={[styles.check, checkedIngr.has(ing.id) && styles.checkOn]}>
-                    {checkedIngr.has(ing.id) && <Icon name="check" size={15} color="#fff" />}
-                  </View>
+                <TouchableOpacity key={ing.id} style={styles.ingrRow} onPress={() => {
+                  hapticLight();
+                  setCheckedIngr(prev => {
+                    const n = new Set(prev);
+                    n.has(ing.id) ? n.delete(ing.id) : n.add(ing.id);
+                    return n;
+                  });
+                }}>
+                  <AnimatedCheck checked={checkedIngr.has(ing.id)} />
                   <Text style={[styles.ingrTxt, checkedIngr.has(ing.id) && styles.ingrDone]}>
-                    <Text style={styles.ingrQty}>
-                      {scaleQuantity(ing.quantity, recipe.servings, servings)} {ing.unit}
-                    </Text>
+                    <Text style={styles.ingrQty}>{displayIngredient(ing.quantity, ing.unit)}</Text>
                     {'  '}{ing.name}
                   </Text>
                 </TouchableOpacity>
@@ -193,19 +306,27 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
           )}
 
           {/* Nutrition tab */}
-          {tab === 'nutrition' && recipe.nutrition && (
-            <View style={styles.nutritionCard}>
-              <View style={styles.calRow}>
-                <Text style={styles.calLabel}>Per serving</Text>
-                <Text style={styles.calVal}>
-                  {recipe.nutrition.calories}{' '}
-                  <Text style={styles.calUnit}>kcal</Text>
+          {tab === 'nutrition' && (
+            recipe.nutrition ? (
+              <View style={styles.nutritionCard}>
+                <View style={styles.calRow}>
+                  <Text style={styles.calLabel}>Per serving</Text>
+                  <Text style={styles.calVal}>
+                    {recipe.nutrition.calories}{' '}
+                    <Text style={styles.calUnit}>kcal</Text>
+                  </Text>
+                </View>
+                <NutrBar label="Carbs" value={recipe.nutrition.carbs} max={80} color={Colors.accent} />
+                <NutrBar label="Protein" value={recipe.nutrition.protein} max={60} color={Colors.accentDeep} />
+                <NutrBar label="Fat" value={recipe.nutrition.fat} max={60} color="#D9602F" />
+              </View>
+            ) : (
+              <View style={styles.nutritionCard}>
+                <Text style={styles.noNutrition}>
+                  No nutrition info for this recipe yet. AI-generated recipes include estimates automatically.
                 </Text>
               </View>
-              <NutrBar label="Carbs" value={recipe.nutrition.carbs} max={80} color={Colors.accent} />
-              <NutrBar label="Protein" value={recipe.nutrition.protein} max={60} color={Colors.accentDeep} />
-              <NutrBar label="Fat" value={recipe.nutrition.fat} max={60} color="#D9602F" />
-            </View>
+            )
           )}
 
           {/* Notes */}
@@ -215,16 +336,38 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
             </View>
           ) : null}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
+
+      {/* Floating header controls — pinned while the hero parallaxes beneath */}
+      <View style={[styles.heroOverlay, { top: insets.top + 8 }]} pointerEvents="box-none">
+        <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.goBack()}>
+          <Icon name="back" size={20} color={Colors.ink} />
+        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 9 }}>
+          <TouchableOpacity
+            style={[styles.iconBtn, recipe.isSaved && styles.iconBtnOn]}
+            onPress={toggleSaved}
+          >
+            <Animated.View style={bookmarkStyle}>
+              <Icon name="bookmark" size={20} color={recipe.isSaved ? '#fff' : Colors.ink} />
+            </Animated.View>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={openMenu}>
+            <Icon name="more" size={20} color={Colors.ink} />
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Sticky Start Cooking CTA */}
-      <View style={styles.stickyBar}>
-        <Button
-          label="Start Cooking"
-          onPress={() => navigation.navigate('CookingMode', { recipeId })}
-          leadingIcon={<Icon name="flame" size={18} color="#fff" />}
-        />
-      </View>
+      {recipe.steps.length > 0 && (
+        <View style={[styles.stickyBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+          <Button
+            label="Start Cooking"
+            onPress={() => navigation.navigate('CookingMode', { recipeId })}
+            leadingIcon={<Icon name="flame" size={18} color="#fff" />}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -254,9 +397,8 @@ function NutrBar({ label, value, max, color }: { label: string; value: number; m
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.paper },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   heroOverlay: {
-    position: 'absolute', top: 52, left: 16, right: 16,
+    position: 'absolute', left: 16, right: 16,
     flexDirection: 'row', justifyContent: 'space-between',
   },
   iconBtn: {
@@ -265,6 +407,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: Colors.line,
   },
+  iconBtnOn: { backgroundColor: Colors.accent, borderColor: Colors.accent },
   body: { padding: 18, paddingTop: 16 },
   eyebrow: {
     fontFamily: Fonts.uiBold, fontSize: 11.5, letterSpacing: 1.6,
@@ -354,6 +497,7 @@ const styles = StyleSheet.create({
     marginTop: 16, backgroundColor: Colors.surface,
     borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.line, padding: 16,
   },
+  noNutrition: { fontFamily: Fonts.uiRegular, fontSize: 14, color: Colors.ink2, lineHeight: 20 },
   calRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
   calLabel: { fontFamily: Fonts.uiBold, fontSize: 15, color: Colors.ink },
   calVal: { fontFamily: Fonts.displayMedium, fontSize: 30, color: Colors.ink },

@@ -6,12 +6,19 @@ export interface AppSettings {
   notificationsEnabled: boolean;
   notificationHour: number;
   notificationMinute: number;
+  // Local subscription state — no payment processor is wired yet, so the
+  // trial is an on-device flag the paywall and settings read/write.
+  subscriptionPlan: 'free' | 'trial';
+  subscriptionBilling: 'monthly' | 'annual';
+  trialStartedAt?: number;
 }
 
 const DEFAULTS: AppSettings = {
   notificationsEnabled: false,
   notificationHour: 18,
   notificationMinute: 0,
+  subscriptionPlan: 'free',
+  subscriptionBilling: 'annual',
 };
 
 export async function getSettings(): Promise<AppSettings> {

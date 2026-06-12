@@ -1,36 +1,121 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   RefreshControl,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, {
+  FadeInDown, cancelAnimation, interpolate, useAnimatedStyle, useSharedValue,
+  withDelay, withRepeat, withSequence, withTiming,
+} from 'react-native-reanimated';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, Recipe } from '../../types';
 import { Colors, Radius, Fonts, Shadow } from '../../theme';
+import { Ambient, Curves } from '../../theme/motion';
 import { getRecipes, getProfile, getFeaturedRecipes } from '../../store/storage';
+import { useAuth } from '../../context/AuthContext';
 import RecipeCard from '../../components/RecipeCard';
 import Chip from '../../components/Chip';
 import FoodPlaceholder from '../../components/FoodPlaceholder';
 import Icon from '../../components/Icon';
+import Tappable from '../../components/Tappable';
+import Sheen from '../../components/Sheen';
+import Skeleton, { RecipeCardSkeleton } from '../../components/Skeleton';
+import EmptyState from '../../components/EmptyState';
 
-const QUICK_FILTERS = ['Quick & Easy', 'Vegetarian', '5 Ingredients', 'Family favorites', 'Comfort'];
+const QUICK_FILTERS = [
+  'Quick & Easy', 'Vegetarian', 'Breakfast', 'Brunch', 'Dinner',
+  'Snacks', 'Desserts', 'Baking', 'Comfort',
+];
+
+// Choreographed entrance: each section arrives 60ms after the previous,
+// falling 16px with a soft spring settle.
+const enter = (i: number) =>
+  FadeInDown.delay(i * 60).springify().damping(26).stiffness(240).mass(1);
+
+// The AI banner's sparkle takes a little breath every few seconds: a quick
+// swell and tilt, then settles — enough to catch the eye without nagging.
+function SparklePulse({ children }: { children: React.ReactNode }) {
+  const t = useSharedValue(0);
+
+  useEffect(() => {
+    t.value = withRepeat(
+      withDelay(
+        2400,
+        withSequence(
+          withTiming(1, { duration: 420, easing: Curves.enter }),
+          withTiming(0, { duration: 520, easing: Curves.exit }),
+        ),
+      ),
+      -1,
+      false,
+    );
+    return () => cancelAnimation(t);
+  }, [t]);
+
+  const anim = useAnimatedStyle(() => ({
+    transform: [
+      { scale: 1 + t.value * 0.18 },
+      { rotate: `${t.value * -14}deg` },
+    ],
+  }));
+
+  return <Animated.View style={anim}>{children}</Animated.View>;
+}
+
+// Subtle ambient backdrop: two soft colour fields and a faint ring drifting
+// behind the content. Stationary while the list scrolls — quiet depth, not decoration.
+function HomeBackdrop() {
+  const f = useSharedValue(0);
+
+  useEffect(() => {
+    f.value = withRepeat(
+      withTiming(1, { duration: Ambient.floatMs, easing: Curves.drift }),
+      -1,
+      true,
+    );
+    return () => cancelAnimation(f);
+  }, [f]);
+
+  const drift = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: interpolate(f.value, [0, 1], [0, 14]) },
+      { translateX: interpolate(f.value, [0, 1], [0, -8]) },
+    ],
+  }));
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Animated.View style={[styles.bdBlobA, drift]} />
+      <View style={styles.bdBlobB} />
+      <View style={styles.bdRing} />
+    </View>
+  );
+}
 
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [featured, setFeatured] = useState<Recipe[]>([]);
   const [userName, setUserName] = useState('');
-  const [activeFilter, setActiveFilter] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   async function load() {
     const [r, p, f] = await Promise.all([getRecipes(), getProfile(), getFeaturedRecipes()]);
     setRecipes(r);
-    setUserName(p?.name?.split(' ')[0] ?? 'Chef');
+    // Never greet with a blank: profile name → signup name → email → Chef.
+    const metaName = (user?.user_metadata?.name as string | undefined)?.trim();
+    const resolved = p?.name?.trim() || metaName || user?.email?.split('@')[0] || 'Chef';
+    setUserName(resolved.split(' ')[0]);
     setFeatured(f);
+    setLoading(false);
   }
 
-  useFocusEffect(useCallback(() => { load(); }, []));
+  useFocusEffect(useCallback(() => { load(); }, [user?.id]));
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,';
@@ -38,60 +123,79 @@ export default function HomeScreen() {
   const recent = recipes.slice(0, 6);
   const dinner = recipes.filter(r => r.tags.includes('dinner')).slice(0, 4);
   const displayed = dinner.length ? dinner : recipes.slice(0, 4);
+  const familyRecipes = recipes.filter(r => r.isFamily);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={Colors.accent} />}
-    >
+    <View style={styles.container}>
+      <HomeBackdrop />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 6 }]}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={Colors.accent} />}
+      >
       {/* App bar */}
       <View style={styles.appbar}>
         <View>
           <Text style={styles.subGreet}>{greeting}</Text>
-          <Text style={styles.nameGreet}>{userName}</Text>
+          {loading && !userName
+            ? <Skeleton width={140} height={28} style={{ marginTop: 4 }} />
+            : <Text style={styles.nameGreet}>{userName}</Text>}
         </View>
-        <View style={styles.appbarActions}>
-          <TouchableOpacity style={styles.iconBtn}>
-            <Icon name="bell" size={20} color={Colors.ink} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.avatar}
-            onPress={() => navigation.navigate('Settings')}
-          >
-            <Text style={styles.avatarTxt}>{userName?.[0]?.toUpperCase() ?? 'M'}</Text>
-          </TouchableOpacity>
-        </View>
+        <Tappable
+          scaleTo={0.92}
+          haptic
+          style={styles.avatar}
+          onPress={() => navigation.navigate('Settings')}
+        >
+          {userName ? (
+            <Text style={styles.avatarTxt}>{userName[0].toUpperCase()}</Text>
+          ) : (
+            <Icon name="user" size={20} color={Colors.white} />
+          )}
+        </Tappable>
       </View>
 
       {/* Search field */}
-      <TouchableOpacity style={styles.searchField} onPress={() => navigation.navigate('Search')}>
-        <Icon name="search" size={18} color={Colors.ink3} />
-        <Text style={styles.searchTxt}>Search recipes &amp; ingredients</Text>
-      </TouchableOpacity>
+      <Animated.View entering={enter(0)}>
+        <TouchableOpacity style={styles.searchField} onPress={() => navigation.navigate('Search')} activeOpacity={0.7}>
+          <Icon name="search" size={18} color={Colors.ink3} />
+          <Text style={styles.searchTxt}>Search recipes &amp; ingredients</Text>
+        </TouchableOpacity>
+      </Animated.View>
 
-      {/* Quick filters */}
+      {/* Quick filters → search pre-filtered */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 16 }}>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {QUICK_FILTERS.map(f => (
             <Chip
               key={f}
               label={f}
-              soft={activeFilter === f}
-              active={activeFilter === f}
-              onPress={() => setActiveFilter(prev => prev === f ? '' : f)}
+              onPress={() => navigation.navigate('Search', { initialQuery: f })}
             />
           ))}
           <View style={{ width: 8 }} />
         </View>
       </ScrollView>
 
+      {/* Loading skeletons */}
+      {loading && recipes.length === 0 && (
+        <>
+          <Skeleton width={160} height={20} style={{ marginTop: 26 }} />
+          <ScrollView horizontal scrollEnabled={false} style={{ marginTop: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 13 }}>
+              <RecipeCardSkeleton />
+              <RecipeCardSkeleton />
+            </View>
+          </ScrollView>
+        </>
+      )}
+
       {/* What's for dinner */}
       {recipes.length > 0 && (
-        <>
+        <Animated.View entering={enter(1)}>
           <View style={styles.sectionHeader}>
             <Text style={styles.secTitle}>What's for dinner?</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => (navigation as any).navigate('Recipes')}>
               <Text style={styles.seeAll}>See all</Text>
             </TouchableOpacity>
           </View>
@@ -109,28 +213,34 @@ export default function HomeScreen() {
               <View style={{ width: 8 }} />
             </View>
           </ScrollView>
-        </>
+        </Animated.View>
       )}
 
-      {/* Cook with what you have — AI card */}
-      <TouchableOpacity style={styles.aiCard} activeOpacity={0.8}>
+      {/* Generate with AI */}
+      <Animated.View entering={enter(2)}>
+      <Tappable
+        scaleTo={0.97}
+        haptic
+        style={styles.aiCard}
+        onPress={() => navigation.navigate('AIGenerator')}
+      >
         <View style={styles.aiIconWrap}>
-          <Icon name="sparkle" size={22} color="#fff" />
+          <SparklePulse>
+            <Icon name="sparkle" size={22} color="#fff" />
+          </SparklePulse>
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.aiTitle}>Cook with what you have</Text>
-          <Text style={styles.aiSub}>
-            {recipes.length > 0
-              ? `${Math.min(recipes.length, 7)} recipes from your pantry tonight`
-              : 'Add pantry items to get suggestions'}
-          </Text>
+          <Text style={styles.aiSub}>Tell the AI what's in your kitchen tonight</Text>
         </View>
         <Icon name="fwd" size={20} color={Colors.accentDeep} />
-      </TouchableOpacity>
+        <Sheen radius={Radius.lg} delayMs={900} peak={0.5} />
+      </Tappable>
+      </Animated.View>
 
       {/* Today's Picks */}
       {featured.length > 0 && (
-        <>
+        <Animated.View entering={enter(3)}>
           <View style={styles.sectionHeader}>
             <Text style={styles.secTitle}>Today's picks</Text>
           </View>
@@ -148,12 +258,12 @@ export default function HomeScreen() {
               <View style={{ width: 8 }} />
             </View>
           </ScrollView>
-        </>
+        </Animated.View>
       )}
 
       {/* Recently added */}
       {recent.length > 0 && (
-        <>
+        <Animated.View entering={enter(4)}>
           <View style={styles.sectionHeader}>
             <Text style={styles.secTitle}>Recently added</Text>
             <TouchableOpacity onPress={() => (navigation as any).navigate('Recipes')}>
@@ -173,42 +283,80 @@ export default function HomeScreen() {
               <View style={{ width: 8 }} />
             </View>
           </ScrollView>
-        </>
+        </Animated.View>
       )}
 
       {/* Empty state */}
-      {recipes.length === 0 && (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Your kitchen awaits</Text>
-          <Text style={styles.emptySub}>Import your first recipe using the + button below.</Text>
-        </View>
+      {!loading && recipes.length === 0 && (
+        <EmptyState
+          icon="chefhat"
+          title="Your kitchen awaits"
+          message="Import a recipe from a link or photo, write your own, or let the AI cook one up."
+          ctaLabel="Add your first recipe"
+          onPress={() => navigation.navigate('AddMenu')}
+        />
       )}
 
       {/* Family shelf */}
-      <Text style={[styles.secTitle, { marginTop: 24 }]}>From the family shelf</Text>
-      <TouchableOpacity style={[styles.familyCard, Shadow.cardSoft]} activeOpacity={0.9}>
-        <FoodPlaceholder variant="cream" style={StyleSheet.absoluteFillObject} />
-        <View style={styles.familyOverlay}>
-          <Text style={styles.familyTitle}>Nonna Lucia's Sundays</Text>
-          <Text style={styles.familySub}>12 recipes · handed down</Text>
-        </View>
-      </TouchableOpacity>
-    </ScrollView>
+      {familyRecipes.length > 0 ? (
+        <>
+          <Text style={[styles.secTitle, { marginTop: 24 }]}>From the family shelf</Text>
+          <TouchableOpacity
+            style={[styles.familyCard, Shadow.cardSoft]}
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate('RecipeDetail', { recipeId: familyRecipes[0].id })}
+          >
+            <FoodPlaceholder variant="cream" style={StyleSheet.absoluteFill} />
+            <View style={styles.familyOverlay}>
+              <Text style={styles.familyTitle}>{familyRecipes[0].title}</Text>
+              <Text style={styles.familySub}>
+                {familyRecipes.length} famil{familyRecipes.length === 1 ? 'y recipe' : 'y recipes'} · handed down
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </>
+      ) : recipes.length > 0 ? (
+        <>
+          <Text style={[styles.secTitle, { marginTop: 24 }]}>From the family shelf</Text>
+          <TouchableOpacity
+            style={styles.familyEmpty}
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('AddMenu')}
+          >
+            <Icon name="people" size={22} color={Colors.accentDeep} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.familyEmptyTitle}>Start your family shelf</Text>
+              <Text style={styles.familyEmptySub}>Scan a handwritten card to keep it forever.</Text>
+            </View>
+            <Icon name="fwd" size={18} color={Colors.ink3} />
+          </TouchableOpacity>
+        </>
+      ) : null}
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.paper },
-  content: { paddingHorizontal: 22, paddingTop: 14, paddingBottom: 100 },
+  scroll: { flex: 1, backgroundColor: Colors.transparent },
+  content: { paddingHorizontal: 22, paddingBottom: 100 },
+  bdBlobA: {
+    position: 'absolute', width: 300, height: 300, borderRadius: 150,
+    backgroundColor: Colors.accentSoft, opacity: 0.55, top: -110, right: -90,
+  },
+  bdBlobB: {
+    position: 'absolute', width: 220, height: 220, borderRadius: 110,
+    backgroundColor: Colors.surface2, opacity: 0.7, top: 230, left: -130,
+  },
+  bdRing: {
+    position: 'absolute', width: 340, height: 340, borderRadius: 170,
+    borderWidth: 1.5, borderColor: Colors.accent, opacity: 0.07,
+    bottom: -120, right: -120,
+  },
   appbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
-  appbarActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   subGreet: { fontFamily: Fonts.uiRegular, fontSize: 14, color: Colors.ink2 },
   nameGreet: { fontFamily: Fonts.displayMedium, fontSize: 30, letterSpacing: -0.3, color: Colors.ink },
-  iconBtn: {
-    width: 44, height: 44, borderRadius: Radius.pill,
-    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.line,
-    alignItems: 'center', justifyContent: 'center',
-  },
   avatar: {
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
@@ -236,15 +384,19 @@ const styles = StyleSheet.create({
   },
   aiTitle: { fontFamily: Fonts.uiBold, fontSize: 15.5, color: Colors.ink },
   aiSub: { fontFamily: Fonts.uiRegular, fontSize: 13, color: Colors.ink2, marginTop: 2 },
-  emptyState: { alignItems: 'center', marginTop: 40, padding: 20 },
-  emptyTitle: { fontFamily: Fonts.displayMedium, fontSize: 22, color: Colors.ink },
-  emptySub: { fontFamily: Fonts.uiRegular, fontSize: 14, color: Colors.ink2, marginTop: 8, textAlign: 'center' },
   familyCard: { marginTop: 12, borderRadius: Radius.lg, overflow: 'hidden', height: 150 },
   familyOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(20,14,6,0.65)',
     justifyContent: 'flex-end', padding: 16,
   },
   familyTitle: { fontFamily: Fonts.displayMedium, fontSize: 22, color: '#fff' },
   familySub: { fontFamily: Fonts.uiRegular, fontSize: 13, color: 'rgba(255,255,255,0.9)', marginTop: 3 },
+  familyEmpty: {
+    flexDirection: 'row', alignItems: 'center', gap: 13, marginTop: 12,
+    padding: 16, backgroundColor: Colors.surface,
+    borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.line,
+  },
+  familyEmptyTitle: { fontFamily: Fonts.uiBold, fontSize: 14.5, color: Colors.ink },
+  familyEmptySub: { fontFamily: Fonts.uiRegular, fontSize: 12.5, color: Colors.ink3, marginTop: 1 },
 });

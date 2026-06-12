@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, TouchableOpacity,
-  ScrollView, Alert,
+  ScrollView,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types';
@@ -9,6 +9,7 @@ import { Colors, Radius, Fonts } from '../../theme';
 import Button from '../../components/Button';
 import Icon from '../../components/Icon';
 import { supabase } from '../../lib/supabase';
+import { authRedirectUrl } from '../../lib/authRedirect';
 import { setOnboarded } from '../../store/storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LogIn'>;
@@ -28,7 +29,15 @@ export default function LoginScreen({ navigation }: Props) {
     const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (signInError) {
-      setError("That password doesn't match. Try again.");
+      const m = signInError.message.toLowerCase();
+      if (m.includes('not confirmed')) {
+        setError('Confirm your email first — check your inbox for the link.');
+      } else if (m.includes('invalid')) {
+        setError("Email or password doesn't match. Try again.");
+      } else {
+        // Surface the real reason (network, rate limit, etc.) instead of guessing
+        setError(signInError.message);
+      }
       return;
     }
     await setOnboarded();
@@ -37,19 +46,11 @@ export default function LoginScreen({ navigation }: Props) {
 
   async function handleForgotPassword() {
     if (!email) { setError('Enter your email above first'); return; }
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: authRedirectUrl,
+    });
     if (resetError) { setError(resetError.message); return; }
     setResetSent(true);
-  }
-
-  async function handleApple() {
-    const { error: e } = await supabase.auth.signInWithOAuth({ provider: 'apple' });
-    if (e) Alert.alert('Apple sign-in failed', e.message);
-  }
-
-  async function handleGoogle() {
-    const { error: e } = await supabase.auth.signInWithOAuth({ provider: 'google' });
-    if (e) Alert.alert('Google sign-in failed', e.message);
   }
 
   return (
@@ -62,31 +63,8 @@ export default function LoginScreen({ navigation }: Props) {
       <Text style={styles.title}>Welcome back</Text>
       <Text style={styles.sub}>Pick up right where you left the pot.</Text>
 
-      {/* Social auth */}
-      <View style={styles.socials}>
-        <Button
-          label="Continue with Apple"
-          variant="outline"
-          onPress={handleApple}
-          leadingIcon={<Icon name="apple" size={20} color={Colors.ink} />}
-        />
-        <Button
-          label="Continue with Google"
-          variant="outline"
-          onPress={handleGoogle}
-          leadingIcon={<Icon name="google" size={19} color={Colors.ink} />}
-        />
-      </View>
-
-      {/* Divider */}
-      <View style={styles.divider}>
-        <View style={styles.hr} />
-        <Text style={styles.orTxt}>or</Text>
-        <View style={styles.hr} />
-      </View>
-
       {/* Email */}
-      <Text style={styles.label}>Email</Text>
+      <Text style={[styles.label, { marginTop: 24 }]}>Email</Text>
       <TextInput
         style={styles.input}
         value={email}
@@ -148,10 +126,6 @@ const styles = StyleSheet.create({
   },
   title: { fontFamily: Fonts.displayMedium, fontSize: 26, lineHeight: 29.6, letterSpacing: -0.13, color: Colors.ink, marginTop: 18 },
   sub: { fontFamily: Fonts.uiRegular, fontSize: 14, color: Colors.ink2, marginTop: 6 },
-  socials: { gap: 14, marginTop: 22 },
-  divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 },
-  hr: { flex: 1, height: 1, backgroundColor: Colors.line },
-  orTxt: { fontFamily: Fonts.uiRegular, fontSize: 12.5, color: Colors.ink3, letterSpacing: 0.1 },
   label: { fontFamily: Fonts.uiSemiBold, fontSize: 13, color: Colors.ink2, marginBottom: 7 },
   input: {
     width: '100%', height: 52, paddingHorizontal: 16,

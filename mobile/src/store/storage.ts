@@ -181,10 +181,36 @@ export async function savePantryItems(items: PantryItem[]): Promise<void> {
 
 // ── Profile ───────────────────────────────────────────────────────────────────
 
+// Fill missing name/email from the auth user. Covers accounts that confirmed
+// email and logged in without ever running the quiz (no profile row), and
+// rows saved before the name was captured — so greetings never come up blank.
+async function healProfile(profile: UserProfile | null): Promise<UserProfile | null> {
+  if (profile?.name?.trim() && profile.email) return profile;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return profile;
+
+  const metaName = (user.user_metadata?.name as string | undefined)?.trim();
+  const name = profile?.name?.trim() || metaName || user.email?.split('@')[0] || '';
+  if (profile && name === profile.name && profile.email) return profile;
+  const healed: UserProfile = {
+    id: profile?.id ?? user.id,
+    name,
+    email: profile?.email || user.email || '',
+    dietaryPrefs: profile?.dietaryPrefs ?? [],
+    skillLevel: profile?.skillLevel ?? 'confident',
+    householdSize: profile?.householdSize ?? 2,
+    preferMetric: profile?.preferMetric ?? false,
+    darkMode: profile?.darkMode ?? false,
+    avatarUri: profile?.avatarUri,
+  };
+  await saveProfile(healed);
+  return healed;
+}
+
 export async function getProfile(): Promise<UserProfile | null> {
   if (await authed()) {
     try {
-      const profile = await dbGetProfile();
+      const profile = await healProfile(await dbGetProfile());
       if (profile) {
         await set(KEYS.profile, profile);
         return profile;

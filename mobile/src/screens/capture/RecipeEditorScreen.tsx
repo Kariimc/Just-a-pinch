@@ -4,20 +4,28 @@ import {
   Alert, KeyboardAvoidingView, Platform, Image, ActionSheetIOS,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, Recipe, Ingredient, Step } from '../../types';
-import { Colors, Radius } from '../../theme';
+import { Colors, Radius, Fonts } from '../../theme';
 import { saveRecipe, getRecipe } from '../../store/storage';
 import { uploadRecipeImage } from '../../lib/db';
 import { uid } from '../../utils/id';
 import Button from '../../components/Button';
+import Chip from '../../components/Chip';
 import FoodPlaceholder from '../../components/FoodPlaceholder';
+import Icon from '../../components/Icon';
+import { showToast } from '../../components/Toast';
 import { hapticSuccess } from '../../lib/haptics';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RecipeEditor'>;
 
+const TAG_OPTIONS = ['dinner', 'lunch', 'breakfast', 'dessert', 'baking', 'quick', 'vegetarian', 'comfort'];
+
 export default function RecipeEditorScreen({ route, navigation }: Props) {
   const editId = route.params?.recipeId;
+  const insets = useSafeAreaInsets();
+  const [existing, setExisting] = useState<Recipe | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [servings, setServings] = useState(4);
@@ -25,6 +33,8 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
   const [cookMin, setCookMin] = useState(30);
   const [imageUri, setImageUri] = useState<string | undefined>();
   const [imageColor, setImageColor] = useState('toast');
+  const [tags, setTags] = useState<string[]>([]);
+  const [isFamily, setIsFamily] = useState(false);
   const [ingredients, setIngredients] = useState<Ingredient[]>([
     { id: uid(), quantity: '', unit: '', name: '' },
   ]);
@@ -37,6 +47,7 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
     if (editId) {
       getRecipe(editId).then(r => {
         if (r) {
+          setExisting(r);
           setTitle(r.title);
           setDescription(r.description ?? '');
           setServings(r.servings);
@@ -44,12 +55,18 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
           setCookMin(r.cookMinutes);
           setImageUri(r.imageUri);
           setImageColor(r.imageColor ?? 'toast');
+          setTags(r.tags);
+          setIsFamily(r.isFamily ?? false);
           setIngredients(r.ingredients.length ? r.ingredients : [{ id: uid(), quantity: '', unit: '', name: '' }]);
           setSteps(r.steps.length ? r.steps : [{ id: uid(), number: 1, text: '' }]);
         }
       });
     }
   }, [editId]);
+
+  function toggleTag(t: string) {
+    setTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
+  }
 
   async function pickImage(useCamera: boolean) {
     const permission = useCamera
@@ -120,7 +137,10 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
       finalImageUri = await uploadRecipeImage(imageUri, recipeId);
     }
 
+    // Spread the existing recipe first so editing never wipes fields the
+    // editor doesn't expose (notes, nutrition, rating, source, collections…).
     const recipe: Recipe = {
+      ...(existing ?? { collections: [], savedAt: Date.now(), createdAt: Date.now() }),
       id: recipeId,
       title: title.trim(),
       description: description.trim() || undefined,
@@ -131,20 +151,23 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
       cookMinutes: cookMin,
       ingredients: ingredients.filter(i => i.name.trim()),
       steps: steps.filter(s => s.text.trim()),
-      tags: [],
-      collections: [],
-      savedAt: Date.now(),
-      createdAt: Date.now(),
-    };
+      tags,
+      isFamily,
+    } as Recipe;
     await saveRecipe(recipe);
     hapticSuccess();
+    showToast(editId ? 'Recipe updated' : 'Recipe saved');
     setSaving(false);
-    navigation.navigate('RecipeDetail', { recipeId: recipe.id });
+    navigation.replace('RecipeDetail', { recipeId: recipe.id });
   }
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Appbar */}
         <View style={styles.appbar}>
           <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -162,14 +185,17 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
             <>
               <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
               <View style={styles.coverOverlay}>
-                <Text style={styles.coverEditTxt}>📷  Change photo</Text>
+                <View style={styles.coverEditPill}>
+                  <Icon name="camera" size={15} color="#fff" />
+                  <Text style={styles.coverEditTxt}>Change photo</Text>
+                </View>
               </View>
             </>
           ) : (
             <>
-              <FoodPlaceholder variant={imageColor as any} style={StyleSheet.absoluteFillObject} />
+              <FoodPlaceholder variant={imageColor as any} style={StyleSheet.absoluteFill} />
               <View style={styles.coverOverlay}>
-                <Text style={{ fontSize: 26 }}>📷</Text>
+                <Icon name="camera" size={26} color="#fff" />
                 <Text style={styles.coverTxt}>Add cover photo</Text>
               </View>
             </>
@@ -225,6 +251,26 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
         ))}
         <Button label="+ Add step" variant="ghost" small onPress={addStep} style={styles.addBtn} />
 
+        {/* Tags */}
+        <Text style={styles.secTitle}>Tags</Text>
+        <View style={styles.tagWrap}>
+          {TAG_OPTIONS.map(t => (
+            <Chip key={t} label={t} soft={tags.includes(t)} active={tags.includes(t)} onPress={() => toggleTag(t)} />
+          ))}
+        </View>
+
+        {/* Family recipe toggle */}
+        <TouchableOpacity style={styles.familyRow} onPress={() => setIsFamily(f => !f)} activeOpacity={0.7}>
+          <Icon name="people" size={20} color={isFamily ? Colors.accentDeep : Colors.ink3} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.familyTitle}>Family recipe</Text>
+            <Text style={styles.familySub}>Show it on your family shelf</Text>
+          </View>
+          <View style={[styles.checkBox, isFamily && styles.checkBoxOn]}>
+            {isFamily && <Icon name="check" size={14} color="#fff" />}
+          </View>
+        </TouchableOpacity>
+
         <Button label="Save recipe" onPress={handleSave} loading={saving} style={{ marginTop: 20 }} />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -234,7 +280,7 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
 function StatInput({ label, value, onChange, numeric }: { label: string; value: string; onChange: (v: string) => void; numeric?: boolean }) {
   return (
     <View style={{ flex: 1, alignItems: 'center' }}>
-      <Text style={{ fontSize: 12, color: Colors.ink3, marginBottom: 4 }}>{label}</Text>
+      <Text style={{ fontFamily: Fonts.uiSemiBold, fontSize: 12, color: Colors.ink3, marginBottom: 4 }}>{label}</Text>
       <TextInput
         style={styles.statInput}
         value={value}
@@ -248,26 +294,37 @@ function StatInput({ label, value, onChange, numeric }: { label: string; value: 
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.paper },
-  content: { padding: 18, paddingTop: 14, paddingBottom: 40 },
+  content: { padding: 18, paddingBottom: 40 },
   appbar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14 },
-  cancelTxt: { fontSize: 15, fontWeight: '600', color: Colors.ink3 },
-  appbarTitle: { fontSize: 16, fontWeight: '700', color: Colors.ink },
-  saveTxt: { fontSize: 15, fontWeight: '700', color: Colors.accentDeep },
+  cancelTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 15, color: Colors.ink3 },
+  appbarTitle: { fontFamily: Fonts.uiBold, fontSize: 16, color: Colors.ink },
+  saveTxt: { fontFamily: Fonts.uiBold, fontSize: 15, color: Colors.accentDeep },
   coverPlaceholder: { height: 160, backgroundColor: Colors.surface2, borderRadius: Radius.lg, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  coverOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.18)', gap: 6 },
-  coverTxt: { fontWeight: '600', fontSize: 13.5, color: '#fff' },
-  coverEditTxt: { fontWeight: '600', fontSize: 13.5, color: '#fff', backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  titleInput: { marginTop: 14, height: 56, backgroundColor: Colors.surface2, borderRadius: Radius.md, paddingHorizontal: 16, fontSize: 19, color: Colors.ink, fontWeight: '600' },
-  descInput: { marginTop: 11, minHeight: 64, backgroundColor: Colors.surface2, borderRadius: Radius.md, paddingHorizontal: 16, paddingVertical: 13, fontSize: 15, color: Colors.ink },
+  coverOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.18)', gap: 6 },
+  coverTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 13.5, color: '#fff' },
+  coverEditPill: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
+  coverEditTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 13.5, color: '#fff' },
+  titleInput: { marginTop: 14, height: 56, backgroundColor: Colors.surface2, borderRadius: Radius.md, paddingHorizontal: 16, fontSize: 19, color: Colors.ink, fontFamily: Fonts.uiSemiBold },
+  descInput: { marginTop: 11, minHeight: 64, backgroundColor: Colors.surface2, borderRadius: Radius.md, paddingHorizontal: 16, paddingVertical: 13, fontSize: 15, color: Colors.ink, fontFamily: Fonts.uiRegular },
   statsRow: { flexDirection: 'row', gap: 9, marginTop: 13 },
-  statInput: { height: 44, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.line, borderRadius: Radius.md, width: '100%', fontSize: 16, fontWeight: '700', color: Colors.ink },
+  statInput: { height: 44, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.line, borderRadius: Radius.md, width: '100%', fontSize: 16, fontFamily: Fonts.uiBold, color: Colors.ink },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 20 },
-  secTitle: { fontSize: 19, fontWeight: '700', color: Colors.ink, marginTop: 20, marginBottom: 6 },
+  secTitle: { fontSize: 19, fontFamily: Fonts.uiBold, color: Colors.ink, marginTop: 20, marginBottom: 6 },
   ingredientRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  ingrInput: { height: 44, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.line, borderRadius: Radius.md, paddingHorizontal: 10, fontSize: 14.5, color: Colors.ink },
+  ingrInput: { height: 44, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.line, borderRadius: Radius.md, paddingHorizontal: 10, fontSize: 14.5, color: Colors.ink, fontFamily: Fonts.uiRegular },
   removeTxt: { fontSize: 16, color: Colors.ink3, paddingHorizontal: 4 },
   addBtn: { alignSelf: 'flex-start', marginTop: 4 },
   stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
   stepNum: { width: 30, height: 30, borderRadius: 15, backgroundColor: Colors.accentSoft, alignItems: 'center', justifyContent: 'center', marginTop: 7 },
-  stepNumTxt: { fontWeight: '700', fontSize: 14, color: Colors.accentInk },
+  stepNumTxt: { fontFamily: Fonts.uiBold, fontSize: 14, color: Colors.accentInk },
+  tagWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  familyRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20,
+    padding: 14, backgroundColor: Colors.surface,
+    borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.line,
+  },
+  familyTitle: { fontFamily: Fonts.uiSemiBold, fontSize: 15, color: Colors.ink },
+  familySub: { fontFamily: Fonts.uiRegular, fontSize: 12.5, color: Colors.ink3, marginTop: 1 },
+  checkBox: { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: Colors.line2, alignItems: 'center', justifyContent: 'center' },
+  checkBoxOn: { backgroundColor: Colors.accent, borderColor: Colors.accent },
 });

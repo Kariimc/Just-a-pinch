@@ -85,6 +85,38 @@ export const Shadow = {
   },
 };
 
+// Badge medallion metals. Each ramp is drawn by BadgeMedallion's SVG layers:
+// rim* paints the polished outer ring, face* the inner dish, ink the engraving
+// and icon, sparkle the glitter particles, glow the bloom behind earned badges.
+// `stone` is the locked state — warm greys that sit quietly on paper surfaces.
+export const BadgeMetals = {
+  bronze: {
+    rimLight: '#EDBE8E', rimMid: '#C98A4E', rimDeep: '#8C5526', edge: '#6E3F18',
+    faceLight: '#F6D9B2', faceMid: '#E0AA72', faceDeep: '#BB8047',
+    ink: '#5C3514', sparkle: '#FFEFD6', glow: 'rgba(201,138,78,0.55)',
+  },
+  silver: {
+    rimLight: '#F4F4F2', rimMid: '#C9CDD1', rimDeep: '#8E959D', edge: '#6F7681',
+    faceLight: '#FBFCFD', faceMid: '#DEE2E7', faceDeep: '#B8BFC8',
+    ink: '#4E565F', sparkle: '#FFFFFF', glow: 'rgba(142,149,157,0.5)',
+  },
+  gold: {
+    rimLight: '#FFE18C', rimMid: '#E9B940', rimDeep: '#B47E12', edge: '#8A5E07',
+    faceLight: '#FFF1BA', faceMid: '#F5CF64', faceDeep: '#DAA934',
+    ink: '#7A5605', sparkle: '#FFF7DA', glow: 'rgba(233,185,64,0.6)',
+  },
+  emerald: {
+    rimLight: '#A4E2B8', rimMid: '#41B06B', rimDeep: '#1E7A41', edge: '#14542C',
+    faceLight: '#DBF4E2', faceMid: '#82CF9D', faceDeep: '#48A76E',
+    ink: '#0F4E27', sparkle: '#ECFFF2', glow: 'rgba(46,158,87,0.55)',
+  },
+  stone: {
+    rimLight: '#E6DFD2', rimMid: '#CFC6B4', rimDeep: '#A99F8C', edge: '#8F8674',
+    faceLight: '#F0EADE', faceMid: '#DED5C3', faceDeep: '#C6BCA8',
+    ink: '#9C9387', sparkle: '#FFFFFF', glow: 'transparent',
+  },
+};
+
 // Food placeholder colours matching the design
 export const FoodColors: Record<string, { a: string; b: string }> = {
   toast:  { a: '#c98a4e', b: '#ecc98f' },

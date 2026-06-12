@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Image, Text, StyleSheet, Animated } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Image, Text, StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types';
 import { supabase } from '../../lib/supabase';
@@ -7,24 +7,22 @@ import { Fonts } from '../../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
 
+// Static brand beat: long enough to register, short enough to never feel stuck.
+const MIN_SPLASH_MS = 1800;
+
 export default function SplashScreen({ navigation }: Props) {
-  const barAnim = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
-    Animated.timing(barAnim, {
-      toValue: 1,
-      duration: 1800,
-      useNativeDriver: false,
-    }).start();
-
-    const timer = setTimeout(async () => {
+    let cancelled = false;
+    const start = Date.now();
+    (async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      navigation.replace(session ? 'Main' : 'Welcome');
-    }, 2400);
-    return () => clearTimeout(timer);
+      const wait = Math.max(0, MIN_SPLASH_MS - (Date.now() - start));
+      setTimeout(() => {
+        if (!cancelled) navigation.replace(session ? 'Main' : 'Welcome');
+      }, wait);
+    })();
+    return () => { cancelled = true; };
   }, []);
-
-  const barWidth = barAnim.interpolate({ inputRange: [0, 1], outputRange: ['20%', '75%'] });
 
   return (
     <View style={styles.container}>
@@ -35,9 +33,6 @@ export default function SplashScreen({ navigation }: Props) {
         tintColor="#fff"
       />
       <Text style={styles.tagline}>your kitchen, remembered</Text>
-      <View style={styles.barTrack}>
-        <Animated.View style={[styles.barFill, { width: barWidth }]} />
-      </View>
     </View>
   );
 }
@@ -47,9 +42,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    // Matches the design's radial-gradient(120% 90% at 50% 32%, #2E9E57 0%, #1b6b3b 56%, #134d2a 100%)
+    // Matches the native splash background so the handoff is seamless
     backgroundColor: '#1E7A41',
-    position: 'relative',
   },
   logo: {
     width: 220,
@@ -61,19 +55,5 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     fontFamily: Fonts.displayRegularItalic,
     marginTop: 18,
-  },
-  barTrack: {
-    position: 'absolute',
-    bottom: 54,
-    width: 130,
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 999,
   },
 });

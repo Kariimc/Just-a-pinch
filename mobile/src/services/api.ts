@@ -1,14 +1,10 @@
-// All API calls go through the local backend so keys never touch the phone.
-// In development (Expo Go) the backend runs on your machine; update BASE_URL
-// to your machine's LAN IP so the Android device can reach it.
-// e.g. http://192.168.1.42:3001
+// Capture endpoints (URL import, text parse, photo OCR, AI generation) run in
+// the `recipe-api` Supabase edge function — HTTPS end to end, no self-hosted
+// backend. supabase.functions.invoke attaches the anon key automatically (and
+// the user's JWT when signed in), so this works signed-out too.
 
-import Constants from 'expo-constants';
-
-// Read from app.json extra, fall back to localhost
-const BASE_URL: string =
-  (Constants.expoConfig?.extra?.apiUrl as string | undefined) ??
-  'http://localhost:3001';
+import { supabase } from '../lib/supabase';
+import { NutritionInfo } from '../types';
 
 interface ImportResult {
   title: string;
@@ -21,54 +17,36 @@ interface ImportResult {
   tags: string[];
   sourceUrl: string;
   imageUrl?: string;
+  nutrition?: NutritionInfo;
+}
+
+async function invokeRecipeApi<T>(payload: Record<string, unknown>, fallbackError: string): Promise<T> {
+  const { data, error } = await supabase.functions.invoke('recipe-api', { body: payload });
+  if (error) {
+    // FunctionsHttpError carries the server response — surface its message.
+    let message = fallbackError;
+    try {
+      const ctx = await (error as { context?: Response }).context?.json();
+      if (ctx?.error) message = String(ctx.error);
+    } catch { /* keep fallback */ }
+    throw new Error(message);
+  }
+  if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+  return data as T;
 }
 
 export async function importFromUrl(url: string): Promise<ImportResult> {
-  const res = await fetch(`${BASE_URL}/api/import/url`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error ?? 'Import failed');
-  }
-  return res.json();
+  return invokeRecipeApi<ImportResult>({ action: 'importUrl', url }, 'Import failed');
 }
 
 export async function generateRecipeAI(prompt: string, constraints: Record<string, unknown>): Promise<ImportResult> {
-  const res = await fetch(`${BASE_URL}/api/ai/generate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, constraints }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error ?? 'Generation failed');
-  }
-  return res.json();
+  return invokeRecipeApi<ImportResult>({ action: 'generate', prompt, constraints }, 'Generation failed');
 }
 
 export async function ocrImage(base64: string): Promise<Partial<ImportResult>> {
-  const res = await fetch(`${BASE_URL}/api/import/ocr`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ image: base64 }),
-  });
-  if (!res.ok) throw new Error('OCR failed');
-  return res.json();
+  return invokeRecipeApi<Partial<ImportResult>>({ action: 'ocr', image: base64 }, 'OCR failed');
 }
 
 export async function parseTextRecipe(text: string): Promise<Partial<ImportResult>> {
-  const res = await fetch(`${BASE_URL}/api/import/text`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
-  });
-  if (!res.ok) throw new Error('Parse failed');
-  return res.json();
-}
-
-export function getApiBaseUrl(): string {
-  return BASE_URL;
+  return invokeRecipeApi<Partial<ImportResult>>({ action: 'parseText', text }, 'Parse failed');
 }

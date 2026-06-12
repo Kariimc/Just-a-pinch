@@ -1,5 +1,6 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ViewStyle, ActivityIndicator, View } from 'react-native';
+import { Text, StyleSheet, ViewStyle, ActivityIndicator, View } from 'react-native';
+import Tappable from './Tappable';
 import { Colors, Radius, Fonts } from '../theme';
 
 interface Props {
@@ -16,7 +17,7 @@ interface Props {
 export default function Button({ label, onPress, variant = 'primary', small, loading, disabled, style, leadingIcon }: Props) {
   const isLight = variant === 'ghost' || variant === 'outline';
   return (
-    <TouchableOpacity
+    <Tappable
       style={[
         styles.btn,
         small && styles.small,
@@ -29,7 +30,7 @@ export default function Button({ label, onPress, variant = 'primary', small, loa
       ]}
       onPress={onPress}
       disabled={disabled || loading}
-      activeOpacity={0.8}
+      scaleTo={0.96}
     >
       {loading ? (
         <ActivityIndicator color={variant === 'primary' ? '#fff' : Colors.accent} />
@@ -41,7 +42,7 @@ export default function Button({ label, onPress, variant = 'primary', small, loa
           </Text>
         </>
       )}
-    </TouchableOpacity>
+    </Tappable>
   );
 }
 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
+import Tappable from './Tappable';
 import { Colors, Radius, Fonts, Shadow } from '../theme';
 import { Recipe } from '../types';
 import { formatTime } from '../utils/id';
@@ -15,20 +16,20 @@ export default function RecipeCard({ recipe, onPress, variant = 'grid' }: Props)
   // Small tile: 128px wide, used in "Recently added" horizontal scroller
   if (variant === 'small') {
     return (
-      <TouchableOpacity style={styles.smallWrap} onPress={onPress} activeOpacity={0.8}>
+      <Tappable style={styles.smallWrap} onPress={onPress}>
         {recipe.imageUri
           ? <Image source={{ uri: recipe.imageUri }} style={styles.smallImg} />
           : <FoodPlaceholder variant={recipe.imageColor as any} style={styles.smallImg} />}
         <Text style={styles.smallTitle} numberOfLines={2}>{recipe.title}</Text>
         <Text style={styles.smallSub}>{formatTime(recipe.prepMinutes + recipe.cookMinutes)} · {recipe.difficulty ?? 'Easy'}</Text>
-      </TouchableOpacity>
+      </Tappable>
     );
   }
 
   // Horizontal card: 215px wide, used in "What's for dinner" scroller
   if (variant === 'horizontal') {
     return (
-      <TouchableOpacity style={[styles.hCard, Shadow.cardSoft]} onPress={onPress} activeOpacity={0.8}>
+      <Tappable style={[styles.hCard, Shadow.cardSoft]} onPress={onPress}>
         {recipe.imageUri
           ? <Image source={{ uri: recipe.imageUri }} style={styles.hImage} />
           : <FoodPlaceholder variant={recipe.imageColor as any} style={styles.hImage} />}
@@ -39,14 +40,14 @@ export default function RecipeCard({ recipe, onPress, variant = 'grid' }: Props)
             {recipe.rating ? ` · ★ ${recipe.rating}` : ''}
           </Text>
         </View>
-      </TouchableOpacity>
+      </Tappable>
     );
   }
 
   // List row
   if (variant === 'list') {
     return (
-      <TouchableOpacity style={styles.listRow} onPress={onPress} activeOpacity={0.7}>
+      <Tappable style={styles.listRow} onPress={onPress}>
         {recipe.imageUri
           ? <Image source={{ uri: recipe.imageUri }} style={styles.listThumb} />
           : <FoodPlaceholder variant={recipe.imageColor as any} style={styles.listThumb} />}
@@ -57,13 +58,13 @@ export default function RecipeCard({ recipe, onPress, variant = 'grid' }: Props)
             {recipe.rating ? ` · ★ ${recipe.rating}` : ''}
           </Text>
         </View>
-      </TouchableOpacity>
+      </Tappable>
     );
   }
 
   // Grid card (default)
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
+    <Tappable style={styles.card} onPress={onPress}>
       {recipe.imageUri
         ? <Image source={{ uri: recipe.imageUri }} style={styles.image} />
         : <FoodPlaceholder variant={recipe.imageColor as any} style={styles.image} />}
@@ -74,7 +75,7 @@ export default function RecipeCard({ recipe, onPress, variant = 'grid' }: Props)
           {recipe.rating ? ` · ★ ${recipe.rating}` : ''}
         </Text>
       </View>
-    </TouchableOpacity>
+    </Tappable>
   );
 }
 

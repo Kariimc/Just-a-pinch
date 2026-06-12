@@ -7,17 +7,19 @@ import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, Recipe } from '../../types';
 import { Colors, Radius, Fonts } from '../../theme';
-import { importFromUrl, ocrImage } from '../../services/api';
+import { importFromUrl, ocrImage, parseTextRecipe } from '../../services/api';
 import { saveRecipe } from '../../store/storage';
 import { uid } from '../../utils/id';
 import BottomSheet from '../../components/BottomSheet';
 import Icon, { IconName } from '../../components/Icon';
+import { hapticSuccess } from '../../lib/haptics';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddMenu'>;
 
 const MENU_ITEMS: { icon: IconName; title: string; sub: string; key: string; ai?: boolean }[] = [
   { icon: 'link',    title: 'Import from link',   sub: 'Paste any recipe URL',           key: 'url' },
   { icon: 'camera',  title: 'Scan a photo or card', sub: 'Camera or photo library · OCR', key: 'ocr' },
+  { icon: 'note',    title: 'Paste text',          sub: 'Paste a recipe from anywhere',   key: 'text' },
   { icon: 'pencil',  title: 'Create manually',     sub: 'Type it in yourself',            key: 'manual' },
   { icon: 'sparkle', title: 'Generate with AI',    sub: "Describe it, we'll write it",    key: 'ai', ai: true },
 ];
@@ -25,7 +27,9 @@ const MENU_ITEMS: { icon: IconName; title: string; sub: string; key: string; ai?
 export default function AddMenuScreen({ navigation }: Props) {
   const [sheetVisible, setSheetVisible] = useState(true);
   const [urlMode, setUrlMode] = useState(false);
+  const [textMode, setTextMode] = useState(false);
   const [url, setUrl] = useState('');
+  const [pastedText, setPastedText] = useState('');
   const [importing, setImporting] = useState(false);
   const [importStep, setImportStep] = useState<string[]>([]);
 
@@ -44,9 +48,11 @@ export default function AddMenuScreen({ navigation }: Props) {
         ingredients: data.ingredients.map(i => ({ ...i, id: uid(), checked: false })),
         steps: data.steps.map(s => ({ ...s, id: uid() })),
         tags: data.tags ?? [], collections: [], sourceUrl: data.sourceUrl,
+        nutrition: data.nutrition,
         savedAt: Date.now(), createdAt: Date.now(),
       };
       await saveRecipe(recipe);
+      hapticSuccess();
       setImporting(false);
       Alert.alert('Saved!', `"${recipe.title}" is in your library.`, [
         { text: 'View recipe', onPress: () => navigation.navigate('RecipeDetail', { recipeId: recipe.id }) },
@@ -55,6 +61,37 @@ export default function AddMenuScreen({ navigation }: Props) {
     } catch (e: any) {
       setImporting(false);
       Alert.alert('Import failed', e.message ?? 'Could not read that recipe. Try a different link.');
+    }
+  }
+
+  async function handleImportText() {
+    if (!pastedText.trim()) return;
+    setImporting(true);
+    setImportStep(['Reading your text…']);
+    try {
+      setImportStep(prev => [...prev, 'Structuring the recipe…']);
+      const data = await parseTextRecipe(pastedText.trim());
+      setImportStep(prev => [...prev, 'Building recipe…']);
+      const recipe: Recipe = {
+        id: uid(), title: data.title ?? 'Pasted recipe', description: data.description,
+        imageColor: 'greens', servings: data.servings ?? 4,
+        prepMinutes: data.prepMinutes ?? 15, cookMinutes: data.cookMinutes ?? 30,
+        ingredients: (data.ingredients ?? []).map(i => ({ ...i, id: uid(), checked: false })),
+        steps: (data.steps ?? []).map((s, idx) => ({ ...s, id: uid(), number: s.number ?? idx + 1 })),
+        tags: data.tags ?? [], collections: [],
+        nutrition: data.nutrition,
+        savedAt: Date.now(), createdAt: Date.now(),
+      };
+      await saveRecipe(recipe);
+      hapticSuccess();
+      setImporting(false);
+      Alert.alert('Saved!', `"${recipe.title}" is in your library.`, [
+        { text: 'View & edit', onPress: () => navigation.navigate('RecipeEditor', { recipeId: recipe.id }) },
+        { text: 'Done', onPress: () => navigation.goBack() },
+      ]);
+    } catch (e: any) {
+      setImporting(false);
+      Alert.alert('Import failed', e.message ?? "Couldn't parse that text. Try cleaning it up.");
     }
   }
 
@@ -85,9 +122,11 @@ export default function AddMenuScreen({ navigation }: Props) {
         ingredients: (data.ingredients ?? []).map(i => ({ ...i, id: uid(), checked: false })),
         steps: (data.steps ?? []).map((s, idx) => ({ ...s, id: uid(), number: s.number ?? idx + 1 })),
         tags: data.tags ?? [], collections: [],
+        nutrition: data.nutrition,
         savedAt: Date.now(), createdAt: Date.now(),
       };
       await saveRecipe(recipe);
+      hapticSuccess();
       setImporting(false);
       Alert.alert('Scanned!', `"${recipe.title}" is in your library.`, [
         { text: 'View & edit', onPress: () => navigation.navigate('RecipeEditor', { recipeId: recipe.id }) },
@@ -118,6 +157,7 @@ export default function AddMenuScreen({ navigation }: Props) {
   function handleMenuItem(key: string) {
     setSheetVisible(false);
     if (key === 'url') setUrlMode(true);
+    else if (key === 'text') setTextMode(true);
     else if (key === 'ai') (navigation as any).navigate('AIGenerator');
     else if (key === 'manual') (navigation as any).navigate('RecipeEditor');
     else if (key === 'ocr') handleOCRTap();
@@ -142,6 +182,40 @@ export default function AddMenuScreen({ navigation }: Props) {
           ))}
         </View>
       </View>
+    );
+  }
+
+  // Paste text mode
+  if (textMode) {
+    return (
+      <KeyboardAvoidingView style={styles.urlContainer} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.urlHeader}>
+          <TouchableOpacity
+            style={styles.iconBtn}
+            onPress={() => { setTextMode(false); setSheetVisible(true); }}
+          >
+            <Icon name="back" size={20} color={Colors.ink} />
+          </TouchableOpacity>
+          <Text style={styles.urlTitle}>Paste a recipe</Text>
+        </View>
+        <TextInput
+          style={styles.textInput}
+          placeholder="Paste the whole thing — title, ingredients, steps. We'll sort it out."
+          placeholderTextColor={Colors.ink3}
+          value={pastedText}
+          onChangeText={setPastedText}
+          multiline
+          textAlignVertical="top"
+          autoFocus
+        />
+        <TouchableOpacity
+          style={[styles.importBtn, !pastedText.trim() && styles.importBtnDisabled]}
+          onPress={handleImportText}
+          disabled={!pastedText.trim()}
+        >
+          <Text style={styles.importBtnTxt}>Import Recipe</Text>
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
     );
   }
 
@@ -230,6 +304,11 @@ const styles = StyleSheet.create({
   urlInput: {
     height: 52, backgroundColor: Colors.surface2, borderRadius: Radius.md,
     paddingHorizontal: 16, fontFamily: Fonts.uiRegular, fontSize: 16, color: Colors.ink,
+  },
+  textInput: {
+    minHeight: 180, maxHeight: 320, backgroundColor: Colors.surface2, borderRadius: Radius.md,
+    paddingHorizontal: 16, paddingVertical: 14,
+    fontFamily: Fonts.uiRegular, fontSize: 15.5, color: Colors.ink, lineHeight: 21,
   },
   importBtn: { marginTop: 16, height: 54, backgroundColor: Colors.accent, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
   importBtnDisabled: { opacity: 0.5 },

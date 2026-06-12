@@ -9,6 +9,7 @@ import { Colors, Radius, Fonts } from '../../theme';
 import Button from '../../components/Button';
 import Icon from '../../components/Icon';
 import { supabase } from '../../lib/supabase';
+import { authRedirectUrl } from '../../lib/authRedirect';
 import { setOnboarded } from '../../store/storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'SignUp'>;
@@ -28,23 +29,23 @@ export default function SignUpScreen({ navigation }: Props) {
     if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
     if (!agreed) { Alert.alert('Please agree to the Terms & Privacy Policy'); return; }
     setLoading(true);
-    const { error: signUpError } = await supabase.auth.signUp({
-      email, password, options: { data: { name } },
+    const { data, error: signUpError } = await supabase.auth.signUp({
+      email, password, options: { data: { name }, emailRedirectTo: authRedirectUrl },
     });
     setLoading(false);
     if (signUpError) { setError(signUpError.message); return; }
     await setOnboarded();
+    // When "Confirm email" is on, Supabase returns no session — the user is
+    // NOT logged in yet. Don't fake entry into the app; tell them to confirm.
+    if (!data.session) {
+      Alert.alert(
+        'Almost there',
+        `We sent a confirmation link to ${email}. Tap it, then come back and log in.`,
+        [{ text: 'Go to log in', onPress: () => navigation.replace('LogIn') }],
+      );
+      return;
+    }
     navigation.replace('PersonalizationQuiz');
-  }
-
-  async function handleApple() {
-    const { error: e } = await supabase.auth.signInWithOAuth({ provider: 'apple' });
-    if (e) Alert.alert('Apple sign-in failed', e.message);
-  }
-
-  async function handleGoogle() {
-    const { error: e } = await supabase.auth.signInWithOAuth({ provider: 'google' });
-    if (e) Alert.alert('Google sign-in failed', e.message);
   }
 
   return (
@@ -57,31 +58,8 @@ export default function SignUpScreen({ navigation }: Props) {
       <Text style={styles.title}>Create your account</Text>
       <Text style={styles.sub}>Free forever for saving & cooking.</Text>
 
-      {/* Social auth */}
-      <View style={styles.socials}>
-        <Button
-          label="Continue with Apple"
-          variant="outline"
-          onPress={handleApple}
-          leadingIcon={<Icon name="apple" size={20} color={Colors.ink} />}
-        />
-        <Button
-          label="Continue with Google"
-          variant="outline"
-          onPress={handleGoogle}
-          leadingIcon={<Icon name="google" size={19} color={Colors.ink} />}
-        />
-      </View>
-
-      {/* Divider */}
-      <View style={styles.divider}>
-        <View style={styles.hr} />
-        <Text style={styles.orTxt}>or with email</Text>
-        <View style={styles.hr} />
-      </View>
-
       {/* Name */}
-      <Text style={styles.label}>Name</Text>
+      <Text style={[styles.label, { marginTop: 24 }]}>Name</Text>
       <TextInput
         style={styles.input}
         placeholder="Your name"
@@ -95,7 +73,7 @@ export default function SignUpScreen({ navigation }: Props) {
       <Text style={[styles.label, { marginTop: 13 }]}>Email</Text>
       <TextInput
         style={styles.input}
-        placeholder="you@email.com"
+        placeholder="your@email.com"
         placeholderTextColor={Colors.ink3}
         value={email}
         onChangeText={setEmail}
@@ -139,8 +117,8 @@ export default function SignUpScreen({ navigation }: Props) {
       <Button label="Create account" onPress={handleCreate} loading={loading} style={{ marginTop: 10 }} />
 
       <View style={styles.loginRow}>
-        <Text style={styles.sub}>Have an account? </Text>
-        <TouchableOpacity onPress={() => navigation.navigate('LogIn')}>
+        <Text style={styles.loginTxt}>Have an account? </Text>
+        <TouchableOpacity onPress={() => navigation.navigate('LogIn')} hitSlop={8}>
           <Text style={styles.link}>Log In</Text>
         </TouchableOpacity>
       </View>
@@ -158,10 +136,6 @@ const styles = StyleSheet.create({
   },
   title: { fontFamily: Fonts.displayMedium, fontSize: 26, lineHeight: 29.6, letterSpacing: -0.13, color: Colors.ink, marginTop: 18 },
   sub: { fontFamily: Fonts.uiRegular, fontSize: 14, color: Colors.ink2, marginTop: 6 },
-  socials: { gap: 14, marginTop: 22 },
-  divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 },
-  hr: { flex: 1, height: 1, backgroundColor: Colors.line },
-  orTxt: { fontFamily: Fonts.uiRegular, fontSize: 12.5, color: Colors.ink3, letterSpacing: 0.1 },
   label: { fontFamily: Fonts.uiSemiBold, fontSize: 13, color: Colors.ink2, marginBottom: 7 },
   input: {
     width: '100%', height: 52, paddingHorizontal: 16,
@@ -179,6 +153,7 @@ const styles = StyleSheet.create({
   checkOn: { backgroundColor: Colors.accent, borderColor: Colors.accent },
   termsText: { fontFamily: Fonts.uiRegular, flex: 1, fontSize: 14, color: Colors.ink2, lineHeight: 20 },
   termsLink: { fontFamily: Fonts.uiBold, color: Colors.ink },
-  loginRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 18 },
-  link: { fontFamily: Fonts.uiBold, fontSize: 14, color: Colors.accentDeep },
+  loginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 18 },
+  loginTxt: { fontFamily: Fonts.uiRegular, fontSize: 14, color: Colors.ink2, lineHeight: 20 },
+  link: { fontFamily: Fonts.uiBold, fontSize: 14, color: Colors.accentDeep, lineHeight: 20 },
 });

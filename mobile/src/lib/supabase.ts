@@ -10,6 +10,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
+    // Native deep-link auth: the app parses the redirect URL itself rather
+    // than reading window.location, and uses PKCE so the email link returns
+    // a short-lived code we exchange for a session.
     detectSessionInUrl: false,
+    flowType: 'pkce',
   },
 });

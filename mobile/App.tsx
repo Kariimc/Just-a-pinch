@@ -3,7 +3,9 @@ import { Platform, View, Text, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
+import { ToastHost } from './src/components/Toast';
 
 import {
   Newsreader_400Regular,
@@ -66,8 +68,11 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <StatusBar style="auto" />
-      <AppNavigator />
+      <SafeAreaProvider>
+        <StatusBar style="auto" />
+        <AppNavigator />
+        <ToastHost />
+      </SafeAreaProvider>
     </ErrorBoundary>
   );
 }

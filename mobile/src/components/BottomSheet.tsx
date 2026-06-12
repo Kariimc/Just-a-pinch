@@ -27,7 +27,7 @@ export default function BottomSheet({ visible, onClose, children }: Props) {
 
 const styles = StyleSheet.create({
   scrim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(33,28,22,0.55)',
   },
   sheet: {

@@ -1,13 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform, Linking,
 } from 'react-native';
+import Constants from 'expo-constants';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, CommonActions } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../types';
+import { RootStackParamList, UserProfile } from '../../types';
 import { Colors, Fonts, Radius, Spacing } from '../../theme';
 import Icon from '../../components/Icon';
+import { showToast } from '../../components/Toast';
 import { getSettings, saveSettings, AppSettings } from '../../store/settingsStorage';
+import { getProfile, saveProfile } from '../../store/storage';
+import { getBadgeSummary, BadgeSummary } from '../../store/badges';
+import BadgeMedallion from '../../components/BadgeMedallion';
 import { requestNotificationPermission, scheduleDailyReminder, cancelDailyReminder } from '../../lib/notifications';
+import { useAuth } from '../../context/AuthContext';
+import { hapticLight } from '../../lib/haptics';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
@@ -20,16 +29,24 @@ function fmt(h: number, m: number) {
 }
 
 export default function SettingsScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets();
+  const { user, signOut } = useAuth();
   const [settings, setSettings] = useState<AppSettings>({
     notificationsEnabled: false,
     notificationHour: 18,
     notificationMinute: 0,
+    subscriptionPlan: 'free',
+    subscriptionBilling: 'annual',
   });
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [badges, setBadges] = useState<BadgeSummary | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     getSettings().then(setSettings);
-  }, []);
+    getProfile().then(setProfile);
+    getBadgeSummary().then(setBadges);
+  }, []));
 
   async function handleNotificationsToggle(value: boolean) {
     if (value && Platform.OS !== 'web') {
@@ -42,8 +59,23 @@ export default function SettingsScreen({ navigation }: Props) {
         return;
       }
     }
-    const updated = { ...settings, notificationsEnabled: value };
-    setSettings(updated);
+    setSettings(s => ({ ...s, notificationsEnabled: value }));
+  }
+
+  async function toggleMetric(value: boolean) {
+    hapticLight();
+    if (!profile) return;
+    const updated = { ...profile, preferMetric: value };
+    setProfile(updated);
+    await saveProfile(updated);
+  }
+
+  async function adjustHousehold(delta: number) {
+    hapticLight();
+    if (!profile) return;
+    const updated = { ...profile, householdSize: Math.max(1, profile.householdSize + delta) };
+    setProfile(updated);
+    await saveProfile(updated);
   }
 
   function adjustHour(delta: number) {
@@ -64,6 +96,7 @@ export default function SettingsScreen({ navigation }: Props) {
       } else {
         await cancelDailyReminder();
       }
+      showToast('Settings saved');
       navigation.goBack();
     } catch {
       Alert.alert('Error', 'Could not save settings. Please try again.');
@@ -72,8 +105,23 @@ export default function SettingsScreen({ navigation }: Props) {
     }
   }
 
+  function handleLogOut() {
+    Alert.alert('Log out', 'Your recipes stay synced to your account.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log out', style: 'destructive',
+        onPress: async () => {
+          await signOut();
+          navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Welcome' }] }));
+        },
+      },
+    ]);
+  }
+
+  const version = Constants.expoConfig?.version ?? '1.0.0';
+
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top + 6 }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
@@ -90,9 +138,113 @@ export default function SettingsScreen({ navigation }: Props) {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+        {/* Account */}
+        <Text style={styles.sectionLabel}>Account</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarTxt}>{(profile?.name?.[0] ?? user?.email?.[0] ?? '?').toUpperCase()}</Text>
+            </View>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>{profile?.name || 'Cooking offline'}</Text>
+              <Text style={styles.rowSub}>{user?.email ?? 'Recipes stored on this device only'}</Text>
+            </View>
+          </View>
+          <View style={styles.divider} />
+          <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('Badges')}>
+            <View style={styles.badgeCluster}>
+              {badges?.latest.length ? (
+                badges.latest.map((b, i) => (
+                  <View key={b.id} style={i > 0 && styles.badgeOverlap}>
+                    <BadgeMedallion metal={b.metal} icon={b.icon} size={32} earned fx="none" />
+                  </View>
+                ))
+              ) : (
+                <BadgeMedallion metal="gold" icon="star" size={32} fx="none" />
+              )}
+            </View>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>Badges</Text>
+              <Text style={styles.rowSub}>
+                {badges
+                  ? badges.earnedCount
+                    ? `${badges.earnedCount} of ${badges.total} earned`
+                    : `${badges.total} to earn — see how`
+                  : 'See how to earn them'}
+              </Text>
+            </View>
+            <Icon name="fwd" size={18} color={Colors.ink3} />
+          </TouchableOpacity>
+          {user && (
+            <>
+              <View style={styles.divider} />
+              <TouchableOpacity style={styles.row} onPress={handleLogOut}>
+                <Text style={[styles.rowTitle, { color: Colors.error }]}>Log out</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        {/* Preferences */}
+        <Text style={styles.sectionLabel}>Preferences</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>Metric units</Text>
+              <Text style={styles.rowSub}>Show grams and millilitres by default</Text>
+            </View>
+            <Switch
+              value={profile?.preferMetric ?? false}
+              onValueChange={toggleMetric}
+              disabled={!profile}
+              trackColor={{ false: Colors.line2, true: Colors.accent }}
+              thumbColor={Colors.surface}
+            />
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>Household size</Text>
+              <Text style={styles.rowSub}>Default servings for plans and scaling</Text>
+            </View>
+            <View style={styles.stepperSm}>
+              <TouchableOpacity style={styles.stepBtnSm} onPress={() => adjustHousehold(-1)} disabled={!profile}>
+                <Icon name="minus" size={15} color={Colors.ink} />
+              </TouchableOpacity>
+              <Text style={styles.stepValSm}>{profile?.householdSize ?? '—'}</Text>
+              <TouchableOpacity style={styles.stepBtnSm} onPress={() => adjustHousehold(1)} disabled={!profile}>
+                <Icon name="plus" size={15} color={Colors.ink} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* Subscription */}
+        <Text style={styles.sectionLabel}>Subscription</Text>
+        <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => navigation.navigate('Paywall', { source: 'settings' })}
+          >
+            <View style={styles.premiumIcon}>
+              <Icon name="sparkle" size={19} color={Colors.accentDeep} />
+            </View>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>
+                {settings.subscriptionPlan === 'trial' ? 'Premium trial' : 'Just a Pinch Premium'}
+              </Text>
+              <Text style={styles.rowSub}>
+                {settings.subscriptionPlan === 'trial'
+                  ? `Active · ${settings.subscriptionBilling} plan`
+                  : 'See plans & start a free trial'}
+              </Text>
+            </View>
+            <Icon name="fwd" size={18} color={Colors.ink3} />
+          </TouchableOpacity>
+        </View>
+
         {/* Notifications section */}
         <Text style={styles.sectionLabel}>Notifications</Text>
-
         <View style={styles.card}>
           <View style={styles.row}>
             <View style={styles.rowLeft}>
@@ -115,13 +267,13 @@ export default function SettingsScreen({ navigation }: Props) {
               <Text style={styles.pickerLabel}>Reminder time</Text>
               <View style={styles.timePicker}>
                 <TouchableOpacity style={styles.stepBtn} onPress={() => adjustHour(-1)}>
-                  <Text style={styles.stepBtnTxt}>−</Text>
+                  <Icon name="minus" size={18} color={Colors.ink} />
                 </TouchableOpacity>
                 <Text style={styles.timeDisplay}>
                   {fmt(settings.notificationHour, settings.notificationMinute)}
                 </Text>
                 <TouchableOpacity style={styles.stepBtn} onPress={() => adjustHour(1)}>
-                  <Text style={styles.stepBtnTxt}>+</Text>
+                  <Icon name="plus" size={18} color={Colors.ink} />
                 </TouchableOpacity>
               </View>
 
@@ -156,6 +308,27 @@ export default function SettingsScreen({ navigation }: Props) {
             </Text>
           </View>
         )}
+
+        {/* About */}
+        <Text style={styles.sectionLabel}>About</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>Just a Pinch</Text>
+              <Text style={styles.rowSub}>Version {version}</Text>
+            </View>
+          </View>
+          <View style={styles.divider} />
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => Linking.openURL('https://github.com/kariimc/just-a-pinch')}
+          >
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>Help &amp; feedback</Text>
+            </View>
+            <Icon name="fwd" size={18} color={Colors.ink3} />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -165,7 +338,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.paper },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg, paddingTop: 14, paddingBottom: 10,
+    paddingHorizontal: Spacing.lg, paddingBottom: 10,
   },
   backBtn: {
     width: 44, height: 44, borderRadius: Radius.pill,
@@ -191,12 +364,23 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md, paddingVertical: 16,
+    paddingHorizontal: Spacing.md, paddingVertical: 16, gap: 12,
   },
   rowLeft: { flex: 1, marginRight: 12 },
   rowTitle: { fontFamily: Fonts.uiSemiBold, fontSize: 15.5, color: Colors.ink },
   rowSub: { fontFamily: Fonts.uiRegular, fontSize: 13, color: Colors.ink3, marginTop: 2 },
   divider: { height: 1, backgroundColor: Colors.line, marginHorizontal: Spacing.md },
+  avatar: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
+  },
+  avatarTxt: { fontFamily: Fonts.uiBold, color: '#fff', fontSize: 16 },
+  badgeCluster: { flexDirection: 'row', alignItems: 'center' },
+  badgeOverlap: { marginLeft: -11 },
+  premiumIcon: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.accentSoft,
+    alignItems: 'center', justifyContent: 'center',
+  },
   pickerLabel: {
     fontFamily: Fonts.uiSemiBold, fontSize: 13, color: Colors.ink2,
     paddingHorizontal: Spacing.md, paddingTop: 14, marginBottom: 8,
@@ -209,10 +393,16 @@ const styles = StyleSheet.create({
     width: 44, height: 44, borderRadius: Radius.pill,
     backgroundColor: Colors.surface2, alignItems: 'center', justifyContent: 'center',
   },
-  stepBtnTxt: { fontFamily: Fonts.uiBold, fontSize: 22, color: Colors.ink },
   timeDisplay: {
     fontFamily: Fonts.displayMedium, fontSize: 32, color: Colors.ink, letterSpacing: -0.5,
   },
+  stepperSm: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderColor: Colors.line2,
+    borderRadius: Radius.pill, overflow: 'hidden',
+  },
+  stepBtnSm: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface },
+  stepValSm: { fontFamily: Fonts.uiBold, minWidth: 36, textAlign: 'center', fontSize: 14.5, color: Colors.ink },
   minuteRow: {
     flexDirection: 'row', gap: 8, paddingHorizontal: Spacing.md, paddingBottom: 16,
   },
