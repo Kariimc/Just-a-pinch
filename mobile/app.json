@@ -43,9 +43,17 @@
         "projectId": "be46212c-555a-4f61-8c1c-07224d7e4807"
       },
       "supabaseUrl": "https://qdlfiewspjgbucszezja.supabase.co",
-      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkbGZpZXdzcGpnYnVjc3plemphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDA0NDUsImV4cCI6MjA5NjE3NjQ0NX0.I9Vtn_B7LTf850syL2sxmy_lMMwpunga72ZWyai_xYM"
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFkbGZpZXdzcGpnYnVjc3plemphIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDA0NDUsImV4cCI6MjA5NjE3NjQ0NX0.I9Vtn_B7LTf850syL2sxmy_lMMwpunga72ZWyai_xYM",
+      "sentryDsn": ""
     },
     "plugins": [
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "",
+          "project": ""
+        }
+      ],
       [
         "expo-splash-screen",
         {

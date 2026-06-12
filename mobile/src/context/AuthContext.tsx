@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { handleAuthLink } from '../lib/authRedirect';
 import { showToast } from '../components/Toast';
 import { resetToMain } from '../navigation/navigationRef';
+import { setSentryUser } from '../lib/sentry';
 
 interface AuthContextType {
   user: User | null;
@@ -34,11 +35,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      setSentryUser(session?.user?.id ?? null);
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+      setSentryUser(session?.user?.id ?? null);
       if (event === 'PASSWORD_RECOVERY') setRecovering(true);
     });
 

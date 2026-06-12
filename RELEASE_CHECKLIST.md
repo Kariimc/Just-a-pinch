@@ -71,13 +71,23 @@ Grounded in the actual state of the code. Tick items as they're completed.
 
 ## 🟢 QA / polish
 
-- [ ] **No crash/error reporting or analytics** anywhere — add Sentry or similar.
+- [x] **Crash/error reporting (Sentry).** Wired: `src/lib/sentry.ts` (optional,
+  fail-open — no-op until a DSN is set, and lazily requires the native package
+  so the app still runs if it isn't installed); `initSentry()` runs at the top
+  of `App.tsx`; the `ErrorBoundary` reports via `componentDidCatch`; auth state
+  tags events with the user id (no PII). **Still to do:** run
+  `npx expo install @sentry/react-native` (confirms the SDK-56-paired version —
+  the `~7.2.0` pin in `package.json` is a placeholder), create a Sentry project
+  and put its DSN in `app.json` → `extra.sentryDsn`, and fill the plugin's
+  `organization`/`project` (+ an auth token via env) for source-map upload. No
+  product analytics added (intentionally — privacy-light).
 - [ ] Ensure "Coming Soon" surfaces (Community screen, Family plan note) are
   clearly gated so they don't read as broken.
 - [ ] Test on real iOS + Android devices via a dev/preview build — Expo Go can't
   exercise Apple auth, IAP, or notifications.
-- [ ] The `ErrorBoundary` in `App.tsx` shows a raw "Crash Diagnostic" stack
-  trace to users — fine for beta, hide it in production builds.
+- [x] The `ErrorBoundary` in `App.tsx` no longer shows a raw stack trace in
+  production — `__DEV__` builds keep the "Crash Diagnostic" view; release builds
+  show a calm, branded "Something went wrong" fallback and report to Sentry.
 - [ ] Verify the deep-link auth flow (email confirm + password reset) end-to-end
   on a standalone build.
 - [ ] Bump `version` / `buildNumber` / `versionCode` for the release.
