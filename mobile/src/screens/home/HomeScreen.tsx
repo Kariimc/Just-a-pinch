@@ -18,6 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import RecipeCard from '../../components/RecipeCard';
 import Chip from '../../components/Chip';
 import FoodPlaceholder from '../../components/FoodPlaceholder';
+import CookbookCover from '../../components/CookbookCover';
 import Icon from '../../components/Icon';
 import Tappable from '../../components/Tappable';
 import Sheen from '../../components/Sheen';
@@ -330,7 +331,7 @@ export default function HomeScreen() {
             activeOpacity={0.9}
             onPress={() => navigation.navigate('RecipeDetail', { recipeId: familyRecipes[0].id })}
           >
-            <FoodPlaceholder variant="cream" style={StyleSheet.absoluteFill} />
+            <CookbookCover style={StyleSheet.absoluteFill} />
             <View style={styles.familyOverlay}>
               <Text style={styles.familyTitle}>{familyRecipes[0].title}</Text>
               <Text style={styles.familySub}>
@@ -429,11 +430,16 @@ const styles = StyleSheet.create({
   familyCard: { marginTop: 12, borderRadius: Radius.lg, overflow: 'hidden', height: 150 },
   familyOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(20,14,6,0.65)',
     justifyContent: 'flex-end', padding: 16,
   },
-  familyTitle: { fontFamily: Fonts.displayMedium, fontSize: 22, color: '#fff' },
-  familySub: { fontFamily: Fonts.uiRegular, fontSize: 13, color: 'rgba(255,255,255,0.9)', marginTop: 3 },
+  familyTitle: {
+    fontFamily: Fonts.displayMedium, fontSize: 22, color: '#fff',
+    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6,
+  },
+  familySub: {
+    fontFamily: Fonts.uiRegular, fontSize: 13, color: 'rgba(255,255,255,0.92)', marginTop: 3,
+    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5,
+  },
   familyEmpty: {
     flexDirection: 'row', alignItems: 'center', gap: 13, marginTop: 12,
     padding: 16, backgroundColor: Colors.surface,

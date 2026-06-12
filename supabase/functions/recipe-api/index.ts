@@ -43,7 +43,10 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
 
-    if (body.action !== 'instacartLink' && !ANTHROPIC_KEY) {
+    // parseText/ocr/generate always need the model. importUrl tries structured
+    // JSON-LD first and only needs the key as a fallback (checked inside), so
+    // it isn't gated here — well-marked-up sites import with no AI key at all.
+    if ((body.action === 'parseText' || body.action === 'ocr' || body.action === 'generate') && !ANTHROPIC_KEY) {
       console.error('ANTHROPIC_API_KEY secret is not set');
       return json({ error: 'AI is not set up yet — add the ANTHROPIC_API_KEY secret in Supabase → Edge Functions → Secrets.' }, 503);
     }
@@ -313,6 +316,162 @@ function pickImageValue(image: unknown): string | undefined {
   return undefined;
 }
 
+// ── Structured recipe (schema.org JSON-LD fast path) ────────────────────────────
+// Parse a complete recipe straight from a page's Recipe structured data. Most
+// real recipe sites embed it, so this imports without an AI call — faster, more
+// accurate, and working even when no ANTHROPIC_API_KEY is set. Returns null when
+// the page has no Recipe node with both ingredients and steps.
+
+interface ParsedRecipe {
+  title: string;
+  description?: string;
+  servings: number;
+  prepMinutes: number;
+  cookMinutes: number;
+  ingredients: Array<{ quantity: string; unit: string; name: string }>;
+  steps: Array<{ number: number; text: string }>;
+  tags: string[];
+}
+
+const UNITS = new Set([
+  'cup', 'cups', 'tablespoon', 'tablespoons', 'tbsp', 'tbs', 'teaspoon', 'teaspoons', 'tsp',
+  'ounce', 'ounces', 'oz', 'pound', 'pounds', 'lb', 'lbs', 'gram', 'grams', 'g',
+  'kilogram', 'kilograms', 'kg', 'milliliter', 'milliliters', 'ml', 'liter', 'liters', 'l',
+  'pinch', 'pinches', 'clove', 'cloves', 'can', 'cans', 'package', 'packages', 'pkg',
+  'stick', 'sticks', 'slice', 'slices', 'quart', 'quarts', 'pint', 'pints', 'gallon', 'gallons',
+  'sprig', 'sprigs', 'bunch', 'bunches', 'handful', 'dash', 'dashes', 'piece', 'pieces',
+]);
+
+const FRACTIONS: Record<string, string> = {
+  '½': '1/2', '¼': '1/4', '¾': '3/4', '⅓': '1/3', '⅔': '2/3',
+  '⅛': '1/8', '⅜': '3/8', '⅝': '5/8', '⅞': '7/8',
+};
+
+// First non-empty string from a value that may be a string or an array.
+function str(v: unknown): string | undefined {
+  if (typeof v === 'string') return v.trim() || undefined;
+  if (Array.isArray(v)) { for (const x of v) { const s = str(x); if (s) return s; } }
+  return undefined;
+}
+
+// ISO 8601 duration → minutes. Splits on 'T' so the date-part 'M' (months) is
+// never confused with the time-part 'M' (minutes). PT1H30M → 90, PT45M → 45.
+function isoToMin(v: unknown): number {
+  const s = str(v);
+  if (!s) return 0;
+  const [datePart, timePart = ''] = s.toUpperCase().split('T');
+  const d = Number(datePart.match(/(\d+)D/)?.[1] ?? 0);
+  const h = Number(timePart.match(/(\d+)H/)?.[1] ?? 0);
+  const m = Number(timePart.match(/(\d+)M/)?.[1] ?? 0);
+  return d * 1440 + h * 60 + m;
+}
+
+// recipeYield: 4 | "4" | "4 servings" | ["4", "4 servings"] → 4
+function parseYield(v: unknown): number {
+  if (typeof v === 'number') return Math.round(v);
+  if (Array.isArray(v)) { for (const x of v) { const n = parseYield(x); if (n) return n; } return 0; }
+  if (typeof v === 'string') { const m = v.match(/\d+/); return m ? Number(m[0]) : 0; }
+  return 0;
+}
+
+// "1 1/2 cups flour" → { quantity: "1 1/2", unit: "cup", name: "flour" }.
+// Heuristic and forgiving — anything unmatched stays in name for the user to fix.
+function splitIngredient(line: string): { quantity: string; unit: string; name: string } {
+  let s = line.replace(/[½¼¾⅓⅔⅛⅜⅝⅞]/g, c => ' ' + FRACTIONS[c]).replace(/\s+/g, ' ').trim();
+  const raw = s;
+
+  let quantity = '';
+  const qm = s.match(/^((?:\d+\s+\d+\/\d+)|(?:\d+\/\d+)|(?:\d+(?:\.\d+)?(?:\s*[-–to]+\s*\d+(?:\.\d+)?)?))\s*/i);
+  if (qm) { quantity = qm[1].replace(/\s*[–-]\s*/, '-').replace(/\s+to\s+/i, '-').trim(); s = s.slice(qm[0].length); }
+
+  let unit = '';
+  const um = s.match(/^([a-zA-Z.]+)\b/);
+  if (um) {
+    const u = um[1].replace(/\.$/, '').toLowerCase();
+    if (UNITS.has(u)) { unit = u; s = s.slice(um[0].length).trim(); }
+  }
+  s = s.replace(/^of\s+/i, '').trim();
+  return { quantity, unit, name: s || raw };
+}
+
+function parseIngredients(v: unknown): Array<{ quantity: string; unit: string; name: string }> {
+  if (!Array.isArray(v)) return [];
+  return v.map(x => splitIngredient(str(x) ?? '')).filter(i => i.name);
+}
+
+// recipeInstructions: a blob string, an array of strings, HowToStep objects, or
+// HowToSection objects with nested itemListElement. Flattened to ordered steps.
+function parseInstructions(v: unknown): Array<{ number: number; text: string }> {
+  let parts: string[] = [];
+  if (typeof v === 'string') {
+    parts = v.split(/\r?\n+|(?<=\.)\s+(?=[A-Z0-9])/);
+  } else {
+    const walk = (x: unknown) => {
+      if (!x) return;
+      if (typeof x === 'string') { parts.push(x); return; }
+      if (Array.isArray(x)) { x.forEach(walk); return; }
+      if (typeof x === 'object') {
+        const o = x as Record<string, unknown>;
+        if (o.itemListElement) { walk(o.itemListElement); return; }
+        const t = str(o.text) ?? str(o.name);
+        if (t) parts.push(t);
+      }
+    };
+    walk(v);
+  }
+  return parts
+    .map(p => p.trim())
+    .filter(p => p.length > 2)
+    .slice(0, 60)
+    .map((text, i) => ({ number: i + 1, text }));
+}
+
+function parseKeywords(node: Record<string, unknown>): string[] {
+  const tags = new Set<string>();
+  const add = (v: unknown) => {
+    if (typeof v === 'string') v.split(',').forEach(t => { const x = t.trim().toLowerCase(); if (x && x.length < 24) tags.add(x); });
+    else if (Array.isArray(v)) v.forEach(add);
+  };
+  add(node.recipeCategory);
+  add(node.recipeCuisine);
+  add(node.keywords);
+  return [...tags].slice(0, 8);
+}
+
+function recipeFromJsonLd(html: string): ParsedRecipe | null {
+  const blocks = html.matchAll(
+    /<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi,
+  );
+  for (const m of blocks) {
+    let data: unknown;
+    try { data = JSON.parse(m[1].trim()); } catch { continue; }
+    const node = findRecipeNode(data);
+    if (!node) continue;
+
+    const title = str(node.name);
+    const ingredients = parseIngredients(node.recipeIngredient);
+    const steps = parseInstructions(node.recipeInstructions);
+    if (!title || !ingredients.length || !steps.length) continue;
+
+    const prep = isoToMin(node.prepTime);
+    let cook = isoToMin(node.cookTime);
+    const total = isoToMin(node.totalTime);
+    if (!cook && total) cook = Math.max(total - prep, 0);
+
+    return {
+      title,
+      description: str(node.description)?.slice(0, 600),
+      servings: parseYield(node.recipeYield) || 4,
+      prepMinutes: prep,
+      cookMinutes: cook,
+      ingredients,
+      steps,
+      tags: parseKeywords(node),
+    };
+  }
+  return null;
+}
+
 // ── Actions ───────────────────────────────────────────────────────────────────
 
 const RECIPE_SHAPE = `{
@@ -350,9 +509,21 @@ async function importUrl(url?: string) {
     clearTimeout(timer);
   }
 
-  const pageText = htmlToText(html);
-  const imageUrl = extractImage(html, url);
+  const image = extractImage(html, url);
 
+  // Fast path: a complete recipe straight from schema.org JSON-LD — no AI call.
+  const structured = recipeFromJsonLd(html);
+  if (structured) {
+    const imageUrl = image ?? await fetchFoodPhoto(structured.title, structured.tags);
+    return json({ ...structured, sourceUrl: url, imageUrl });
+  }
+
+  // No structured data — fall back to the model to read the page text.
+  if (!ANTHROPIC_KEY) {
+    return json({ error: "This page has no embedded recipe data, and AI parsing isn't set up. Add the ANTHROPIC_API_KEY secret to import from pages like this." }, 503);
+  }
+
+  const pageText = htmlToText(html);
   const system = `You are a recipe parser. Extract the recipe from the provided page text and return ONLY valid JSON with this exact structure:
 ${RECIPE_SHAPE}
 If you cannot find a value, use a sensible default. Return only JSON, no other text.`;
@@ -360,7 +531,7 @@ If you cannot find a value, use a sensible default. Return only JSON, no other t
   const raw = await callClaude(system, `URL: ${url}\n\nPage text:\n${pageText}`);
   const recipe = parseRecipeJSON(raw);
   // Prefer the page's own photo (JSON-LD/og/twitter); else a stock food photo.
-  const photo = imageUrl ?? await fetchFoodPhoto(recipe.title, recipe.tags);
+  const photo = image ?? await fetchFoodPhoto(recipe.title, recipe.tags);
   return json({ ...recipe, sourceUrl: url, imageUrl: photo });
 }
 

@@ -48,12 +48,17 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   const onScroll = useAnimatedScrollHandler(e => { scrollY.value = e.contentOffset.y; });
 
   // Hero parallax: scrolls at 45% speed, stretches past 1x on overscroll pull.
-  const heroStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: interpolate(scrollY.value, [-300, 0, 248], [-150, 0, 112], Extrapolation.CLAMP) },
-      { scale: interpolate(scrollY.value, [-300, 0], [2.2, 1], Extrapolation.CLAMP) },
-    ],
-  }));
+  // Scroll-driven transforms drift and jank on react-native-web, so the hero
+  // stays fixed there and the effect runs on native only.
+  const heroStyle = useAnimatedStyle(() => {
+    if (Platform.OS === 'web') return {};
+    return {
+      transform: [
+        { translateY: interpolate(scrollY.value, [-300, 0, 248], [-150, 0, 112], Extrapolation.CLAMP) },
+        { scale: interpolate(scrollY.value, [-300, 0], [2.2, 1], Extrapolation.CLAMP) },
+      ],
+    };
+  });
   const bookmarkStyle = useAnimatedStyle(() => ({ transform: [{ scale: bookmarkScale.value }] }));
   const servingsStyle = useAnimatedStyle(() => ({ transform: [{ scale: servingsScale.value }] }));
 

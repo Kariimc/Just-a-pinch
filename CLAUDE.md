@@ -42,14 +42,19 @@ Supabase dashboard's Auth → URL Configuration allowlist (app scheme is
 - `claude-proxy` edge function is deployed at v5 with `verify_jwt: true` and
   vision support (photo OCR sends a base64 image block).
 - `recipe-api` edge function (source in `supabase/functions/recipe-api/`)
-  deployed at v10 with `verify_jwt: true` — the app's anon key satisfies the
+  deployed at v11 with `verify_jwt: true` — the app's anon key satisfies the
   JWT check, so capture works signed-out too. This replaced the LAN-IP
   Express backend (Android blocked it as CLEARTEXT; see 2026-06-12 device QA).
   Also hosts `instacartLink` (shopping list → Instacart cart page via the
-  Instacart Developer Platform API). Image handling: URL import uses a smart
-  extraction chain (`extractImage`) — schema.org Recipe JSON-LD image →
-  og:image → twitter:image → `<link rel=image_src>`, resolved to absolute
-  URLs. Recipes with no image of their own (AI-generated, pasted, scanned, or
+  Instacart Developer Platform API). URL import has a JSON-LD fast path
+  (`recipeFromJsonLd`): when a page embeds schema.org Recipe structured data
+  (most real recipe sites do), the full recipe — title, ISO-duration times,
+  yield, ingredients (heuristically split into qty/unit/name), HowToStep/
+  HowToSection steps, keywords — is parsed with NO AI call, so it's faster,
+  more accurate, AND works even with no `ANTHROPIC_API_KEY` (the model is only
+  the fallback for unstructured pages). Image handling: `extractImage` chain —
+  JSON-LD image → og:image → twitter:image → `<link rel=image_src>`, resolved
+  to absolute URLs; recipes with no image of their own (AI/pasted/scanned, or
   a URL where the chain finds nothing) fall back to a real Pexels food photo
   keyed off the dish name (`fetchFoodPhoto`) — itself a graceful no-op to the
   gradient placeholder when `PEXELS_API_KEY` is unset.

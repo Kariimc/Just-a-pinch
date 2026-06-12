@@ -228,7 +228,7 @@ export default function ShoppingScreen() {
           </View>
         )}
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
           {Object.keys(byCategory).length === 0 ? (
             <EmptyState
               icon="cart"
@@ -290,7 +290,8 @@ const styles = StyleSheet.create({
   progressTrack: { flex: 1, height: 6, borderRadius: 99, backgroundColor: Colors.surface2, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: Colors.accent, borderRadius: 99 },
   progressTxt: { fontFamily: Fonts.uiBold, fontSize: 12.5, color: Colors.ink2 },
-  content: { paddingBottom: 120 },
+  scroll: { flex: 1 },
+  content: { paddingBottom: 24, flexGrow: 1 },
   catLabel: { fontFamily: Fonts.uiBold, fontSize: 16, color: Colors.ink, marginTop: 18, marginBottom: 4 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: Colors.line },
   itemTxt: { fontFamily: Fonts.uiRegular, fontSize: 15.5, color: Colors.ink, lineHeight: 21 },
