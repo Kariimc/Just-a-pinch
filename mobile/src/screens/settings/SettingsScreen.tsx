@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform, Linking,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform, Linking, TextInput,
 } from 'react-native';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,12 +41,23 @@ export default function SettingsScreen({ navigation }: Props) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [badges, setBadges] = useState<BadgeSummary | null>(null);
   const [saving, setSaving] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
 
   useFocusEffect(useCallback(() => {
     getSettings().then(setSettings);
-    getProfile().then(setProfile);
+    getProfile().then(p => { setProfile(p); setNameInput(p?.name ?? ''); });
     getBadgeSummary().then(setBadges);
   }, []));
+
+  async function saveName() {
+    if (!profile) return;
+    const updated = { ...profile, name: nameInput.trim() || profile.name };
+    setProfile(updated);
+    setEditingName(false);
+    await saveProfile(updated);
+    showToast('Name updated');
+  }
 
   async function handleNotificationsToggle(value: boolean) {
     if (value && Platform.OS !== 'web') {
@@ -143,12 +154,32 @@ export default function SettingsScreen({ navigation }: Props) {
         <View style={styles.card}>
           <View style={styles.row}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarTxt}>{(profile?.name?.[0] ?? user?.email?.[0] ?? '?').toUpperCase()}</Text>
+              <Text style={styles.avatarTxt}>{(nameInput?.[0] ?? user?.email?.[0] ?? '?').toUpperCase()}</Text>
             </View>
             <View style={styles.rowLeft}>
-              <Text style={styles.rowTitle}>{profile?.name || 'Cooking offline'}</Text>
+              {editingName ? (
+                <TextInput
+                  style={styles.nameInput}
+                  value={nameInput}
+                  onChangeText={setNameInput}
+                  autoFocus
+                  returnKeyType="done"
+                  onSubmitEditing={saveName}
+                  onBlur={saveName}
+                  placeholder="Your name"
+                  placeholderTextColor={Colors.ink3}
+                />
+              ) : (
+                <Text style={styles.rowTitle}>{nameInput || profile?.name || 'Cooking offline'}</Text>
+              )}
               <Text style={styles.rowSub}>{user?.email ?? 'Recipes stored on this device only'}</Text>
             </View>
+            <TouchableOpacity
+              onPress={() => editingName ? saveName() : setEditingName(true)}
+              style={styles.editNameBtn}
+            >
+              <Icon name={editingName ? 'check' : 'pencil'} size={16} color={Colors.ink3} />
+            </TouchableOpacity>
           </View>
           <View style={styles.divider} />
           <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('Badges')}>
@@ -375,6 +406,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
   },
   avatarTxt: { fontFamily: Fonts.uiBold, color: '#fff', fontSize: 16 },
+  nameInput: {
+    fontFamily: Fonts.uiSemiBold, fontSize: 15.5, color: Colors.ink,
+    borderBottomWidth: 1.5, borderBottomColor: Colors.accent,
+    paddingVertical: 2, marginBottom: 2,
+  },
+  editNameBtn: { padding: 8 },
   badgeCluster: { flexDirection: 'row', alignItems: 'center' },
   badgeOverlap: { marginLeft: -11 },
   premiumIcon: {

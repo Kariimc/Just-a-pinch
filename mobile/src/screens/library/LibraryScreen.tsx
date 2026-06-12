@@ -13,7 +13,18 @@ import Icon from '../../components/Icon';
 import { GridCardSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 
-const MEAL_FILTERS = ['All', 'Dinner', 'Breakfast', 'Baking', 'Quick', 'Veg'];
+const MEAL_FILTERS = ['All', 'Quick & Easy', 'Vegetarian', 'Breakfast', 'Brunch', 'Dinner', 'Snacks', 'Desserts', 'Baking', 'Comfort'];
+
+function matchesFilter(recipe: Recipe, filter: string): boolean {
+  if (filter === 'All') return true;
+  const lf = filter.toLowerCase();
+  return recipe.tags.some(t => {
+    const lt = t.toLowerCase();
+    if (lf === 'quick & easy') return lt.includes('quick') || lt.includes('easy');
+    if (lf === 'vegetarian') return lt.includes('veg') || lt.includes('vegetarian');
+    return lt.includes(lf);
+  });
+}
 
 type SortKey = 'recent' | 'alpha' | 'time';
 const SORTS: Array<{ key: SortKey; label: string }> = [
@@ -42,9 +53,7 @@ export default function LibraryScreen() {
     return true;
   });
 
-  const filtered = byTab.filter(r =>
-    filter === 'All' || r.tags.some(t => t.toLowerCase().includes(filter.toLowerCase()))
-  );
+  const filtered = byTab.filter(r => matchesFilter(r, filter));
 
   const sorted = [...filtered].sort((a, b) => {
     if (sort === 'alpha') return a.title.localeCompare(b.title);

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert,
+  View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -30,14 +30,17 @@ export default function AIGeneratorScreen({ navigation }: Props) {
   const [vegetarian, setVegetarian] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [draft, setDraft] = useState<Recipe | null>(null);
+  const [genError, setGenError] = useState('');
 
   function cycle<T>(options: T[], current: T): T {
     return options[(options.indexOf(current) + 1) % options.length];
   }
 
   async function handleGenerate() {
-    if (!prompt.trim()) { Alert.alert('Describe what you want to cook'); return; }
+    if (!prompt.trim()) { setGenError('Describe what you want to cook first.'); return; }
     setGenerating(true);
+    setGenError('');
+    setDraft(null);
     try {
       const data = await generateRecipeAI(prompt, {
         servings,
@@ -63,7 +66,7 @@ export default function AIGeneratorScreen({ navigation }: Props) {
       setDraft(recipe);
       hapticSuccess();
     } catch (e: any) {
-      Alert.alert('Generation failed', e.message ?? 'Try a different prompt.');
+      setGenError(e.message ?? 'Generation failed — try a different prompt.');
     }
     setGenerating(false);
   }
@@ -120,6 +123,13 @@ export default function AIGeneratorScreen({ navigation }: Props) {
         leadingIcon={<Icon name="sparkle" size={18} color="#fff" />}
       />
 
+      {genError ? (
+        <View style={styles.errorBox}>
+          <Icon name="info" size={15} color={Colors.error} />
+          <Text style={styles.errorTxt}>{genError}</Text>
+        </View>
+      ) : null}
+
       {generating && (
         <Text style={styles.generatingHint}>Writing your recipe — this takes a few seconds…</Text>
       )}
@@ -172,6 +182,8 @@ const styles = StyleSheet.create({
   constraintLabel: { fontFamily: Fonts.uiBold, fontSize: 11.5, letterSpacing: 0.6, color: Colors.ink3, marginTop: 18, marginBottom: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   generatingHint: { fontFamily: Fonts.uiRegular, fontSize: 13.5, color: Colors.ink2, textAlign: 'center', marginTop: 14 },
+  errorBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 12, padding: 12, backgroundColor: '#FEF2F2', borderRadius: 10, borderWidth: 1, borderColor: '#FECACA' },
+  errorTxt: { flex: 1, fontFamily: Fonts.uiRegular, fontSize: 13.5, color: Colors.error, lineHeight: 19 },
   draftCard: { marginTop: 20, backgroundColor: Colors.surface, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.line, overflow: 'hidden' },
   draftImg: { width: '100%', height: 120 },
   draftBody: { padding: 14 },

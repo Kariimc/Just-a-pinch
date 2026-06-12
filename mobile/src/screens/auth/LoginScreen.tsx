@@ -140,6 +140,6 @@ const styles = StyleSheet.create({
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8 },
   errorTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 13, color: Colors.error },
   forgotRow: { alignItems: 'flex-end', marginTop: 12, marginBottom: 16 },
-  row: { flexDirection: 'row', justifyContent: 'center', marginTop: 18 },
+  row: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 18 },
   link: { fontFamily: Fonts.uiBold, fontSize: 13.5, color: Colors.accentDeep },
 });
