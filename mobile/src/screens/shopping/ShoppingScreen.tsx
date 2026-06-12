@@ -100,10 +100,11 @@ export default function ShoppingScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<ShoppingItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [newItem, setNewItem] = useState('');
 
   useFocusEffect(useCallback(() => {
-    getShoppingItems().then(setItems);
+    getShoppingItems().then(i => { setItems(i); setLoading(false); });
   }, []));
 
   async function toggle(id: string) {
@@ -184,6 +185,8 @@ export default function ShoppingScreen() {
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
           {Object.keys(byCategory).length === 0 ? (
+            // Only after loading — otherwise the CTA flashes during the fetch.
+            !loading && (
             <EmptyState
               icon="cart"
               title="List is empty"
@@ -191,6 +194,7 @@ export default function ShoppingScreen() {
               ctaLabel="Open meal plan"
               onPress={() => (navigation as any).navigate('Plan')}
             />
+            )
           ) : (
             <>
               {Object.entries(byCategory).map(([cat, catItems]) => (

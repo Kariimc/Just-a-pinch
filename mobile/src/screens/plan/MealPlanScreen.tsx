@@ -29,6 +29,7 @@ export default function MealPlanScreen() {
 
   const [entries, setEntries] = useState<MealPlanEntry[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(new Date());
   const [defaultServings, setDefaultServings] = useState(2);
 
@@ -47,6 +48,7 @@ export default function MealPlanScreen() {
     setEntries(e);
     setRecipes(r);
     if (p?.householdSize) setDefaultServings(p.householdSize);
+    setLoading(false);
   }
 
   useFocusEffect(useCallback(() => { load(); }, []));
@@ -271,7 +273,9 @@ export default function MealPlanScreen() {
           );
         })}
 
-        {recipes.length === 0 && (
+        {/* Only after loading — otherwise the CTA flashes during the fetch
+            and vanishes once recipes arrive. */}
+        {!loading && recipes.length === 0 && (
           <EmptyState
             icon="calendar"
             title="Plan your week"

@@ -208,7 +208,12 @@ export default function HomeScreen() {
               <Text style={styles.seeAll}>See all</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginTop: 12 }}
+            contentContainerStyle={styles.cardRow}
+          >
             <View style={{ flexDirection: 'row', gap: 13 }}>
               {displayed.map(r => (
                 <View key={r.id} style={{ width: 215 }}>
@@ -277,7 +282,12 @@ export default function HomeScreen() {
           <View style={styles.sectionHeader}>
             <Text style={styles.secTitle}>Today's picks</Text>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginTop: 12 }}
+            contentContainerStyle={styles.cardRow}
+          >
             <View style={{ flexDirection: 'row', gap: 13 }}>
               {featured.map(r => (
                 <View key={r.id} style={{ width: 215 }}>
@@ -403,6 +413,9 @@ const styles = StyleSheet.create({
   },
   searchTxt: { fontFamily: Fonts.uiRegular, fontSize: 15, color: Colors.ink3 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 22 },
+  // Room for the card shadow to render before the scroller clips it —
+  // without this the drop shadow ends in a hard straight edge.
+  cardRow: { paddingTop: 2, paddingBottom: 14 },
   secTitle: { fontFamily: Fonts.uiBold, fontSize: 19, letterSpacing: -0.2, color: Colors.ink },
   seeAll: { fontFamily: Fonts.uiBold, fontSize: 12.5, color: Colors.accentDeep },
   aiCard: {
