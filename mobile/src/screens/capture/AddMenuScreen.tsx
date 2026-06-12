@@ -73,7 +73,7 @@ export default function AddMenuScreen({ navigation }: Props) {
       setImportStep(prev => [...prev, 'Building recipe…']);
       const recipe: Recipe = {
         id: uid(), title: data.title ?? 'Pasted recipe', description: data.description,
-        imageColor: 'greens', servings: data.servings ?? 4,
+        imageUri: data.imageUrl, imageColor: 'greens', servings: data.servings ?? 4,
         prepMinutes: data.prepMinutes ?? 15, cookMinutes: data.cookMinutes ?? 30,
         ingredients: (data.ingredients ?? []).map(i => ({ ...i, id: uid(), checked: false })),
         steps: (data.steps ?? []).map((s, idx) => ({ ...s, id: uid(), number: s.number ?? idx + 1 })),
@@ -114,7 +114,7 @@ export default function AddMenuScreen({ navigation }: Props) {
       setImportStep(prev => [...prev, 'Building recipe…']);
       const recipe: Recipe = {
         id: uid(), title: data.title ?? 'Scanned recipe', description: data.description,
-        imageColor: 'cream', servings: data.servings ?? 4,
+        imageUri: data.imageUrl, imageColor: 'cream', servings: data.servings ?? 4,
         prepMinutes: data.prepMinutes ?? 15, cookMinutes: data.cookMinutes ?? 30,
         ingredients: (data.ingredients ?? []).map(i => ({ ...i, id: uid(), checked: false })),
         steps: (data.steps ?? []).map((s, idx) => ({ ...s, id: uid(), number: s.number ?? idx + 1 })),

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -51,6 +51,7 @@ export default function AIGeneratorScreen({ navigation }: Props) {
         id: uid(),
         title: data.title,
         description: data.description,
+        imageUri: data.imageUrl,
         imageColor: 'soup',
         servings: data.servings,
         prepMinutes: data.prepMinutes,
@@ -136,7 +137,9 @@ export default function AIGeneratorScreen({ navigation }: Props) {
 
       {draft && !generating && (
         <View style={styles.draftCard}>
-          <FoodPlaceholder variant={draft.imageColor as any} style={styles.draftImg} />
+          {draft.imageUri
+            ? <Image source={{ uri: draft.imageUri }} style={styles.draftImg} resizeMode="cover" />
+            : <FoodPlaceholder variant={draft.imageColor as any} style={styles.draftImg} />}
           <View style={styles.draftBody}>
             <View style={styles.aiBadge}>
               <Icon name="sparkle" size={12} color={Colors.accentInk} />

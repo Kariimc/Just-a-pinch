@@ -8,6 +8,10 @@
 // Platform API (INSTACART_API_KEY secret; set INSTACART_ENV=development to
 // hit the sandbox host while using a dev key).
 //
+// Recipes with no photo of their own (AI-generated, pasted, scanned) get a
+// real food photograph from Pexels keyed off the dish name (PEXELS_API_KEY
+// secret — free; when unset the app falls back to the gradient placeholder).
+//
 // Request: POST { action: 'importUrl'|'parseText'|'ocr'|'generate'|'instacartLink', ...payload }
 // Response: recipe JSON matching mobile/src/services/api.ts ImportResult,
 // { url } for instacartLink, or { error: string } with a non-2xx status.
@@ -21,6 +25,10 @@ const INSTACART_KEY = Deno.env.get('INSTACART_API_KEY') ?? '';
 const INSTACART_HOST = Deno.env.get('INSTACART_ENV') === 'development'
   ? 'https://connect.dev.instacart.tools'
   : 'https://connect.instacart.com';
+
+// Stock food photography for recipes with no image of their own (AI-generated,
+// pasted text, scanned cards). Free Pexels key — optional; absent → gradient.
+const PEXELS_KEY = Deno.env.get('PEXELS_API_KEY') ?? '';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -103,6 +111,42 @@ function parseRecipeJSON(raw: string): Record<string, unknown> {
   const match = raw.match(/```json\n?([\s\S]*?)\n?```/) ?? raw.match(/(\{[\s\S]*\})/);
   if (!match) throw new Error('No JSON found in AI response');
   return JSON.parse(match[1]);
+}
+
+// ── Stock food photo (Pexels) ──────────────────────────────────────────────────
+// Finds a real food photograph for a recipe that has no image of its own. Tries
+// the dish title first, then a tag, then a generic term — first hit wins. Any
+// failure (no key, rate limit, no match) returns undefined so the caller falls
+// back to the colored gradient placeholder; it never blocks or throws.
+async function fetchFoodPhoto(title?: unknown, tags?: unknown): Promise<string | undefined> {
+  if (!PEXELS_KEY) return undefined;
+
+  const tag = Array.isArray(tags) ? tags.find(t => typeof t === 'string' && t.trim()) : undefined;
+  const queries = [
+    typeof title === 'string' && title.trim() ? title.trim() : '',
+    tag ? `${tag} food` : '',
+    'plated food dish',
+  ].filter(Boolean);
+
+  for (const q of queries) {
+    try {
+      const res = await fetch(
+        `https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=1&orientation=landscape&size=medium`,
+        { headers: { Authorization: PEXELS_KEY } },
+      );
+      if (!res.ok) {
+        console.error('Pexels error:', res.status);
+        return undefined; // bad key / rate limit — stop, use gradient
+      }
+      const data = await res.json();
+      const src = data.photos?.[0]?.src;
+      if (src) return src.landscape ?? src.large ?? src.medium;
+    } catch (e) {
+      console.error('Pexels fetch failed:', (e as Error)?.message);
+      return undefined;
+    }
+  }
+  return undefined;
 }
 
 // ── Instacart ─────────────────────────────────────────────────────────────────
@@ -229,7 +273,9 @@ If you cannot find a value, use a sensible default. Return only JSON, no other t
 
   const raw = await callClaude(system, `URL: ${url}\n\nPage text:\n${pageText}`);
   const recipe = parseRecipeJSON(raw);
-  return json({ ...recipe, sourceUrl: url, imageUrl });
+  // Prefer the page's own og:image; fall back to a stock food photo.
+  const photo = imageUrl ?? await fetchFoodPhoto(recipe.title, recipe.tags);
+  return json({ ...recipe, sourceUrl: url, imageUrl: photo });
 }
 
 async function parseText(text?: string) {
@@ -239,7 +285,9 @@ async function parseText(text?: string) {
 ${RECIPE_SHAPE}`;
 
   const raw = await callClaude(system, text);
-  return json(parseRecipeJSON(raw));
+  const recipe = parseRecipeJSON(raw);
+  const imageUrl = await fetchFoodPhoto(recipe.title, recipe.tags);
+  return json({ ...recipe, imageUrl });
 }
 
 async function ocr(image?: string) {
@@ -261,7 +309,10 @@ If a value is unreadable, use a sensible default. Return only JSON, no other tex
 
   const base64 = image.replace(/^data:image\/\w+;base64,/, '');
   const raw = await callClaude(system, 'Extract the recipe from this photo.', base64);
-  return json(parseRecipeJSON(raw));
+  const recipe = parseRecipeJSON(raw);
+  // The scan is of the recipe card, not the dish — use a stock food photo.
+  const imageUrl = await fetchFoodPhoto(recipe.title, recipe.tags);
+  return json({ ...recipe, imageUrl });
 }
 
 async function generate(prompt?: string, constraints?: Record<string, unknown>) {
@@ -290,5 +341,7 @@ Be creative but practical. Include realistic timing and accurate nutrition estim
 
   const userMsg = `Create a recipe for: ${prompt}${constraintText ? `\nConstraints: ${constraintText}` : ''}`;
   const raw = await callClaude(system, userMsg);
-  return json(parseRecipeJSON(raw));
+  const recipe = parseRecipeJSON(raw);
+  const imageUrl = await fetchFoodPhoto(recipe.title, recipe.tags);
+  return json({ ...recipe, imageUrl });
 }
