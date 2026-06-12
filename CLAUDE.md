@@ -106,17 +106,33 @@ No simulator in cloud sessions — flag device-level claims as unverified.
 
 ## 2026-06-12 later additions
 
-- **Brand green is now the hero olive** (#5C6847; deep #47523A, soft #E8EBDC,
-  ink #3A4430 — anchored to CookbookCover's gradient). Applied universally:
-  theme tokens, splash (code + app.json native config), notification color,
-  emerald badge ramp, FoodColors.greens, badge confetti, and the icon PNGs
-  (icon.png / android-icon-background.png recolored in place; favicon
-  regenerated from the brand icon — it was a leftover blue Expo default).
-  Instacart's greens (#0AAD0A button, carrot mark) are deliberately untouched
-  — partner brand colors. Don't reintroduce the old kelly green (#2E9E57).
+- **Brand green is the original kelly** (#2E9E57; deep #1E7A41, soft #E4F2E8,
+  ink #14542C) — the 2026-06-12 olive experiment was reverted on user request,
+  but the *unification* stayed: splash (code reads Colors.accent + app.json
+  native config), notification color, emerald badge ramp, badge confetti, and
+  the icon PNGs (recolored in place via a white-anchored channel remap;
+  favicon regenerated from the brand icon). CookbookCover's gradient is a
+  deep muted version of the same family (#2E8B50→#1E7A41→#123E22). Instacart's
+  greens are deliberately untouched — partner brand colors.
 - CookbookCover measures its card via onLayout and draws a matching viewBox
   (edge-anchored frame/sides, centre-anchored art) — no slice scaling, so no
-  zoom/crop on wide screens like the user's Fold.
+  zoom/crop on wide screens like the user's Fold. Art is hand-engraved style
+  (asymmetric paths, varied stroke weights, hatch shading) — the user
+  explicitly rejected geometric/figma-style shapes here.
+- **No system dialogs anywhere** (user dislikes them; Alert.alert is also a
+  web no-op): `components/ActionSheet.tsx` hosts an imperative themed bottom
+  sheet — `showActionSheet`/`confirmSheet`, mirrors showToast. All former
+  Alert/confirm/ActionSheetIOS sites were swept. AddMenuScreen is a native
+  modal that would cover the root host on iOS, so its OCR chooser renders
+  inside its own BottomSheet instead. Low-stakes actions (clear checked
+  shopping items) just act + toast, no confirm.
+- Shopping list: per-item ✕ removes without checking off first. Instacart
+  button copies the list to the clipboard (expo-clipboard) and opens the
+  Instacart app (instacart:// → web fallback) — the partner cart API path
+  was removed with the program closed to new devs.
+- Meal plan: ⋮ on a planned meal (or long-press) opens View recipe / Remove
+  from {meal} via the action sheet (removal used to be an invisible
+  long-press Alert — broken on web).
 
 - Profiles now have `last_name` (migration `20260614000000`, applied live;
   mapped in db.ts + healProfile). Settings edits first/last name separately;

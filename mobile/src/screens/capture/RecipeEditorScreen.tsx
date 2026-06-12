@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, KeyboardAvoidingView, Platform, Image, ActionSheetIOS,
+  KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,6 +16,7 @@ import Chip from '../../components/Chip';
 import FoodPlaceholder from '../../components/FoodPlaceholder';
 import Icon from '../../components/Icon';
 import { showToast } from '../../components/Toast';
+import { showActionSheet } from '../../components/ActionSheet';
 import { hapticSuccess } from '../../lib/haptics';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RecipeEditor'>;
@@ -88,20 +89,18 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
   }
 
   function handleCoverPhotoTap() {
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['Cancel', 'Take Photo', 'Choose from Library'], cancelButtonIndex: 0 },
-        idx => { if (idx === 1) pickImage(true); else if (idx === 2) pickImage(false); }
-      );
-    } else if (Platform.OS === 'web') {
+    // No camera on web — straight to the file picker.
+    if (Platform.OS === 'web') {
       pickImage(false);
-    } else {
-      Alert.alert('Add cover photo', undefined, [
-        { text: 'Take Photo', onPress: () => pickImage(true) },
-        { text: 'Choose from Library', onPress: () => pickImage(false) },
-        { text: 'Cancel', style: 'cancel' },
-      ]);
+      return;
     }
+    showActionSheet({
+      title: 'Add cover photo',
+      actions: [
+        { label: 'Take Photo', onPress: () => pickImage(true) },
+        { label: 'Choose from Library', onPress: () => pickImage(false) },
+      ],
+    });
   }
 
   function addIngredient() {

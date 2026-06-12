@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
 import { ToastHost } from './src/components/Toast';
+import { ActionSheetHost } from './src/components/ActionSheet';
 import { BadgeUnlockHost } from './src/components/BadgeUnlock';
 
 import {
@@ -75,6 +76,7 @@ export default function App() {
           <StatusBar style="auto" />
           <AppNavigator />
           <BadgeUnlockHost />
+          <ActionSheetHost />
           <ToastHost />
         </SafeAreaProvider>
       </GestureHandlerRootView>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, TextInput,
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ActionSheetIOS,
+  ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -33,6 +33,7 @@ export default function AddMenuScreen({ navigation }: Props) {
   const [pastedText, setPastedText] = useState('');
   const [importing, setImporting] = useState(false);
   const [importStep, setImportStep] = useState<string[]>([]);
+  const [ocrChooser, setOcrChooser] = useState(false);
 
   async function handleImportUrl() {
     if (!url.trim()) return;
@@ -93,16 +94,19 @@ export default function AddMenuScreen({ navigation }: Props) {
   }
 
   async function launchOCR(useCamera: boolean) {
+    setOcrChooser(false);
+    setSheetVisible(false);
     const perm = useCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { showToast('Please allow access in Settings.', 'wifi'); return; }
+    if (!perm.granted) { showToast('Please allow access in Settings.', 'wifi'); setSheetVisible(true); return; }
 
     const result = useCamera
       ? await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7, base64: true })
       : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.7, base64: true });
 
-    if (result.canceled || !result.assets[0]) return;
+    // Backed out of the picker — bring the menu back instead of a blank screen.
+    if (result.canceled || !result.assets[0]) { setSheetVisible(true); return; }
     const base64 = result.assets[0].base64;
     if (!base64) { showToast('Could not read image', 'wifi'); return; }
 
@@ -133,31 +137,23 @@ export default function AddMenuScreen({ navigation }: Props) {
     }
   }
 
+  // No camera on web — straight to the file picker. On native the menu sheet
+  // swaps to an in-sheet chooser (no system dialogs anywhere in the app).
   function handleOCRTap() {
-    setSheetVisible(false);
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['Cancel', 'Take Photo', 'Choose from Library'], cancelButtonIndex: 0 },
-        idx => { if (idx === 0) { setSheetVisible(true); return; } launchOCR(idx === 1); }
-      );
-    } else if (Platform.OS === 'web') {
+    if (Platform.OS === 'web') {
       launchOCR(false);
-    } else {
-      Alert.alert('Scan recipe', undefined, [
-        { text: 'Take Photo', onPress: () => launchOCR(true) },
-        { text: 'Choose from Library', onPress: () => launchOCR(false) },
-        { text: 'Cancel', style: 'cancel', onPress: () => setSheetVisible(true) },
-      ]);
+      return;
     }
+    setOcrChooser(true);
   }
 
   function handleMenuItem(key: string) {
+    if (key === 'ocr') { handleOCRTap(); return; }
     setSheetVisible(false);
     if (key === 'url') setUrlMode(true);
     else if (key === 'text') setTextMode(true);
     else if (key === 'ai') (navigation as any).navigate('AIGenerator');
     else if (key === 'manual') (navigation as any).navigate('RecipeEditor');
-    else if (key === 'ocr') handleOCRTap();
   }
 
   // Import progress
@@ -256,19 +252,52 @@ export default function AddMenuScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <BottomSheet visible={sheetVisible} onClose={() => navigation.goBack()}>
-        <Text style={styles.sheetTitle}>Add a recipe</Text>
-        {MENU_ITEMS.map(item => (
-          <TouchableOpacity key={item.key} style={styles.menuRow} onPress={() => handleMenuItem(item.key)}>
-            <View style={[styles.menuIconWrap, item.ai && styles.menuIconWrapAI]}>
-              <Icon name={item.icon} size={22} color={item.ai ? '#fff' : Colors.ink2} />
+        {ocrChooser ? (
+          <>
+            <View style={styles.chooserHeader}>
+              <TouchableOpacity onPress={() => setOcrChooser(false)} hitSlop={12}>
+                <Icon name="back" size={20} color={Colors.ink} />
+              </TouchableOpacity>
+              <Text style={styles.sheetTitle}>Scan a recipe</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.menuTitle}>{item.title}</Text>
-              <Text style={styles.menuSub}>{item.sub}</Text>
-            </View>
-            <Icon name="fwd" size={20} color={Colors.ink3} />
-          </TouchableOpacity>
-        ))}
+            <TouchableOpacity style={styles.menuRow} onPress={() => launchOCR(true)}>
+              <View style={styles.menuIconWrap}>
+                <Icon name="camera" size={22} color={Colors.ink2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.menuTitle}>Take a photo</Text>
+                <Text style={styles.menuSub}>Point at a recipe card or cookbook page</Text>
+              </View>
+              <Icon name="fwd" size={20} color={Colors.ink3} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuRow} onPress={() => launchOCR(false)}>
+              <View style={styles.menuIconWrap}>
+                <Icon name="grid" size={22} color={Colors.ink2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.menuTitle}>Choose from library</Text>
+                <Text style={styles.menuSub}>Pick a photo you already took</Text>
+              </View>
+              <Icon name="fwd" size={20} color={Colors.ink3} />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Text style={styles.sheetTitle}>Add a recipe</Text>
+            {MENU_ITEMS.map(item => (
+              <TouchableOpacity key={item.key} style={styles.menuRow} onPress={() => handleMenuItem(item.key)}>
+                <View style={[styles.menuIconWrap, item.ai && styles.menuIconWrapAI]}>
+                  <Icon name={item.icon} size={22} color={item.ai ? '#fff' : Colors.ink2} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.menuTitle}>{item.title}</Text>
+                  <Text style={styles.menuSub}>{item.sub}</Text>
+                </View>
+                <Icon name="fwd" size={20} color={Colors.ink3} />
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
       </BottomSheet>
     </View>
   );
@@ -277,6 +306,7 @@ export default function AddMenuScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   sheetTitle: { fontFamily: Fonts.uiBold, fontSize: 19, color: Colors.ink, marginBottom: 6 },
+  chooserHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   menuRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.line,

@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
-  Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -10,6 +10,7 @@ import { RootStackParamList } from '../../types';
 import { Colors, Fonts, Radius, Spacing } from '../../theme';
 import { StaggerMs } from '../../theme/motion';
 import Icon, { IconName } from '../../components/Icon';
+import { confirmSheet } from '../../components/ActionSheet';
 import Button from '../../components/Button';
 import Tappable from '../../components/Tappable';
 import Sheen from '../../components/Sheen';
@@ -84,20 +85,19 @@ export default function PaywallScreen({ navigation, route }: Props) {
   }
 
   function cancelTrial() {
-    Alert.alert('Switch to free?', 'You can restart your trial any time.', [
-      { text: 'Keep Premium', style: 'cancel' },
-      {
-        text: 'Switch to free',
-        style: 'destructive',
-        onPress: async () => {
-          if (!settings) return;
-          const updated: AppSettings = { ...settings, subscriptionPlan: 'free' };
-          await saveSettings(updated);
-          setSettings(updated);
-          showToast('Back on the free plan');
-        },
+    confirmSheet({
+      title: 'Switch to free?',
+      message: 'You can restart your trial any time.',
+      confirmLabel: 'Switch to free',
+      cancelLabel: 'Keep Premium',
+      onConfirm: async () => {
+        if (!settings) return;
+        const updated: AppSettings = { ...settings, subscriptionPlan: 'free' };
+        await saveSettings(updated);
+        setSettings(updated);
+        showToast('Back on the free plan');
       },
-    ]);
+    });
   }
 
   return (

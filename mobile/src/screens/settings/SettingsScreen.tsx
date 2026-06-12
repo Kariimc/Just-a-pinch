@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform, Linking, TextInput,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Platform, Linking, TextInput,
 } from 'react-native';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { RootStackParamList, UserProfile } from '../../types';
 import { Colors, Fonts, Radius, Spacing } from '../../theme';
 import Icon from '../../components/Icon';
 import { showToast } from '../../components/Toast';
+import { confirmSheet } from '../../components/ActionSheet';
 import { getSettings, saveSettings, AppSettings } from '../../store/settingsStorage';
 import { getProfile, saveProfile } from '../../store/storage';
 import { getBadgeSummary, BadgeSummary } from '../../store/badges';
@@ -77,10 +78,7 @@ export default function SettingsScreen({ navigation }: Props) {
     if (value && Platform.OS !== 'web') {
       const granted = await requestNotificationPermission();
       if (!granted) {
-        Alert.alert(
-          'Permission required',
-          'Enable notifications in your device Settings to use this feature.',
-        );
+        showToast('Enable notifications in your device Settings first', 'info');
         return;
       }
     }
@@ -132,23 +130,22 @@ export default function SettingsScreen({ navigation }: Props) {
       showToast('Settings saved');
       navigation.goBack();
     } catch {
-      Alert.alert('Error', 'Could not save settings. Please try again.');
+      showToast('Could not save settings. Please try again.', 'wifi');
     } finally {
       setSaving(false);
     }
   }
 
   function handleLogOut() {
-    Alert.alert('Log out', 'Your recipes stay synced to your account.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Log out', style: 'destructive',
-        onPress: async () => {
-          await signOut();
-          navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Welcome' }] }));
-        },
+    confirmSheet({
+      title: 'Log out',
+      message: 'Your recipes stay synced to your account.',
+      confirmLabel: 'Log out',
+      onConfirm: async () => {
+        await signOut();
+        navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Welcome' }] }));
       },
-    ]);
+    });
   }
 
   const version = Constants.expoConfig?.version ?? '1.0.0';

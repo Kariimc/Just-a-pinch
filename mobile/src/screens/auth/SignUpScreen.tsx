@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, TouchableOpacity,
-  ScrollView, Alert,
+  ScrollView,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types';
 import { Colors, Radius, Fonts } from '../../theme';
 import Button from '../../components/Button';
+import { showToast } from '../../components/Toast';
+import { showActionSheet } from '../../components/ActionSheet';
 import Icon from '../../components/Icon';
 import { supabase } from '../../lib/supabase';
 import { authRedirectUrl } from '../../lib/authRedirect';
@@ -27,7 +29,7 @@ export default function SignUpScreen({ navigation }: Props) {
     setError('');
     if (!name || !email || !password) { setError('Please fill in all fields'); return; }
     if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
-    if (!agreed) { Alert.alert('Please agree to the Terms & Privacy Policy'); return; }
+    if (!agreed) { showToast('Please agree to the Terms & Privacy Policy', 'info'); return; }
     setLoading(true);
     const { data, error: signUpError } = await supabase.auth.signUp({
       email, password, options: { data: { name }, emailRedirectTo: authRedirectUrl },
@@ -38,11 +40,13 @@ export default function SignUpScreen({ navigation }: Props) {
     // When "Confirm email" is on, Supabase returns no session — the user is
     // NOT logged in yet. Don't fake entry into the app; tell them to confirm.
     if (!data.session) {
-      Alert.alert(
-        'Almost there',
-        `We sent a confirmation link to ${email}. Tap it, then come back and log in.`,
-        [{ text: 'Go to log in', onPress: () => navigation.replace('LogIn') }],
-      );
+      showActionSheet({
+        title: 'Almost there',
+        message: `We sent a confirmation link to ${email}. Tap it, then come back and log in.`,
+        actions: [{ label: 'Go to log in', onPress: () => navigation.replace('LogIn') }],
+        cancelLabel: null,
+        onCancel: () => navigation.replace('LogIn'),
+      });
       return;
     }
     navigation.replace('PersonalizationQuiz');

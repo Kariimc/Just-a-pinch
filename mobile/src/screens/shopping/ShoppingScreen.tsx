@@ -1,9 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  Alert, KeyboardAvoidingView, Platform, LayoutAnimation, UIManager, Linking,
-  ActivityIndicator, Modal,
+  KeyboardAvoidingView, Platform, LayoutAnimation, UIManager, Linking,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -14,7 +14,6 @@ import AnimatedCheck from '../../components/AnimatedCheck';
 import EmptyState from '../../components/EmptyState';
 import { showToast } from '../../components/Toast';
 import { getShoppingItems, saveShoppingItems, toggleShoppingItem } from '../../store/storage';
-import { createInstacartLink } from '../../services/api';
 import { bumpBadgeStat } from '../../store/badges';
 import { RootStackParamList, ShoppingItem } from '../../types';
 import { uid } from '../../utils/id';
@@ -59,86 +58,41 @@ function openExternal(url: string) {
   }
 }
 
-function instacartSearchUrl(item: ShoppingItem) {
-  return `https://www.instacart.com/store/s?k=${encodeURIComponent(item.name.trim())}`;
-}
-
 function InstacartButton({ items }: { items: ShoppingItem[] }) {
-  const [building, setBuilding] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [visited, setVisited] = useState<Set<string>>(new Set());
   const unchecked = items.filter(i => !i.checked);
 
+  // Copy the list silently, then hand off to Instacart — the app when it's
+  // installed (instacart:// on native; on web the https link app-links into
+  // it), the website otherwise. The user pastes the list into their cart.
   async function openInstacart() {
     if (!unchecked.length) {
       showToast('Add items to your list first', 'info');
       return;
     }
-    if (building) return;
-    setBuilding(true);
-    try {
-      // One-tap cart via the Instacart partner API. Their developer program is
-      // currently closed to new apps, so until a key exists this 503s fast and
-      // we fall through to the item-by-item sheet below.
-      const url = await createInstacartLink(
-        unchecked.map(i => ({ name: i.name, quantity: i.quantity, unit: i.unit })),
-        'Just a Pinch shopping list',
-      );
-      openExternal(url);
-    } catch {
-      setVisited(new Set());
-      setSheetOpen(true);
-    } finally {
-      setBuilding(false);
+    const text = unchecked
+      .map(i => [i.quantity, i.unit, i.name].filter(Boolean).join(' ').trim())
+      .join('\n');
+    try { await Clipboard.setStringAsync(text); } catch { /* clipboard unavailable — still open */ }
+    showToast('List copied — paste it into your Instacart search', 'cart');
+
+    if (Platform.OS === 'web') {
+      openExternal('https://www.instacart.com/store/');
+    } else {
+      try {
+        await Linking.openURL('instacart://');
+      } catch {
+        openExternal('https://www.instacart.com/store/');
+      }
     }
   }
 
-  function shopItem(item: ShoppingItem) {
-    setVisited(prev => new Set(prev).add(item.id));
-    openExternal(instacartSearchUrl(item));
-  }
-
   return (
-    <>
-      <TouchableOpacity style={styles.instacartBtn} onPress={openInstacart} activeOpacity={0.85} disabled={building}>
-        <View style={styles.instacartCircle}>
-          {building ? <ActivityIndicator size="small" color={Colors.instacart} /> : <InstacartMark size={24} />}
-        </View>
-        <Text style={styles.instacartText}>{building ? 'Opening Instacart…' : 'Get it on Instacart'}</Text>
-      </TouchableOpacity>
-
-      {/* Item-by-item shopper — each row opens an accurate single-item search */}
-      <Modal visible={sheetOpen} transparent animationType="slide" onRequestClose={() => setSheetOpen(false)}>
-        <TouchableOpacity style={styles.icBackdrop} activeOpacity={1} onPress={() => setSheetOpen(false)}>
-          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={styles.icSheet}>
-            <View style={styles.icHeader}>
-              <View style={styles.icHeaderMark}><InstacartMark size={22} /></View>
-              <Text style={styles.icTitle}>Shop on Instacart</Text>
-            </View>
-            <Text style={styles.icNote}>
-              Tap an item to find it on Instacart and add it to your cart, then come back for the next one.
-            </Text>
-            <ScrollView style={{ maxHeight: 340 }} contentContainerStyle={{ paddingBottom: 4 }}>
-              {unchecked.map(item => {
-                const done = visited.has(item.id);
-                return (
-                  <TouchableOpacity key={item.id} style={[styles.icRow, done && styles.icRowDone]} onPress={() => shopItem(item)}>
-                    <Text style={[styles.icRowTxt, done && styles.icRowTxtDone]} numberOfLines={1}>
-                      <Text style={styles.icRowQty}>{[item.quantity, item.unit].filter(Boolean).join(' ')}</Text>
-                      {'  '}{item.name}
-                    </Text>
-                    <Icon name={done ? 'check' : 'fwd'} size={17} color={done ? Colors.instacart : Colors.ink3} />
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            <TouchableOpacity style={styles.icDoneBtn} onPress={() => setSheetOpen(false)}>
-              <Text style={styles.icDoneTxt}>Done</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
-    </>
+    <TouchableOpacity style={styles.instacartBtn} onPress={openInstacart} activeOpacity={0.85}>
+      <View style={styles.instacartCircle}>
+        <InstacartMark size={24} />
+      </View>
+      <Text style={styles.instacartText}>Get it on Instacart</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -175,26 +129,26 @@ export default function ShoppingScreen() {
     hapticLight();
   }
 
+  // No confirmation dialog — clearing checked items is low-stakes and the
+  // toast confirms what happened.
   async function clearChecked() {
     const checkedCount = items.filter(i => i.checked).length;
     if (!checkedCount) { showToast('Nothing checked off yet', 'info'); return; }
-    const doClear = async () => {
-      const updated = items.filter(i => !i.checked);
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      await saveShoppingItems(updated);
-      setItems(updated);
-      hapticSuccess();
-      showToast('Checked items cleared', 'trash');
-    };
-    if (Platform.OS === 'web') {
-      // Alert.alert is a no-op on react-native-web
-      if ((window as any).confirm(`Remove ${checkedCount} checked item${checkedCount === 1 ? '' : 's'}?`)) doClear();
-      return;
-    }
-    Alert.alert('Clear checked', `Remove ${checkedCount} checked item${checkedCount === 1 ? '' : 's'}?`, [
-      { text: 'Cancel' },
-      { text: 'Clear', style: 'destructive', onPress: doClear },
-    ]);
+    const updated = items.filter(i => !i.checked);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    await saveShoppingItems(updated);
+    setItems(updated);
+    hapticSuccess();
+    showToast(`${checkedCount} item${checkedCount === 1 ? '' : 's'} cleared`, 'trash');
+  }
+
+  // Remove a single item outright — no need to check it off first.
+  async function removeItem(id: string) {
+    hapticLight();
+    const updated = items.filter(i => i.id !== id);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    await saveShoppingItems(updated);
+    setItems(updated);
   }
 
   const total = items.length;
@@ -253,6 +207,14 @@ export default function ShoppingScreen() {
                       {item.checked && (
                         <View style={styles.haveBadge}><Text style={styles.haveTxt}>In cart</Text></View>
                       )}
+                      <TouchableOpacity
+                        onPress={() => removeItem(item.id)}
+                        hitSlop={10}
+                        style={styles.removeBtn}
+                        accessibilityLabel={`Remove ${item.name}`}
+                      >
+                        <Icon name="x" size={15} color={Colors.ink3} />
+                      </TouchableOpacity>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -323,35 +285,9 @@ const styles = StyleSheet.create({
     fontSize: 16.5,
     color: Colors.white,
   },
-
-  // Item-by-item Instacart sheet
-  icBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  icSheet: {
-    backgroundColor: Colors.paper,
-    borderTopLeftRadius: Radius.lg, borderTopRightRadius: Radius.lg,
-    paddingHorizontal: 20, paddingTop: 18, paddingBottom: 26,
+  removeBtn: {
+    width: 28, height: 28, borderRadius: 14, marginLeft: 2,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.surface2,
   },
-  icHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  icHeaderMark: {
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: Colors.surface2, alignItems: 'center', justifyContent: 'center',
-  },
-  icTitle: { fontFamily: Fonts.uiBold, fontSize: 18, color: Colors.ink },
-  icNote: {
-    fontFamily: Fonts.uiRegular, fontSize: 13, color: Colors.ink2,
-    lineHeight: 18.5, marginTop: 8, marginBottom: 10,
-  },
-  icRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-    paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: Colors.line,
-  },
-  icRowDone: { opacity: 0.55 },
-  icRowTxt: { flex: 1, fontFamily: Fonts.uiRegular, fontSize: 15, color: Colors.ink },
-  icRowTxtDone: { color: Colors.ink3 },
-  icRowQty: { fontFamily: Fonts.uiBold },
-  icDoneBtn: {
-    marginTop: 14, height: 50, borderRadius: Radius.pill,
-    backgroundColor: Colors.instacart, alignItems: 'center', justifyContent: 'center',
-  },
-  icDoneTxt: { fontFamily: Fonts.uiBold, fontSize: 15.5, color: Colors.white },
 });
