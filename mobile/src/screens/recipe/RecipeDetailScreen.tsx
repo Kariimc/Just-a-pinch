@@ -235,7 +235,19 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
         <Animated.View style={[{ height: 248 }, heroStyle]}>
           {recipe.imageUri
             ? <Image source={{ uri: recipe.imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-            : <FoodPlaceholder variant={recipe.imageColor as any} style={StyleSheet.absoluteFill} />}
+            : (
+              <TouchableOpacity
+                style={StyleSheet.absoluteFill}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('RecipeEditor', { recipeId: recipe.id })}
+              >
+                <FoodPlaceholder variant={recipe.imageColor as any} style={StyleSheet.absoluteFill} />
+                <View style={styles.addPhotoHint}>
+                  <Icon name="camera" size={16} color="rgba(255,255,255,0.9)" />
+                  <Text style={styles.addPhotoTxt}>Add a cover photo</Text>
+                </View>
+              </TouchableOpacity>
+            )}
         </Animated.View>
 
         <View style={styles.body}>
@@ -608,4 +620,11 @@ const styles = StyleSheet.create({
   webMenuTxt: { fontFamily: Fonts.uiBold, fontSize: 16, color: Colors.ink },
   webMenuDestructiveTxt: { color: '#E53535' },
   webMenuCancelTxt: { fontFamily: Fonts.uiBold, fontSize: 16, color: Colors.ink3 },
+  addPhotoHint: {
+    position: 'absolute', bottom: 12, alignSelf: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.38)', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 6,
+  },
+  addPhotoTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 13, color: 'rgba(255,255,255,0.9)' },
 });

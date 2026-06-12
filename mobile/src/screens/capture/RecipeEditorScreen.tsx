@@ -266,7 +266,7 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
           <Icon name="people" size={20} color={isFamily ? Colors.accentDeep : Colors.ink3} />
           <View style={{ flex: 1 }}>
             <Text style={styles.familyTitle}>Family recipe</Text>
-            <Text style={styles.familySub}>Show it on your family shelf</Text>
+            <Text style={styles.familySub}>Show it on your family cookbook</Text>
           </View>
           <View style={[styles.checkBox, isFamily && styles.checkBoxOn]}>
             {isFamily && <Icon name="check" size={14} color="#fff" />}

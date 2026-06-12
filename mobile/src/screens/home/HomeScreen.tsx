@@ -324,7 +324,7 @@ export default function HomeScreen() {
       {/* Family shelf */}
       {familyRecipes.length > 0 ? (
         <>
-          <Text style={[styles.secTitle, { marginTop: 24 }]}>From the family shelf</Text>
+          <Text style={[styles.secTitle, { marginTop: 24 }]}>From the family cookbook</Text>
           <TouchableOpacity
             style={[styles.familyCard, Shadow.cardSoft]}
             activeOpacity={0.9}
@@ -341,7 +341,7 @@ export default function HomeScreen() {
         </>
       ) : recipes.length > 0 ? (
         <>
-          <Text style={[styles.secTitle, { marginTop: 24 }]}>From the family shelf</Text>
+          <Text style={[styles.secTitle, { marginTop: 24 }]}>From the family cookbook</Text>
           <TouchableOpacity
             style={styles.familyEmpty}
             activeOpacity={0.8}
@@ -349,7 +349,7 @@ export default function HomeScreen() {
           >
             <Icon name="people" size={22} color={Colors.accentDeep} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.familyEmptyTitle}>Start your family shelf</Text>
+              <Text style={styles.familyEmptyTitle}>Start your family cookbook</Text>
               <Text style={styles.familyEmptySub}>Scan a handwritten card to keep it forever.</Text>
             </View>
             <Icon name="fwd" size={18} color={Colors.ink3} />
