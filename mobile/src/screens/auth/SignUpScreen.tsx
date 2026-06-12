@@ -10,6 +10,7 @@ import Button from '../../components/Button';
 import { showToast } from '../../components/Toast';
 import { showActionSheet } from '../../components/ActionSheet';
 import Icon from '../../components/Icon';
+import SocialAuthButtons from '../../components/SocialAuthButtons';
 import { supabase } from '../../lib/supabase';
 import { authRedirectUrl } from '../../lib/authRedirect';
 import { setOnboarded } from '../../store/storage';
@@ -119,6 +120,8 @@ export default function SignUpScreen({ navigation }: Props) {
       </TouchableOpacity>
 
       <Button label="Create account" onPress={handleCreate} loading={loading} style={{ marginTop: 10 }} />
+
+      <SocialAuthButtons onSuccess={() => navigation.replace('PersonalizationQuiz')} />
 
       <View style={styles.loginRow}>
         <Text style={styles.loginTxt}>Have an account? </Text>

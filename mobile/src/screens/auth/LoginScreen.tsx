@@ -8,6 +8,7 @@ import { RootStackParamList } from '../../types';
 import { Colors, Radius, Fonts } from '../../theme';
 import Button from '../../components/Button';
 import Icon from '../../components/Icon';
+import SocialAuthButtons from '../../components/SocialAuthButtons';
 import { supabase } from '../../lib/supabase';
 import { authRedirectUrl } from '../../lib/authRedirect';
 import { setOnboarded } from '../../store/storage';
@@ -105,6 +106,8 @@ export default function LoginScreen({ navigation }: Props) {
       </TouchableOpacity>
 
       <Button label="Log In" onPress={handleLogin} loading={loading} />
+
+      <SocialAuthButtons onSuccess={() => navigation.replace('Main')} />
 
       <View style={styles.row}>
         <Text style={[styles.sub, { marginTop: 0 }]}>New here? </Text>
