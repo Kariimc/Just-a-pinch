@@ -6,7 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import Svg, { Path, Circle } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { Colors, Radius, Fonts } from '../../theme';
 import Icon from '../../components/Icon';
 import AnimatedCheck from '../../components/AnimatedCheck';
@@ -25,22 +25,23 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 const CATEGORIES = ['Produce', 'Dairy & eggs', 'Meat & fish', 'Pantry', 'Bakery', 'Other'];
 
-// Exact Instacart carrot mark:
-//   white dot → green vertical stem → two diagonal branches spreading down → orange dome
-function InstacartMark({ size = 30 }: { size?: number }) {
-  const h = Math.round(size * 68 / 56);
+// Instacart carrot mark traced from carrot.png:
+// green down-arrow top (vertical stem + two flared leaves) over a plump
+// rounded orange carrot body tapering to a soft point at the bottom.
+function InstacartMark({ size = 24 }: { size?: number }) {
   return (
-    <Svg width={size} height={h} viewBox="0 0 56 68">
-      {/* White dot */}
-      <Circle cx={28} cy={8} r={5.5} fill="white" />
-      {/* Green vertical stem */}
-      <Path d="M28,13.5 L28,30" stroke="#178244" strokeWidth={6} strokeLinecap="round" />
-      {/* Green left diagonal branch */}
-      <Path d="M28,30 Q20,40 11,52" stroke="#178244" strokeWidth={6} strokeLinecap="round" />
-      {/* Green right diagonal branch */}
-      <Path d="M28,30 Q36,40 45,52" stroke="#178244" strokeWidth={6} strokeLinecap="round" />
-      {/* Orange carrot dome */}
-      <Path d="M9,54 Q9,68 28,68 Q47,68 47,54 Z" fill="#F07830" />
+    <Svg width={size} height={size} viewBox="0 0 100 100">
+      {/* Stem */}
+      <Path d="M50,7 L50,24" stroke="#3DB41F" strokeWidth={11} strokeLinecap="round" />
+      {/* Left leaf */}
+      <Path d="M33,13 L47,26" stroke="#3DB41F" strokeWidth={11} strokeLinecap="round" />
+      {/* Right leaf */}
+      <Path d="M67,13 L53,26" stroke="#3DB41F" strokeWidth={11} strokeLinecap="round" />
+      {/* Carrot body */}
+      <Path
+        d="M50,97 C37,91 21,73 21,52 C21,39 33,32 50,32 C67,32 79,39 79,52 C79,73 63,91 50,97 Z"
+        fill="#F4690F"
+      />
     </Svg>
   );
 }
@@ -66,9 +67,11 @@ function InstacartButton({ items }: { items: ShoppingItem[] }) {
   }
 
   return (
-    <TouchableOpacity style={styles.instacartBtn} onPress={openInstacart} activeOpacity={0.8}>
-      <InstacartMark size={30} />
-      <Text style={styles.instacartText}>instacart</Text>
+    <TouchableOpacity style={styles.instacartBtn} onPress={openInstacart} activeOpacity={0.85}>
+      <View style={styles.instacartCircle}>
+        <InstacartMark size={24} />
+      </View>
+      <Text style={styles.instacartText}>Get it on Instacart</Text>
     </TouchableOpacity>
   );
 }
@@ -226,25 +229,25 @@ const styles = StyleSheet.create({
   addBar: { borderTopWidth: 1, borderTopColor: Colors.line, paddingVertical: 11, flexDirection: 'row', gap: 10, alignItems: 'center', backgroundColor: Colors.paper },
   addInput: { flex: 1, height: 46, backgroundColor: Colors.surface2, borderRadius: Radius.md, paddingHorizontal: 16, fontFamily: Fonts.uiRegular, fontSize: 15, color: Colors.ink },
   micBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
-  // Instacart button — exact logo reproduction: carrot mark + "instacart" on cream
+  // Instacart CTA — green pill, carrot mark on a white circle, app font
   instacartBtn: {
     marginTop: 32,
-    backgroundColor: '#F5F0E0',
-    borderRadius: Radius.lg,
-    paddingVertical: 18,
-    paddingHorizontal: 24,
+    height: 56,
+    backgroundColor: Colors.instacart,
+    borderRadius: Radius.pill,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#E8DFC8',
+    gap: 11,
+  },
+  instacartCircle: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: Colors.white,
+    alignItems: 'center', justifyContent: 'center',
   },
   instacartText: {
     fontFamily: Fonts.uiBold,
-    fontSize: 26,
-    color: '#1A1A1A',
-    letterSpacing: -0.4,
-    lineHeight: 30,
+    fontSize: 16.5,
+    color: Colors.white,
   },
 });
