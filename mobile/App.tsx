@@ -3,9 +3,11 @@ import { Platform, View, Text, ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
 import { ToastHost } from './src/components/Toast';
+import { BadgeUnlockHost } from './src/components/BadgeUnlock';
 
 import {
   Newsreader_400Regular,
@@ -68,11 +70,14 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <SafeAreaProvider>
-        <StatusBar style="auto" />
-        <AppNavigator />
-        <ToastHost />
-      </SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <StatusBar style="auto" />
+          <AppNavigator />
+          <BadgeUnlockHost />
+          <ToastHost />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
     </ErrorBoundary>
   );
 }

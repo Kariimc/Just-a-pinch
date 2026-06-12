@@ -37,6 +37,13 @@ async function authed(): Promise<boolean> {
   return !!session;
 }
 
+// Fires after writes that can advance badge progress. badges.ts registers the
+// sole listener at module init; a callback keeps the dependency one-way.
+let onMutation: (() => void) | null = null;
+export function setStorageMutationListener(cb: (() => void) | null): void {
+  onMutation = cb;
+}
+
 // ── Recipes ──────────────────────────────────────────────────────────────────
 
 export async function getRecipes(): Promise<Recipe[]> {
@@ -74,6 +81,7 @@ export async function saveRecipe(recipe: Recipe): Promise<void> {
   if (idx >= 0) all[idx] = recipe;
   else all.unshift(recipe);
   await set(KEYS.recipes, all);
+  onMutation?.();
 }
 
 export async function deleteRecipe(id: string): Promise<void> {
@@ -127,6 +135,7 @@ export async function saveMealEntry(entry: MealPlanEntry): Promise<void> {
   if (idx >= 0) all[idx] = entry;
   else all.push(entry);
   await set(KEYS.mealPlan, all);
+  onMutation?.();
 }
 
 export async function deleteMealEntry(id: string): Promise<void> {
