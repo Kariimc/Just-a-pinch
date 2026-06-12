@@ -5,10 +5,12 @@ Grounded in the actual state of the code. Tick items as they're completed.
 
 ## 🔴 Blockers — store rejection or broken core flows
 
-- [ ] **In-app account deletion.** None exists anywhere. Apple Guideline 5.1.1(v)
-  requires any app with account sign-up to offer account deletion in-app.
-  Needs a Settings entry + an edge function (the client can't delete its own
-  auth user) that also wipes the user's rows.
+- [x] **In-app account deletion.** Built: Settings → Account → "Delete account"
+  (`handleDeleteAccount`) → `deleteAccount()` in `store/storage.ts` calls the
+  new `delete-account` edge function, which runs the service-role
+  `auth.admin.deleteUser` (cascades to every table), then drops the session and
+  clears all local `@jap_` data. **Still to do:** `supabase functions deploy
+  delete-account` and set `verify_jwt = true` on it.
 - [ ] **Real payments / subscriptions.** The Paywall is a local fake — it writes
   `subscriptionPlan: 'trial'` to AsyncStorage and states "Payments aren't live
   during early access." "Restore purchases" only shows a toast. No StoreKit /

@@ -12,7 +12,7 @@ import Icon from '../../components/Icon';
 import { showToast } from '../../components/Toast';
 import { confirmSheet } from '../../components/ActionSheet';
 import { getSettings, saveSettings, AppSettings } from '../../store/settingsStorage';
-import { getProfile, saveProfile } from '../../store/storage';
+import { getProfile, saveProfile, deleteAccount } from '../../store/storage';
 import { getBadgeSummary, BadgeSummary } from '../../store/badges';
 import BadgeMedallion from '../../components/BadgeMedallion';
 import { requestNotificationPermission, scheduleDailyReminder, cancelDailyReminder } from '../../lib/notifications';
@@ -170,6 +170,24 @@ export default function SettingsScreen({ navigation }: Props) {
       onConfirm: async () => {
         await signOut();
         navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Welcome' }] }));
+      },
+    });
+  }
+
+  function handleDeleteAccount() {
+    confirmSheet({
+      title: 'Delete account?',
+      message: 'This permanently erases your account and all your recipes, plans and lists. This cannot be undone.',
+      confirmLabel: 'Delete account',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteAccount();
+          showToast('Your account has been deleted');
+          navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Welcome' }] }));
+        } catch (e: any) {
+          showToast(e?.message ?? 'Could not delete your account', 'info');
+        }
       },
     });
   }
@@ -342,6 +360,14 @@ export default function SettingsScreen({ navigation }: Props) {
               <View style={styles.divider} />
               <TouchableOpacity style={styles.row} onPress={handleLogOut}>
                 <Text style={[styles.rowTitle, { color: Colors.error }]}>Log out</Text>
+              </TouchableOpacity>
+              <View style={styles.divider} />
+              <TouchableOpacity style={styles.row} onPress={handleDeleteAccount}>
+                <View style={styles.rowLeft}>
+                  <Text style={[styles.rowTitle, { color: Colors.error }]}>Delete account</Text>
+                  <Text style={styles.rowSub}>Permanently erase your account and data</Text>
+                </View>
+                <Icon name="trash" size={18} color={Colors.error} />
               </TouchableOpacity>
             </>
           )}

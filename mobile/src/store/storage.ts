@@ -267,3 +267,31 @@ export async function isOnboarded(): Promise<boolean> {
 export async function setOnboarded(): Promise<void> {
   await AsyncStorage.setItem(KEYS.onboarded, 'true');
 }
+
+// ── Account deletion ──────────────────────────────────────────────────────────
+
+// Wipes every local trace of the user (recipes, plan, shopping, profile,
+// settings, badges, onboarding) — all of this app's '@jap_' keys.
+export async function clearLocalData(): Promise<void> {
+  const keys = await AsyncStorage.getAllKeys();
+  const ours = keys.filter(k => k.startsWith('@jap_'));
+  if (ours.length) await AsyncStorage.multiRemove(ours);
+}
+
+// Permanently deletes the signed-in user's account. A privileged edge function
+// removes the auth user (cascading to all their server data); we then drop the
+// session and clear this device's local copy. Throws a readable message on
+// failure so the caller can surface it.
+export async function deleteAccount(): Promise<void> {
+  const { error } = await supabase.functions.invoke('delete-account', { body: {} });
+  if (error) {
+    let message = 'Could not delete your account. Please try again.';
+    try {
+      const ctx = await (error as { context?: Response }).context?.json();
+      if (ctx?.error) message = String(ctx.error);
+    } catch { /* keep fallback */ }
+    throw new Error(message);
+  }
+  await supabase.auth.signOut();
+  await clearLocalData();
+}
