@@ -3,14 +3,24 @@
 // to Supabase with no separately-hosted backend. Calls Claude directly using
 // the project-wide ANTHROPIC_API_KEY secret (shared with claude-proxy).
 //
-// Request: POST { action: 'importUrl'|'parseText'|'ocr'|'generate', ...payload }
+// Also hosts the Instacart integration: `instacartLink` turns the shopping
+// list into an Instacart shopping-list page URL via the Instacart Developer
+// Platform API (INSTACART_API_KEY secret; set INSTACART_ENV=development to
+// hit the sandbox host while using a dev key).
+//
+// Request: POST { action: 'importUrl'|'parseText'|'ocr'|'generate'|'instacartLink', ...payload }
 // Response: recipe JSON matching mobile/src/services/api.ts ImportResult,
-// or { error: string } with a non-2xx status.
+// { url } for instacartLink, or { error: string } with a non-2xx status.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY') ?? '';
-const MODEL = 'claude-opus-4-8';
+const MODEL = 'claude-haiku-4-5-20251001';
+
+const INSTACART_KEY = Deno.env.get('INSTACART_API_KEY') ?? '';
+const INSTACART_HOST = Deno.env.get('INSTACART_ENV') === 'development'
+  ? 'https://connect.dev.instacart.tools'
+  : 'https://connect.instacart.com';
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -24,15 +34,24 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
+
+    if (body.action !== 'instacartLink' && !ANTHROPIC_KEY) {
+      console.error('ANTHROPIC_API_KEY secret is not set');
+      return json({ error: 'AI is not set up yet — add the ANTHROPIC_API_KEY secret in Supabase → Edge Functions → Secrets.' }, 503);
+    }
+
     switch (body.action) {
       case 'importUrl': return await importUrl(body.url);
       case 'parseText': return await parseText(body.text);
       case 'ocr': return await ocr(body.image);
       case 'generate': return await generate(body.prompt, body.constraints);
+      case 'instacartLink': return await instacartLink(body.items, body.title);
       default: return json({ error: `Unknown action: ${body.action}` }, 400);
     }
   } catch (err) {
-    return json({ error: String((err as Error)?.message ?? err) }, 500);
+    const msg = (err as Error)?.message ?? String(err);
+    console.error('recipe-api error:', msg);
+    return json({ error: msg }, 500);
   }
 });
 
@@ -73,8 +92,8 @@ async function callClaude(system: string, user: string, imageBase64?: string): P
 
   if (!res.ok) {
     const detail = await res.text();
-    console.error('Anthropic error:', detail);
-    throw new Error('The AI service is unavailable right now. Please try again.');
+    console.error('Anthropic error:', res.status, detail);
+    throw new Error(`AI service error (${res.status}). Please try again.`);
   }
   const data = await res.json();
   return data.content?.[0]?.text ?? '';
@@ -84,6 +103,61 @@ function parseRecipeJSON(raw: string): Record<string, unknown> {
   const match = raw.match(/```json\n?([\s\S]*?)\n?```/) ?? raw.match(/(\{[\s\S]*\})/);
   if (!match) throw new Error('No JSON found in AI response');
   return JSON.parse(match[1]);
+}
+
+// ── Instacart ─────────────────────────────────────────────────────────────────
+
+interface InstacartItem { name: string; quantity?: string; unit?: string }
+
+// "1 1/2" → 1.5, "3/4" → 0.75, "2" → 2; anything unparseable → 1.
+function parseQty(q?: string): number {
+  if (!q) return 1;
+  const s = q.trim();
+  const mixed = s.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (mixed) return Number(mixed[1]) + Number(mixed[2]) / Number(mixed[3]);
+  const frac = s.match(/^(\d+)\/(\d+)$/);
+  if (frac) return Number(frac[1]) / Number(frac[2]);
+  const n = parseFloat(s.replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+async function instacartLink(items?: InstacartItem[], title?: string) {
+  if (!items?.length) return json({ error: 'items are required' }, 400);
+  if (!INSTACART_KEY) {
+    console.error('INSTACART_API_KEY secret is not set');
+    return json({ error: 'Instacart is not connected yet — add the INSTACART_API_KEY secret in Supabase → Edge Functions → Secrets.' }, 503);
+  }
+
+  const line_items = items.slice(0, 100).map(i => ({
+    name: i.name,
+    quantity: parseQty(i.quantity),
+    unit: i.unit?.trim().toLowerCase() || 'each',
+    display_text: [i.quantity, i.unit, i.name].filter(Boolean).join(' ').trim() || i.name,
+  }));
+
+  const res = await fetch(`${INSTACART_HOST}/idp/v1/products/products_link`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${INSTACART_KEY}`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+      title: title || 'Just a Pinch shopping list',
+      link_type: 'shopping_list',
+      expires_in: 30,
+      line_items,
+      landing_page_configuration: { enable_pantry_items: true },
+    }),
+  });
+
+  if (!res.ok) {
+    const detail = await res.text();
+    console.error('Instacart error:', res.status, detail);
+    return json({ error: `Instacart error (${res.status}). Please try again.` }, 502);
+  }
+  const data = await res.json();
+  return json({ url: data.products_link_url });
 }
 
 // ── HTML helpers (regex-based; no DOM dependency in the edge runtime) ────────

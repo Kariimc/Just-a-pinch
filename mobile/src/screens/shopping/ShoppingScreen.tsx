@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
   Alert, KeyboardAvoidingView, Platform, LayoutAnimation, UIManager, Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -13,6 +14,7 @@ import AnimatedCheck from '../../components/AnimatedCheck';
 import EmptyState from '../../components/EmptyState';
 import { showToast } from '../../components/Toast';
 import { getShoppingItems, saveShoppingItems, toggleShoppingItem } from '../../store/storage';
+import { createInstacartLink } from '../../services/api';
 import { bumpBadgeStat } from '../../store/badges';
 import { RootStackParamList, ShoppingItem } from '../../types';
 import { uid } from '../../utils/id';
@@ -47,6 +49,7 @@ function InstacartMark({ size = 24 }: { size?: number }) {
 }
 
 function InstacartButton({ items }: { items: ShoppingItem[] }) {
+  const [building, setBuilding] = useState(false);
   const unchecked = items.filter(i => !i.checked);
 
   async function openInstacart() {
@@ -54,24 +57,42 @@ function InstacartButton({ items }: { items: ShoppingItem[] }) {
       showToast('Add items to your list first', 'info');
       return;
     }
-    const query = unchecked
-      .slice(0, 12)
-      .map(i => [i.quantity, i.unit, i.name].filter(Boolean).join(' ').trim())
-      .join(', ');
-    const url = `https://www.instacart.com/store/s?k=${encodeURIComponent(query)}`;
+    if (building) return;
+
+    // On web, window.open must happen synchronously in the tap handler or the
+    // popup blocker eats it — open a blank tab now, point it at the link later.
+    const webTab: any = Platform.OS === 'web' ? (window as any).open('', '_blank') : null;
+
+    setBuilding(true);
     try {
-      await Linking.openURL(url);
-    } catch {
-      showToast('Could not open Instacart', 'info');
+      const url = await createInstacartLink(
+        unchecked.map(i => ({ name: i.name, quantity: i.quantity, unit: i.unit })),
+        'Just a Pinch shopping list',
+      );
+      if (webTab) webTab.location.href = url;
+      else await Linking.openURL(url);
+    } catch (e) {
+      // No INSTACART_API_KEY yet (or Instacart hiccup) — fall back to a plain
+      // search so the button still lands the user on Instacart.
+      const query = unchecked
+        .slice(0, 12)
+        .map(i => [i.quantity, i.unit, i.name].filter(Boolean).join(' ').trim())
+        .join(', ');
+      const fallback = `https://www.instacart.com/store/s?k=${encodeURIComponent(query)}`;
+      if (webTab) webTab.location.href = fallback;
+      else Linking.openURL(fallback).catch(() => {});
+      showToast(e instanceof Error ? e.message : 'Could not build the Instacart cart', 'info');
+    } finally {
+      setBuilding(false);
     }
   }
 
   return (
-    <TouchableOpacity style={styles.instacartBtn} onPress={openInstacart} activeOpacity={0.85}>
+    <TouchableOpacity style={styles.instacartBtn} onPress={openInstacart} activeOpacity={0.85} disabled={building}>
       <View style={styles.instacartCircle}>
-        <InstacartMark size={24} />
+        {building ? <ActivityIndicator size="small" color={Colors.instacart} /> : <InstacartMark size={24} />}
       </View>
-      <Text style={styles.instacartText}>Get it on Instacart</Text>
+      <Text style={styles.instacartText}>{building ? 'Building your cart…' : 'Get it on Instacart'}</Text>
     </TouchableOpacity>
   );
 }
@@ -112,16 +133,22 @@ export default function ShoppingScreen() {
   async function clearChecked() {
     const checkedCount = items.filter(i => i.checked).length;
     if (!checkedCount) { showToast('Nothing checked off yet', 'info'); return; }
+    const doClear = async () => {
+      const updated = items.filter(i => !i.checked);
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      await saveShoppingItems(updated);
+      setItems(updated);
+      hapticSuccess();
+      showToast('Checked items cleared', 'trash');
+    };
+    if (Platform.OS === 'web') {
+      // Alert.alert is a no-op on react-native-web
+      if ((window as any).confirm(`Remove ${checkedCount} checked item${checkedCount === 1 ? '' : 's'}?`)) doClear();
+      return;
+    }
     Alert.alert('Clear checked', `Remove ${checkedCount} checked item${checkedCount === 1 ? '' : 's'}?`, [
       { text: 'Cancel' },
-      { text: 'Clear', style: 'destructive', onPress: async () => {
-        const updated = items.filter(i => !i.checked);
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-        await saveShoppingItems(updated);
-        setItems(updated);
-        hapticSuccess();
-        showToast('Checked items cleared', 'trash');
-      }},
+      { text: 'Clear', style: 'destructive', onPress: doClear },
     ]);
   }
 

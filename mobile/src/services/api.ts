@@ -50,3 +50,17 @@ export async function ocrImage(base64: string): Promise<Partial<ImportResult>> {
 export async function parseTextRecipe(text: string): Promise<Partial<ImportResult>> {
   return invokeRecipeApi<Partial<ImportResult>>({ action: 'parseText', text }, 'Parse failed');
 }
+
+// Creates an Instacart shopping-list page from the items and returns its URL.
+// Opening it lands the user in the Instacart app/site with every item matched
+// to real products, one tap from the cart.
+export async function createInstacartLink(
+  items: Array<{ name: string; quantity?: string; unit?: string }>,
+  title?: string,
+): Promise<string> {
+  const { url } = await invokeRecipeApi<{ url: string }>(
+    { action: 'instacartLink', items, title },
+    'Could not build the Instacart cart',
+  );
+  return url;
+}
