@@ -225,7 +225,9 @@ function Navigator() {
 export default function AppNavigator() {
   return (
     <AuthProvider>
-      <NavigationContainer ref={navigationRef}>
+      {/* linking must be explicitly disabled: with no config, tab buttons on web
+          still get hrefs like /Main/Recipes that escape the GitHub Pages base path */}
+      <NavigationContainer ref={navigationRef} linking={{ enabled: false, prefixes: [] }}>
         <Navigator />
       </NavigationContainer>
     </AuthProvider>
