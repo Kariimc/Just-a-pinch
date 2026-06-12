@@ -1,9 +1,11 @@
 export const Colors = {
-  // Accents
-  accent: '#2E9E57',
-  accentDeep: '#1E7A41',
-  accentSoft: '#E4F2E8',
-  accentInk: '#14542C',
+  // Accents — the brand olive, anchored to the family-cookbook hero
+  // (CookbookCover's radial gradient runs #6B7551 → #5C6847 → #47523A).
+  // Every green in the app derives from this ramp; don't introduce others.
+  accent: '#5C6847',
+  accentDeep: '#47523A',
+  accentSoft: '#E8EBDC',
+  accentInk: '#3A4430',
 
   // Light theme
   paper: '#FAF6EF',
@@ -77,7 +79,7 @@ export const Shadow = {
     elevation: 5,
   },
   fab: {
-    shadowColor: '#2E9E57',
+    shadowColor: '#5C6847',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.45,
     shadowRadius: 14,
@@ -106,9 +108,9 @@ export const BadgeMetals = {
     ink: '#7A5605', sparkle: '#FFF7DA', glow: 'rgba(233,185,64,0.6)',
   },
   emerald: {
-    rimLight: '#A4E2B8', rimMid: '#41B06B', rimDeep: '#1E7A41', edge: '#14542C',
-    faceLight: '#DBF4E2', faceMid: '#82CF9D', faceDeep: '#48A76E',
-    ink: '#0F4E27', sparkle: '#ECFFF2', glow: 'rgba(46,158,87,0.55)',
+    rimLight: '#C9D2AC', rimMid: '#7C8A5C', rimDeep: '#47523A', edge: '#39422E',
+    faceLight: '#E8EBD8', faceMid: '#A9B585', faceDeep: '#6B7551',
+    ink: '#333D28', sparkle: '#F2F4E6', glow: 'rgba(92,104,71,0.55)',
   },
   stone: {
     rimLight: '#E6DFD2', rimMid: '#CFC6B4', rimDeep: '#A99F8C', edge: '#8F8674',
@@ -120,7 +122,7 @@ export const BadgeMetals = {
 // Food placeholder colours matching the design
 export const FoodColors: Record<string, { a: string; b: string }> = {
   toast:  { a: '#c98a4e', b: '#ecc98f' },
-  greens: { a: '#5f8a4c', b: '#aecb86' },
+  greens: { a: '#5C6847', b: '#A9B585' },
   berry:  { a: '#7d3f63', b: '#c98aa9' },
   soup:   { a: '#cf9b3f', b: '#ecd087' },
   bread:  { a: '#b07a44', b: '#e3bd84' },

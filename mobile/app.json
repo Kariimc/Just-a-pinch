@@ -22,7 +22,7 @@
       "package": "com.justapinch.app",
       "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#1E7A41",
+        "backgroundColor": "#5C6847",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -52,14 +52,14 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 180,
           "resizeMode": "contain",
-          "backgroundColor": "#1E7A41"
+          "backgroundColor": "#5C6847"
         }
       ],
       [
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#2E9E57",
+          "color": "#5C6847",
           "sounds": []
         }
       ],

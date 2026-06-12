@@ -29,7 +29,7 @@ const MEDALLION = 58;
 // ─── Celebratory glitter burst ───────────────────────────────────────────────
 
 const BURST_COLORS = [
-  '#F5CF64', '#FFE9A8', '#2E9E57', '#8BD4A6',
+  '#F5CF64', '#FFE9A8', '#5C6847', '#A9B585',
   '#F4905E', '#E58BB4', '#7FB8DC', '#FFFFFF',
 ];
 

@@ -441,7 +441,8 @@ const styles = StyleSheet.create({
   // bottom ~55px stays free for the spice still-life baked into the SVG.
   familyOverlay: {
     ...StyleSheet.absoluteFill,
-    alignItems: 'center', justifyContent: 'center', paddingBottom: 42, paddingHorizontal: 56,
+    alignItems: 'center', justifyContent: 'center',
+    paddingTop: 18, paddingBottom: 42, paddingHorizontal: 56,
   },
   familyName: {
     fontFamily: Fonts.displayMedium, fontSize: 26, color: '#EDE8D6',

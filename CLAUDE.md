@@ -106,6 +106,18 @@ No simulator in cloud sessions — flag device-level claims as unverified.
 
 ## 2026-06-12 later additions
 
+- **Brand green is now the hero olive** (#5C6847; deep #47523A, soft #E8EBDC,
+  ink #3A4430 — anchored to CookbookCover's gradient). Applied universally:
+  theme tokens, splash (code + app.json native config), notification color,
+  emerald badge ramp, FoodColors.greens, badge confetti, and the icon PNGs
+  (icon.png / android-icon-background.png recolored in place; favicon
+  regenerated from the brand icon — it was a leftover blue Expo default).
+  Instacart's greens (#0AAD0A button, carrot mark) are deliberately untouched
+  — partner brand colors. Don't reintroduce the old kelly green (#2E9E57).
+- CookbookCover measures its card via onLayout and draws a matching viewBox
+  (edge-anchored frame/sides, centre-anchored art) — no slice scaling, so no
+  zoom/crop on wide screens like the user's Fold.
+
 - Profiles now have `last_name` (migration `20260614000000`, applied live;
   mapped in db.ts + healProfile). Settings edits first/last name separately;
   the home "family cookbook" hero renders "{LASTNAME}'S FAMILY COOKBOOK" on
