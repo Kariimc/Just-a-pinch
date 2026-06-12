@@ -13,6 +13,7 @@ import { uid } from '../../utils/id';
 import BottomSheet from '../../components/BottomSheet';
 import Icon, { IconName } from '../../components/Icon';
 import { hapticSuccess } from '../../lib/haptics';
+import { showToast } from '../../components/Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddMenu'>;
 
@@ -54,13 +55,11 @@ export default function AddMenuScreen({ navigation }: Props) {
       await saveRecipe(recipe);
       hapticSuccess();
       setImporting(false);
-      Alert.alert('Saved!', `"${recipe.title}" is in your library.`, [
-        { text: 'View recipe', onPress: () => navigation.navigate('RecipeDetail', { recipeId: recipe.id }) },
-        { text: 'Done', onPress: () => navigation.goBack() },
-      ]);
+      showToast(`"${recipe.title}" saved to your library`);
+      navigation.navigate('RecipeDetail', { recipeId: recipe.id });
     } catch (e: any) {
       setImporting(false);
-      Alert.alert('Import failed', e.message ?? 'Could not read that recipe. Try a different link.');
+      showToast(e.message ?? 'Could not read that recipe. Try a different link.', 'wifi');
     }
   }
 
@@ -85,13 +84,11 @@ export default function AddMenuScreen({ navigation }: Props) {
       await saveRecipe(recipe);
       hapticSuccess();
       setImporting(false);
-      Alert.alert('Saved!', `"${recipe.title}" is in your library.`, [
-        { text: 'View & edit', onPress: () => navigation.navigate('RecipeEditor', { recipeId: recipe.id }) },
-        { text: 'Done', onPress: () => navigation.goBack() },
-      ]);
+      showToast(`"${recipe.title}" saved to your library`);
+      navigation.navigate('RecipeEditor', { recipeId: recipe.id });
     } catch (e: any) {
       setImporting(false);
-      Alert.alert('Import failed', e.message ?? "Couldn't parse that text. Try cleaning it up.");
+      showToast(e.message ?? "Couldn't parse that text. Try cleaning it up.", 'wifi');
     }
   }
 
@@ -99,7 +96,7 @@ export default function AddMenuScreen({ navigation }: Props) {
     const perm = useCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert('Permission needed', 'Please allow access in Settings.'); return; }
+    if (!perm.granted) { showToast('Please allow access in Settings.', 'wifi'); return; }
 
     const result = useCamera
       ? await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7, base64: true })
@@ -107,7 +104,7 @@ export default function AddMenuScreen({ navigation }: Props) {
 
     if (result.canceled || !result.assets[0]) return;
     const base64 = result.assets[0].base64;
-    if (!base64) { Alert.alert('Could not read image'); return; }
+    if (!base64) { showToast('Could not read image', 'wifi'); return; }
 
     setImporting(true);
     setImportStep(['Reading image…']);
@@ -128,13 +125,11 @@ export default function AddMenuScreen({ navigation }: Props) {
       await saveRecipe(recipe);
       hapticSuccess();
       setImporting(false);
-      Alert.alert('Scanned!', `"${recipe.title}" is in your library.`, [
-        { text: 'View & edit', onPress: () => navigation.navigate('RecipeEditor', { recipeId: recipe.id }) },
-        { text: 'Done', onPress: () => navigation.goBack() },
-      ]);
+      showToast(`"${recipe.title}" saved to your library`);
+      navigation.navigate('RecipeEditor', { recipeId: recipe.id });
     } catch {
       setImporting(false);
-      Alert.alert('Scan failed', 'Could not read that photo. Try a clearer image.');
+      showToast('Could not read that photo. Try a clearer image.', 'wifi');
     }
   }
 
@@ -145,6 +140,8 @@ export default function AddMenuScreen({ navigation }: Props) {
         { options: ['Cancel', 'Take Photo', 'Choose from Library'], cancelButtonIndex: 0 },
         idx => { if (idx === 0) { setSheetVisible(true); return; } launchOCR(idx === 1); }
       );
+    } else if (Platform.OS === 'web') {
+      launchOCR(false);
     } else {
       Alert.alert('Scan recipe', undefined, [
         { text: 'Take Photo', onPress: () => launchOCR(true) },

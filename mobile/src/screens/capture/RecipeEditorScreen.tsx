@@ -74,7 +74,7 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      Alert.alert('Permission needed', 'Please allow access in Settings.');
+      showToast('Please allow access in Settings.', 'wifi');
       return;
     }
 
@@ -93,6 +93,8 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
         { options: ['Cancel', 'Take Photo', 'Choose from Library'], cancelButtonIndex: 0 },
         idx => { if (idx === 1) pickImage(true); else if (idx === 2) pickImage(false); }
       );
+    } else if (Platform.OS === 'web') {
+      pickImage(false);
     } else {
       Alert.alert('Add cover photo', undefined, [
         { text: 'Take Photo', onPress: () => pickImage(true) },
@@ -127,7 +129,7 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
   }
 
   async function handleSave() {
-    if (!title.trim()) { Alert.alert('Please add a recipe title'); return; }
+    if (!title.trim()) { showToast('Please add a recipe title'); return; }
     setSaving(true);
 
     const recipeId = editId ?? uid();

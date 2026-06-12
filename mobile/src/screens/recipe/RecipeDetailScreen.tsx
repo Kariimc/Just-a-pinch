@@ -38,6 +38,8 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   const [authorName, setAuthorName] = useState('');
   const [unit, setUnit] = useState<Unit>('us');
   const [checkedIngr, setCheckedIngr] = useState<Set<string>>(new Set());
+  const [webMenuOpen, setWebMenuOpen] = useState(false);
+  const [webMenuActions, setWebMenuActions] = useState<Array<{ label: string; fn: () => void; destructive?: boolean }>>([]);
 
   const scrollY = useSharedValue(0);
   const bookmarkScale = useSharedValue(1);
@@ -104,6 +106,14 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
 
   function confirmDelete() {
     if (!recipe) return;
+    if (Platform.OS === 'web') {
+      if (!(window as any).confirm(`Delete "${recipe.title}" forever?`)) return;
+      deleteRecipe(recipe.id).then(() => {
+        showToast('Recipe deleted', 'trash');
+        navigation.goBack();
+      });
+      return;
+    }
     Alert.alert('Delete recipe', `Delete "${recipe.title}" forever?`, [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -137,23 +147,25 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
 
   function shareToJapCommunity() {
     if (!recipe) return;
+    const doShare = async () => {
+      try {
+        await shareToCommunity(recipe, authorName || 'Anonymous');
+        showToast('Shared to the community!', 'people');
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Could not share';
+        showToast(msg === 'Sign in to share recipes' ? 'Sign in to share recipes' : 'Could not share recipe', 'wifi');
+      }
+    };
+    if (Platform.OS === 'web') {
+      if ((window as any).confirm(`Share "${recipe.title}" with the Just a Pinch community? Anyone can see and save it.`)) doShare();
+      return;
+    }
     Alert.alert(
       'Share to Community',
       `Share "${recipe.title}" with the Just a Pinch community? Anyone can see and save it.`,
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Share',
-          onPress: async () => {
-            try {
-              await shareToCommunity(recipe, authorName || 'Anonymous');
-              showToast('Shared to the community!', 'people');
-            } catch (e) {
-              const msg = e instanceof Error ? e.message : 'Could not share';
-              showToast(msg === 'Sign in to share recipes' ? 'Sign in to share recipes' : 'Could not share recipe', 'wifi');
-            }
-          },
-        },
+        { text: 'Share', onPress: doShare },
       ],
     );
   }
@@ -176,6 +188,9 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
         },
         idx => { if (idx > 0) actions[idx - 1].fn(); },
       );
+    } else if (Platform.OS === 'web') {
+      setWebMenuActions(actions);
+      setWebMenuOpen(true);
     } else {
       Alert.alert(recipe.title, undefined, [
         ...actions.map(a => ({
@@ -395,6 +410,27 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
           />
         </View>
       )}
+
+      {/* Web action sheet — replaces non-functional Alert.alert on web */}
+      {Platform.OS === 'web' && webMenuOpen && (
+        <TouchableOpacity
+          style={[StyleSheet.absoluteFill, styles.webMenuBackdrop]}
+          activeOpacity={1}
+          onPress={() => setWebMenuOpen(false)}
+        >
+          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={styles.webMenuSheet}>
+            {webMenuActions.map((a) => (
+              <TouchableOpacity key={a.label} style={styles.webMenuItem} onPress={() => { setWebMenuOpen(false); a.fn(); }}>
+                <Text style={[styles.webMenuTxt, a.destructive && styles.webMenuDestructiveTxt]}>{a.label}</Text>
+              </TouchableOpacity>
+            ))}
+            <View style={{ height: 8 }} />
+            <TouchableOpacity style={styles.webMenuItem} onPress={() => setWebMenuOpen(false)}>
+              <Text style={styles.webMenuCancelTxt}>Cancel</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -548,4 +584,28 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(250,246,239,0.96)',
     borderTopWidth: 1, borderTopColor: Colors.line,
   },
+
+  // Web action sheet (replaces Alert.alert which is a no-op on web)
+  webMenuBackdrop: {
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+    zIndex: 999,
+  },
+  webMenuSheet: {
+    backgroundColor: Colors.paper,
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 20,
+  },
+  webMenuItem: {
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.line,
+    alignItems: 'center',
+  },
+  webMenuTxt: { fontFamily: Fonts.uiBold, fontSize: 16, color: Colors.ink },
+  webMenuDestructiveTxt: { color: '#E53535' },
+  webMenuCancelTxt: { fontFamily: Fonts.uiBold, fontSize: 16, color: Colors.ink3 },
 });
