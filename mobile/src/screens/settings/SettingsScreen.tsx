@@ -131,8 +131,52 @@ export default function SettingsScreen({ navigation }: Props) {
 
   const version = Constants.expoConfig?.version ?? '1.0.0';
 
+  const WATERMARKS = [
+    { emoji: '🍳', top: '6%', left: '5%', size: 52, rotate: '-18deg', opacity: 0.07 },
+    { emoji: '🥕', top: '3%', right: '8%', size: 44, rotate: '22deg', opacity: 0.08 },
+    { emoji: '🫙', top: '14%', left: '72%', size: 38, rotate: '-8deg', opacity: 0.07 },
+    { emoji: '🥑', top: '22%', left: '2%', size: 46, rotate: '30deg', opacity: 0.07 },
+    { emoji: '🍋', top: '18%', right: '3%', size: 40, rotate: '-25deg', opacity: 0.08 },
+    { emoji: '🧄', top: '31%', left: '60%', size: 50, rotate: '14deg', opacity: 0.07 },
+    { emoji: '🫐', top: '38%', left: '8%', size: 42, rotate: '-12deg', opacity: 0.07 },
+    { emoji: '🥩', top: '44%', right: '5%', size: 48, rotate: '20deg', opacity: 0.07 },
+    { emoji: '🥐', top: '52%', left: '3%', size: 44, rotate: '10deg', opacity: 0.08 },
+    { emoji: '🧅', top: '55%', left: '65%', size: 38, rotate: '-20deg', opacity: 0.07 },
+    { emoji: '🍅', top: '62%', right: '2%', size: 46, rotate: '28deg', opacity: 0.07 },
+    { emoji: '🥚', top: '68%', left: '6%', size: 40, rotate: '-15deg', opacity: 0.08 },
+    { emoji: '🧂', top: '72%', left: '55%', size: 42, rotate: '18deg', opacity: 0.07 },
+    { emoji: '🍯', top: '78%', right: '6%', size: 44, rotate: '-22deg', opacity: 0.07 },
+    { emoji: '🥦', top: '82%', left: '2%', size: 48, rotate: '12deg', opacity: 0.07 },
+    { emoji: '🍴', top: '88%', left: '68%', size: 36, rotate: '-8deg', opacity: 0.08 },
+    { emoji: '🫚', top: '93%', left: '10%', size: 42, rotate: '25deg', opacity: 0.07 },
+    { emoji: '🥣', top: '10%', left: '35%', size: 36, rotate: '-30deg', opacity: 0.06 },
+    { emoji: '🍄', top: '48%', left: '38%', size: 34, rotate: '16deg', opacity: 0.06 },
+    { emoji: '🧁', top: '76%', left: '30%', size: 40, rotate: '-10deg', opacity: 0.07 },
+  ];
+
   return (
     <View style={[styles.root, { paddingTop: insets.top + 6 }]}>
+      {/* Food watermarks */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        {WATERMARKS.map((w, i) => (
+          <Text
+            key={i}
+            style={[
+              styles.watermark,
+              {
+                top: w.top as any,
+                left: w.left as any,
+                right: w.right as any,
+                fontSize: w.size,
+                opacity: w.opacity,
+                transform: [{ rotate: w.rotate }],
+              },
+            ]}
+          >
+            {w.emoji}
+          </Text>
+        ))}
+      </View>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
@@ -367,6 +411,7 @@ export default function SettingsScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.paper },
+  watermark: { position: 'absolute' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg, paddingBottom: 10,

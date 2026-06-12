@@ -107,7 +107,7 @@ export default function LoginScreen({ navigation }: Props) {
       <Button label="Log In" onPress={handleLogin} loading={loading} />
 
       <View style={styles.row}>
-        <Text style={styles.sub}>New here? </Text>
+        <Text style={[styles.sub, { marginTop: 0 }]}>New here? </Text>
         <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
           <Text style={styles.link}>Create an account</Text>
         </TouchableOpacity>

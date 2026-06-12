@@ -1,11 +1,12 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
-  Alert, KeyboardAvoidingView, Platform, LayoutAnimation, UIManager,
+  Alert, KeyboardAvoidingView, Platform, LayoutAnimation, UIManager, Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import Svg, { Path, G } from 'react-native-svg';
 import { Colors, Radius, Fonts } from '../../theme';
 import Icon from '../../components/Icon';
 import AnimatedCheck from '../../components/AnimatedCheck';
@@ -23,6 +24,97 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const CATEGORIES = ['Produce', 'Dairy & eggs', 'Meat & fish', 'Pantry', 'Bakery', 'Other'];
+
+const CATEGORY_EMOJI: Record<string, string> = {
+  'Produce': '🥬',
+  'Dairy & eggs': '🥚',
+  'Meat & fish': '🥩',
+  'Pantry': '🫙',
+  'Bakery': '🥖',
+  'Other': '🛒',
+};
+
+const ITEM_EMOJI: Record<string, string> = {
+  'Produce': '🥦',
+  'Dairy & eggs': '🧀',
+  'Meat & fish': '🍗',
+  'Pantry': '🧂',
+  'Bakery': '🍞',
+  'Other': '🛒',
+};
+
+function CarrotIcon({ size = 22 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <G>
+        {/* Carrot body */}
+        <Path
+          d="M12 2C10.5 2 9 3 8 5L5 20C5 21 6 22 7 22L17 22C18 22 19 21 19 20L16 5C15 3 13.5 2 12 2Z"
+          fill="#FF6B00"
+        />
+        {/* Carrot highlight */}
+        <Path
+          d="M10 4C9.5 5 9 7 9 9L10 9C10 7.5 10.5 5.5 11 4.5Z"
+          fill="#FF9940"
+          opacity="0.7"
+        />
+        {/* Carrot top greens */}
+        <Path
+          d="M12 2C11 1 9 0.5 8 1C9 2 10 3 10.5 4.5C11 3.5 11.5 2.5 12 2Z"
+          fill="#2E9E57"
+        />
+        <Path
+          d="M12 2C13 1 15 0.5 16 1C15 2 14 3 13.5 4.5C13 3.5 12.5 2.5 12 2Z"
+          fill="#2E9E57"
+        />
+        <Path
+          d="M12 2C12 1 11.5 0 11 0C10.5 0.5 10.5 2 10.5 3C11 2.5 11.5 2.2 12 2Z"
+          fill="#40B86A"
+        />
+      </G>
+    </Svg>
+  );
+}
+
+function InstacartButton({ items }: { items: ShoppingItem[] }) {
+  const unchecked = items.filter(i => !i.checked);
+
+  async function openInstacart() {
+    if (!unchecked.length) {
+      showToast('Check off items to exclude, or add items first', 'info');
+      return;
+    }
+    const query = unchecked
+      .slice(0, 10)
+      .map(i => [i.quantity, i.unit, i.name].filter(Boolean).join(' ').trim())
+      .join(', ');
+    const url = `https://www.instacart.com/store/s?k=${encodeURIComponent(query)}`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      showToast('Could not open Instacart', 'info');
+    }
+  }
+
+  return (
+    <TouchableOpacity style={styles.instacartBtn} onPress={openInstacart} activeOpacity={0.82}>
+      <View style={styles.instacartLeft}>
+        <CarrotIcon size={26} />
+        <View>
+          <Text style={styles.instacartBrand}>instacart</Text>
+          <Text style={styles.instacartSub}>
+            {unchecked.length
+              ? `Send ${unchecked.length} item${unchecked.length === 1 ? '' : 's'} to cart`
+              : 'Add items to your list first'}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.instacartCta}>
+        <Text style={styles.instacartCtaTxt}>Shop</Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 export default function ShoppingScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -115,24 +207,33 @@ export default function ShoppingScreen() {
               onPress={() => (navigation as any).navigate('Plan')}
             />
           ) : (
-            Object.entries(byCategory).map(([cat, catItems]) => (
-              <View key={cat}>
-                <Text style={styles.catLabel}>{cat}</Text>
-                {catItems.map(item => (
-                  <TouchableOpacity key={item.id} style={styles.itemRow} onPress={() => toggle(item.id)}>
-                    <AnimatedCheck checked={item.checked} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.itemTxt, item.checked && styles.itemDone]}>
-                        <Text style={styles.itemQty}>{item.quantity} {item.unit}</Text>{'  '}{item.name}
-                      </Text>
-                    </View>
-                    {item.checked && (
-                      <View style={styles.haveBadge}><Text style={styles.haveTxt}>In cart</Text></View>
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ))
+            <>
+              {Object.entries(byCategory).map(([cat, catItems]) => (
+                <View key={cat}>
+                  <View style={styles.catRow}>
+                    <Text style={styles.catEmoji}>{CATEGORY_EMOJI[cat] ?? '🛒'}</Text>
+                    <Text style={styles.catLabel}>{cat}</Text>
+                  </View>
+                  {catItems.map(item => (
+                    <TouchableOpacity key={item.id} style={styles.itemRow} onPress={() => toggle(item.id)}>
+                      <Text style={styles.itemEmoji}>{ITEM_EMOJI[item.category] ?? '🛒'}</Text>
+                      <AnimatedCheck checked={item.checked} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.itemTxt, item.checked && styles.itemDone]}>
+                          <Text style={styles.itemQty}>{item.quantity} {item.unit}</Text>{'  '}{item.name}
+                        </Text>
+                      </View>
+                      {item.checked && (
+                        <View style={styles.haveBadge}><Text style={styles.haveTxt}>In cart</Text></View>
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ))}
+
+              {/* Instacart button */}
+              <InstacartButton items={items} />
+            </>
           )}
         </ScrollView>
 
@@ -166,10 +267,11 @@ const styles = StyleSheet.create({
   progressFill: { height: '100%', backgroundColor: Colors.accent, borderRadius: 99 },
   progressTxt: { fontFamily: Fonts.uiBold, fontSize: 12.5, color: Colors.ink2 },
   content: { paddingBottom: 120 },
-  catLabel: { fontFamily: Fonts.uiBold, fontSize: 16, color: Colors.ink, marginTop: 18, marginBottom: 4 },
-  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: Colors.line },
-  check: { width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: Colors.line2, alignItems: 'center', justifyContent: 'center' },
-  checkOn: { backgroundColor: Colors.accent, borderColor: Colors.accent },
+  catRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 18, marginBottom: 4 },
+  catEmoji: { fontSize: 18 },
+  catLabel: { fontFamily: Fonts.uiBold, fontSize: 16, color: Colors.ink },
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: Colors.line },
+  itemEmoji: { fontSize: 20, width: 28, textAlign: 'center' },
   itemTxt: { fontFamily: Fonts.uiRegular, fontSize: 15.5, color: Colors.ink, lineHeight: 21 },
   itemQty: { fontFamily: Fonts.uiBold },
   itemDone: { color: Colors.ink3, textDecorationLine: 'line-through' },
@@ -178,7 +280,28 @@ const styles = StyleSheet.create({
   addBar: { borderTopWidth: 1, borderTopColor: Colors.line, paddingVertical: 11, flexDirection: 'row', gap: 10, alignItems: 'center', backgroundColor: Colors.paper },
   addInput: { flex: 1, height: 46, backgroundColor: Colors.surface2, borderRadius: Radius.md, paddingHorizontal: 16, fontFamily: Fonts.uiRegular, fontSize: 15, color: Colors.ink },
   micBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
-  empty: { alignItems: 'center', paddingTop: 60 },
-  emptyTitle: { fontFamily: Fonts.displayMedium, fontSize: 22, color: Colors.ink },
-  emptySub: { fontFamily: Fonts.uiRegular, fontSize: 14, color: Colors.ink2, marginTop: 8 },
+  // Instacart button
+  instacartBtn: {
+    marginTop: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F5F0E8',
+    borderRadius: Radius.lg,
+    borderWidth: 1.5,
+    borderColor: '#E8E0CC',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 12,
+  },
+  instacartLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  instacartBrand: { fontFamily: Fonts.uiBold, fontSize: 17, color: '#1A1A1A', letterSpacing: -0.3 },
+  instacartSub: { fontFamily: Fonts.uiRegular, fontSize: 12.5, color: '#5A5248', marginTop: 1 },
+  instacartCta: {
+    backgroundColor: '#0AAD0A',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: Radius.pill,
+  },
+  instacartCtaTxt: { fontFamily: Fonts.uiBold, fontSize: 13.5, color: '#fff' },
 });
