@@ -142,6 +142,18 @@ No simulator in cloud sessions — flag device-level claims as unverified.
 - Accessibility: `AppSettings.largerText` + `speakSteps` (local), toggles in
   Settings → Accessibility, applied in cooking mode (bigger step text;
   expo-speech reads each step aloud — header soundwave button toggles it live).
+- **Dark mode** (`AppSettings.darkMode`): screens snapshot Colors into
+  StyleSheets at module-import time, so App.tsx reads the flag and calls
+  `applyDarkTheme()` (mutates the Colors object to the dark ramp) BEFORE
+  lazy-importing `src/Root.tsx` — never import Root/screens statically from
+  App. Toggling needs a reboot: web `location.reload()`s itself, native shows
+  a "reopen the app" toast. Translucent bars use `Colors.glass`/`glassPaper`
+  (flipped by the theme), not raw rgba.
+- Shopping list has an explicit "Copy list to clipboard" button under the
+  Instacart button; both buttons auto-include text still sitting in the
+  add-item field (people tap them without pressing + first), and the
+  clipboard write happens before any await so the tap's permission window
+  is honored on web.
 
 ## 2026-06-12 device QA round
 

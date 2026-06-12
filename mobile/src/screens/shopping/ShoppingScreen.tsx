@@ -58,41 +58,22 @@ function openExternal(url: string) {
   }
 }
 
-function InstacartButton({ items }: { items: ShoppingItem[] }) {
-  const unchecked = items.filter(i => !i.checked);
-
-  // Copy the list silently, then hand off to Instacart — the app when it's
-  // installed (instacart:// on native; on web the https link app-links into
-  // it), the website otherwise. The user pastes the list into their cart.
-  async function openInstacart() {
-    if (!unchecked.length) {
-      showToast('Add items to your list first', 'info');
-      return;
-    }
-    const text = unchecked
-      .map(i => [i.quantity, i.unit, i.name].filter(Boolean).join(' ').trim())
-      .join('\n');
-    try { await Clipboard.setStringAsync(text); } catch { /* clipboard unavailable — still open */ }
-    showToast('List copied — paste it into your Instacart search', 'cart');
-
-    if (Platform.OS === 'web') {
-      openExternal('https://www.instacart.com/store/');
-    } else {
-      try {
-        await Linking.openURL('instacart://');
-      } catch {
-        openExternal('https://www.instacart.com/store/');
-      }
-    }
-  }
-
+// Big Instacart hand-off plus an explicit copy affordance — the silent copy
+// alone wasn't discoverable, so "Copy list" makes it a visible action too.
+function InstacartButtons({ onOpen, onCopy }: { onOpen: () => void; onCopy: () => void }) {
   return (
-    <TouchableOpacity style={styles.instacartBtn} onPress={openInstacart} activeOpacity={0.85}>
-      <View style={styles.instacartCircle}>
-        <InstacartMark size={24} />
-      </View>
-      <Text style={styles.instacartText}>Get it on Instacart</Text>
-    </TouchableOpacity>
+    <>
+      <TouchableOpacity style={styles.instacartBtn} onPress={onOpen} activeOpacity={0.85}>
+        <View style={styles.instacartCircle}>
+          <InstacartMark size={24} />
+        </View>
+        <Text style={styles.instacartText}>Get it on Instacart</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.copyBtn} onPress={onCopy} activeOpacity={0.7}>
+        <Icon name="note" size={16} color={Colors.ink2} />
+        <Text style={styles.copyTxt}>Copy list to clipboard</Text>
+      </TouchableOpacity>
+    </>
   );
 }
 
@@ -150,6 +131,58 @@ export default function ShoppingScreen() {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     await saveShoppingItems(updated);
     setItems(updated);
+  }
+
+  // Copy the unchecked items as plain text, then optionally hand off to
+  // Instacart (app when installed, website otherwise). Text still sitting in
+  // the add-field counts too — people type an item and tap the button without
+  // pressing + first. The clipboard write happens before any await so the
+  // browser still honors the tap's permission window.
+  async function copyList(openAfter: boolean) {
+    let list = items;
+    const pending = newItem.trim();
+    if (pending) {
+      list = [...items, {
+        id: uid(), name: pending, quantity: '1', unit: '',
+        category: categorizeIngredient(pending), checked: false, isManual: true,
+      }];
+    }
+    const unchecked = list.filter(i => !i.checked);
+    if (!unchecked.length) {
+      showToast('Type an item below or add a recipe’s ingredients first', 'info');
+      return;
+    }
+    const text = unchecked
+      .map(i => [i.quantity, i.unit, i.name].filter(Boolean).join(' ').trim())
+      .join('\n');
+
+    let copied = true;
+    try { await Clipboard.setStringAsync(text); } catch { copied = false; }
+
+    if (pending) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setItems(list);
+      setNewItem('');
+      saveShoppingItems(list);
+    }
+    hapticSuccess();
+    showToast(
+      copied
+        ? `${unchecked.length} item${unchecked.length === 1 ? '' : 's'} copied — paste anywhere`
+        : 'Could not copy automatically — try again',
+      copied ? 'check' : 'info',
+    );
+
+    if (!openAfter) return;
+    if (Platform.OS === 'web') {
+      openExternal('https://www.instacart.com/store/');
+    } else {
+      try {
+        await Linking.openURL('instacart://');
+      } catch {
+        openExternal('https://www.instacart.com/store/');
+      }
+    }
   }
 
   const total = items.length;
@@ -223,7 +256,7 @@ export default function ShoppingScreen() {
                   ))}
                 </View>
               ))}
-              <InstacartButton items={items} />
+              <InstacartButtons onOpen={() => copyList(true)} onCopy={() => copyList(false)} />
             </>
           )}
         </ScrollView>
@@ -294,4 +327,10 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.surface2,
   },
+  copyBtn: {
+    marginTop: 10, height: 44, borderRadius: Radius.pill,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.line2,
+  },
+  copyTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 14, color: Colors.ink2 },
 });

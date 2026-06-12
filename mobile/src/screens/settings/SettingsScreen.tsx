@@ -40,6 +40,7 @@ export default function SettingsScreen({ navigation }: Props) {
     subscriptionBilling: 'annual',
     largerText: false,
     speakSteps: false,
+    darkMode: false,
   });
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [badges, setBadges] = useState<BadgeSummary | null>(null);
@@ -107,6 +108,20 @@ export default function SettingsScreen({ navigation }: Props) {
     const updated = { ...settings, [key]: value };
     setSettings(updated);
     await saveSettings(updated);
+  }
+
+  // The theme is baked into screen styles at startup, so flipping it needs a
+  // fresh boot: web reloads itself; native asks for a relaunch.
+  async function toggleDarkMode(value: boolean) {
+    hapticLight();
+    const updated = { ...settings, darkMode: value };
+    setSettings(updated);
+    await saveSettings(updated);
+    if (Platform.OS === 'web') {
+      (window as any).location.reload();
+    } else {
+      showToast('Close and reopen the app to apply');
+    }
   }
 
   function adjustHour(delta: number) {
@@ -385,6 +400,24 @@ export default function SettingsScreen({ navigation }: Props) {
             <Switch
               value={settings.speakSteps}
               onValueChange={v => toggleAccessibility('speakSteps', v)}
+              trackColor={{ false: Colors.line2, true: Colors.accent }}
+              thumbColor={Colors.surface}
+            />
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <View style={styles.accessIcon}>
+              <Icon name="contrast" size={19} color={Colors.accentDeep} />
+            </View>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>Dark mode</Text>
+              <Text style={styles.rowSub}>
+                {Platform.OS === 'web' ? 'Easier on the eyes — reloads the app' : 'Applies after you reopen the app'}
+              </Text>
+            </View>
+            <Switch
+              value={settings.darkMode}
+              onValueChange={toggleDarkMode}
               trackColor={{ false: Colors.line2, true: Colors.accent }}
               thumbColor={Colors.surface}
             />

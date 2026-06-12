@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
   stickyBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     padding: 12, paddingHorizontal: 18,
-    backgroundColor: 'rgba(250,246,239,0.96)',
+    backgroundColor: Colors.glassPaper,
     borderTopWidth: 1, borderTopColor: Colors.line,
   },
 
