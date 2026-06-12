@@ -6,7 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import Svg, { Path, G } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 import { Colors, Radius, Fonts } from '../../theme';
 import Icon from '../../components/Icon';
 import AnimatedCheck from '../../components/AnimatedCheck';
@@ -25,53 +25,22 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 
 const CATEGORIES = ['Produce', 'Dairy & eggs', 'Meat & fish', 'Pantry', 'Bakery', 'Other'];
 
-const CATEGORY_EMOJI: Record<string, string> = {
-  'Produce': '🥬',
-  'Dairy & eggs': '🥚',
-  'Meat & fish': '🥩',
-  'Pantry': '🫙',
-  'Bakery': '🥖',
-  'Other': '🛒',
-};
-
-const ITEM_EMOJI: Record<string, string> = {
-  'Produce': '🥦',
-  'Dairy & eggs': '🧀',
-  'Meat & fish': '🍗',
-  'Pantry': '🧂',
-  'Bakery': '🍞',
-  'Other': '🛒',
-};
-
-function CarrotIcon({ size = 22 }: { size?: number }) {
+// Exact Instacart carrot mark:
+//   white dot → green vertical stem → two diagonal branches spreading down → orange dome
+function InstacartMark({ size = 30 }: { size?: number }) {
+  const h = Math.round(size * 68 / 56);
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <G>
-        {/* Carrot body */}
-        <Path
-          d="M12 2C10.5 2 9 3 8 5L5 20C5 21 6 22 7 22L17 22C18 22 19 21 19 20L16 5C15 3 13.5 2 12 2Z"
-          fill="#FF6B00"
-        />
-        {/* Carrot highlight */}
-        <Path
-          d="M10 4C9.5 5 9 7 9 9L10 9C10 7.5 10.5 5.5 11 4.5Z"
-          fill="#FF9940"
-          opacity="0.7"
-        />
-        {/* Carrot top greens */}
-        <Path
-          d="M12 2C11 1 9 0.5 8 1C9 2 10 3 10.5 4.5C11 3.5 11.5 2.5 12 2Z"
-          fill="#2E9E57"
-        />
-        <Path
-          d="M12 2C13 1 15 0.5 16 1C15 2 14 3 13.5 4.5C13 3.5 12.5 2.5 12 2Z"
-          fill="#2E9E57"
-        />
-        <Path
-          d="M12 2C12 1 11.5 0 11 0C10.5 0.5 10.5 2 10.5 3C11 2.5 11.5 2.2 12 2Z"
-          fill="#40B86A"
-        />
-      </G>
+    <Svg width={size} height={h} viewBox="0 0 56 68">
+      {/* White dot */}
+      <Circle cx={28} cy={8} r={5.5} fill="white" />
+      {/* Green vertical stem */}
+      <Path d="M28,13.5 L28,30" stroke="#178244" strokeWidth={6} strokeLinecap="round" />
+      {/* Green left diagonal branch */}
+      <Path d="M28,30 Q20,40 11,52" stroke="#178244" strokeWidth={6} strokeLinecap="round" />
+      {/* Green right diagonal branch */}
+      <Path d="M28,30 Q36,40 45,52" stroke="#178244" strokeWidth={6} strokeLinecap="round" />
+      {/* Orange carrot dome */}
+      <Path d="M9,54 Q9,68 28,68 Q47,68 47,54 Z" fill="#F07830" />
     </Svg>
   );
 }
@@ -81,11 +50,11 @@ function InstacartButton({ items }: { items: ShoppingItem[] }) {
 
   async function openInstacart() {
     if (!unchecked.length) {
-      showToast('Check off items to exclude, or add items first', 'info');
+      showToast('Add items to your list first', 'info');
       return;
     }
     const query = unchecked
-      .slice(0, 10)
+      .slice(0, 12)
       .map(i => [i.quantity, i.unit, i.name].filter(Boolean).join(' ').trim())
       .join(', ');
     const url = `https://www.instacart.com/store/s?k=${encodeURIComponent(query)}`;
@@ -97,21 +66,9 @@ function InstacartButton({ items }: { items: ShoppingItem[] }) {
   }
 
   return (
-    <TouchableOpacity style={styles.instacartBtn} onPress={openInstacart} activeOpacity={0.82}>
-      <View style={styles.instacartLeft}>
-        <CarrotIcon size={26} />
-        <View>
-          <Text style={styles.instacartBrand}>instacart</Text>
-          <Text style={styles.instacartSub}>
-            {unchecked.length
-              ? `Send ${unchecked.length} item${unchecked.length === 1 ? '' : 's'} to cart`
-              : 'Add items to your list first'}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.instacartCta}>
-        <Text style={styles.instacartCtaTxt}>Shop</Text>
-      </View>
+    <TouchableOpacity style={styles.instacartBtn} onPress={openInstacart} activeOpacity={0.8}>
+      <InstacartMark size={30} />
+      <Text style={styles.instacartText}>instacart</Text>
     </TouchableOpacity>
   );
 }
@@ -187,7 +144,6 @@ export default function ShoppingScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Progress */}
         {total > 0 && (
           <View style={styles.progressRow}>
             <View style={styles.progressTrack}>
@@ -210,13 +166,9 @@ export default function ShoppingScreen() {
             <>
               {Object.entries(byCategory).map(([cat, catItems]) => (
                 <View key={cat}>
-                  <View style={styles.catRow}>
-                    <Text style={styles.catEmoji}>{CATEGORY_EMOJI[cat] ?? '🛒'}</Text>
-                    <Text style={styles.catLabel}>{cat}</Text>
-                  </View>
+                  <Text style={styles.catLabel}>{cat}</Text>
                   {catItems.map(item => (
                     <TouchableOpacity key={item.id} style={styles.itemRow} onPress={() => toggle(item.id)}>
-                      <Text style={styles.itemEmoji}>{ITEM_EMOJI[item.category] ?? '🛒'}</Text>
                       <AnimatedCheck checked={item.checked} />
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.itemTxt, item.checked && styles.itemDone]}>
@@ -230,14 +182,11 @@ export default function ShoppingScreen() {
                   ))}
                 </View>
               ))}
-
-              {/* Instacart button */}
               <InstacartButton items={items} />
             </>
           )}
         </ScrollView>
 
-        {/* Add item bar */}
         <View style={styles.addBar}>
           <TextInput
             style={styles.addInput}
@@ -267,11 +216,8 @@ const styles = StyleSheet.create({
   progressFill: { height: '100%', backgroundColor: Colors.accent, borderRadius: 99 },
   progressTxt: { fontFamily: Fonts.uiBold, fontSize: 12.5, color: Colors.ink2 },
   content: { paddingBottom: 120 },
-  catRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 18, marginBottom: 4 },
-  catEmoji: { fontSize: 18 },
-  catLabel: { fontFamily: Fonts.uiBold, fontSize: 16, color: Colors.ink },
-  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: Colors.line },
-  itemEmoji: { fontSize: 20, width: 28, textAlign: 'center' },
+  catLabel: { fontFamily: Fonts.uiBold, fontSize: 16, color: Colors.ink, marginTop: 18, marginBottom: 4 },
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 13, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: Colors.line },
   itemTxt: { fontFamily: Fonts.uiRegular, fontSize: 15.5, color: Colors.ink, lineHeight: 21 },
   itemQty: { fontFamily: Fonts.uiBold },
   itemDone: { color: Colors.ink3, textDecorationLine: 'line-through' },
@@ -280,28 +226,25 @@ const styles = StyleSheet.create({
   addBar: { borderTopWidth: 1, borderTopColor: Colors.line, paddingVertical: 11, flexDirection: 'row', gap: 10, alignItems: 'center', backgroundColor: Colors.paper },
   addInput: { flex: 1, height: 46, backgroundColor: Colors.surface2, borderRadius: Radius.md, paddingHorizontal: 16, fontFamily: Fonts.uiRegular, fontSize: 15, color: Colors.ink },
   micBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center' },
-  // Instacart button
+  // Instacart button — exact logo reproduction: carrot mark + "instacart" on cream
   instacartBtn: {
-    marginTop: 28,
+    marginTop: 32,
+    backgroundColor: '#F5F0E0',
+    borderRadius: Radius.lg,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F5F0E8',
-    borderRadius: Radius.lg,
-    borderWidth: 1.5,
-    borderColor: '#E8E0CC',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    justifyContent: 'center',
     gap: 12,
+    borderWidth: 1,
+    borderColor: '#E8DFC8',
   },
-  instacartLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  instacartBrand: { fontFamily: Fonts.uiBold, fontSize: 17, color: '#1A1A1A', letterSpacing: -0.3 },
-  instacartSub: { fontFamily: Fonts.uiRegular, fontSize: 12.5, color: '#5A5248', marginTop: 1 },
-  instacartCta: {
-    backgroundColor: '#0AAD0A',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: Radius.pill,
+  instacartText: {
+    fontFamily: Fonts.uiBold,
+    fontSize: 26,
+    color: '#1A1A1A',
+    letterSpacing: -0.4,
+    lineHeight: 30,
   },
-  instacartCtaTxt: { fontFamily: Fonts.uiBold, fontSize: 13.5, color: '#fff' },
 });

@@ -14,11 +14,12 @@ import Icon, { IconName } from './Icon';
 import { BadgeMetal } from '../store/badges';
 
 // Four distinct badge shapes:
-//   bronze  → coin pendant (circle + bail ring at top, like a charm)
-//   silver  → heraldic shield (rectangle top, pointed at bottom)
-//   gold    → trophy cup (trapezoid + handles + stem + base)
-//   emerald → 8-pointed sunburst star
-// All shapes keep the same metallic palette + sheen/twinkle FX system.
+//   bronze  → coin pendant with bail ring (charm) + engraved rope border
+//   silver  → heraldic shield with laurel dots + star accents
+//   gold    → trophy cup with crown, ornate handles, decorative base
+//   emerald → 8-pointed sunburst star with gem dots at each point
+//
+// Earned badges: double sheen sweep + 12 glitter twinkles for dazzling FX.
 
 type Fx = 'full' | 'sheen' | 'none';
 
@@ -34,21 +35,20 @@ interface Props {
 const PIPS: Record<BadgeMetal, number> = { bronze: 1, silver: 2, gold: 3, emerald: 3 };
 const PIP_X: Record<number, number[]> = { 1: [60], 2: [55.5, 64.5], 3: [51, 60, 69] };
 
-// 8-pointed star polygon points (outer r=50, inner r=22, center 60,60)
+// 8-pointed star polygon (outer r=50, inner r=22, center 60,60)
 const STAR_OUTER = '60,10 68.4,39.7 95.4,24.6 80.3,51.6 110,60 80.3,68.4 95.4,95.4 68.4,80.3 60,110 51.6,80.3 24.6,95.4 39.7,68.4 10,60 39.7,51.6 24.6,24.6 51.6,39.7';
-// Inner star (75% scale from center): outer r=37.5, inner r=16.5
+// Inner star (75% scale): outer r=37.5, inner r=16.5
 const STAR_FACE = '60,22.5 66.3,44.8 86.6,33.5 75.2,53.7 97.5,60 75.2,66.3 86.6,86.6 66.3,75.2 60,97.5 53.7,75.2 33.5,86.6 44.8,66.3 22.5,60 44.8,53.7 33.5,33.5 53.7,44.8';
 
-// How much to translateY the icon from container center (fraction of size)
-// positive = shift down, negative = shift up
+// Icon translate from container center: fraction of size (+ = down, – = up)
 const ICON_TRANSLATE: Record<BadgeMetal, number> = {
-  bronze: 0.067,   // coin face center is at cy=68, 8px below viewBox center (60)
-  silver: 0,       // shield visual center ≈ viewBox center
-  gold: -0.14,     // cup face center is at ~y=42, 18px above viewBox center
-  emerald: 0,      // star centered at viewBox center
+  bronze: 0.067,   // coin face cy=68, 8px below viewBox center
+  silver: 0,       // shield visual centre ≈ viewBox centre
+  gold: -0.14,     // inside cup: cup centre ~y=42, 18px above viewBox centre
+  emerald: 0,      // star centred at 60,60
 };
 
-// SheenSweep clip radius approximation per shape
+// Sheen clip border-radius per shape (approximates the silhouette)
 const SHEEN_CLIP: Record<BadgeMetal, (s: number) => number> = {
   bronze: s => s * 0.5,
   silver: s => s * 0.08,
@@ -56,15 +56,24 @@ const SHEEN_CLIP: Record<BadgeMetal, (s: number) => number> = {
   emerald: s => s * 0.5,
 };
 
-// ─── Particle FX ─────────────────────────────────────────────────────────────
+// ─── 12 glitter twinkle positions ────────────────────────────────────────────
 
 const TWINKLES = [
-  { x: 0.14, y: 0.18, s: 0.11, delay: 0 },
-  { x: 0.78, y: 0.10, s: 0.14, delay: 620 },
-  { x: 0.88, y: 0.56, s: 0.09, delay: 1280 },
-  { x: 0.22, y: 0.82, s: 0.12, delay: 1960 },
-  { x: 0.04, y: 0.46, s: 0.08, delay: 2540 },
+  { x: 0.14, y: 0.18, s: 0.12, delay: 0 },
+  { x: 0.78, y: 0.10, s: 0.14, delay: 600 },
+  { x: 0.88, y: 0.56, s: 0.10, delay: 1280 },
+  { x: 0.22, y: 0.82, s: 0.12, delay: 1950 },
+  { x: 0.04, y: 0.46, s: 0.09, delay: 2540 },
+  { x: 0.62, y: 0.04, s: 0.11, delay: 380 },
+  { x: 0.94, y: 0.30, s: 0.12, delay: 1050 },
+  { x: 0.70, y: 0.90, s: 0.10, delay: 1740 },
+  { x: 0.36, y: 0.94, s: 0.11, delay: 2200 },
+  { x: 0.06, y: 0.70, s: 0.09, delay: 2880 },
+  { x: 0.50, y: 0.06, s: 0.14, delay: 320 },
+  { x: 0.92, y: 0.74, s: 0.10, delay: 1600 },
 ];
+
+// ─── Particle FX ─────────────────────────────────────────────────────────────
 
 function Glint({ size, color }: { size: number; color: string }) {
   return (
@@ -89,7 +98,10 @@ function Twinkle({ x, y, s, delay, color }: { x: number; y: number; s: number; d
   }, [delay, t]);
   const anim = useAnimatedStyle(() => ({
     opacity: t.value,
-    transform: [{ scale: 0.4 + t.value * 0.6 }, { rotate: `${t.value * 90}deg` }],
+    transform: [
+      { scale: 0.3 + t.value * 0.7 },
+      { rotate: `${t.value * 135}deg` },
+    ],
   }));
   return (
     <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: x, top: y }, anim]}>
@@ -98,6 +110,7 @@ function Twinkle({ x, y, s, delay, color }: { x: number; y: number; s: number; d
   );
 }
 
+// Single sheen pass — call twice with different delayMs for double sweep
 function SheenSweep({ size, delayMs, gradId, clipRadius }: { size: number; delayMs: number; gradId: string; clipRadius: number }) {
   const p = useSharedValue(0);
   useEffect(() => {
@@ -112,23 +125,23 @@ function SheenSweep({ size, delayMs, gradId, clipRadius }: { size: number; delay
   }, [delayMs, p]);
   const anim = useAnimatedStyle(() => ({
     transform: [
-      { translateX: interpolate(p.value, [0, 1], [-size * 0.85, size * 0.85]) },
-      { rotate: '24deg' },
+      { translateX: interpolate(p.value, [0, 1], [-size * 0.9, size * 0.9]) },
+      { rotate: '22deg' },
     ],
   }));
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderRadius: clipRadius, overflow: 'hidden' }]}>
       <Animated.View style={[
-        { position: 'absolute', left: size * 0.27, top: -size * 0.25, width: size * 0.46, height: size * 1.5 },
+        { position: 'absolute', left: size * 0.24, top: -size * 0.28, width: size * 0.52, height: size * 1.56 },
         anim,
       ]}>
         <Svg width="100%" height="100%">
           <Defs>
             <LinearGradient id={gradId} x1="0" y1="0" x2="1" y2="0">
               <Stop offset="0" stopColor={Colors.white} stopOpacity="0" />
-              <Stop offset="0.42" stopColor={Colors.white} stopOpacity="0.34" />
-              <Stop offset="0.5" stopColor={Colors.white} stopOpacity="0.72" />
-              <Stop offset="0.58" stopColor={Colors.white} stopOpacity="0.34" />
+              <Stop offset="0.38" stopColor={Colors.white} stopOpacity="0.28" />
+              <Stop offset="0.5" stopColor={Colors.white} stopOpacity="0.78" />
+              <Stop offset="0.62" stopColor={Colors.white} stopOpacity="0.28" />
               <Stop offset="1" stopColor={Colors.white} stopOpacity="0" />
             </LinearGradient>
           </Defs>
@@ -147,157 +160,213 @@ function BronzeSvg({ uid, palette, size, pips }: { uid: string; palette: any; si
       <Defs>
         <LinearGradient id={`rim${uid}`} x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor={palette.rimLight} />
-          <Stop offset="0.3" stopColor={palette.rimMid} />
-          <Stop offset="0.55" stopColor={palette.rimDeep} />
-          <Stop offset="0.78" stopColor={palette.rimMid} />
+          <Stop offset="0.25" stopColor={palette.rimMid} />
+          <Stop offset="0.5" stopColor={palette.rimDeep} />
+          <Stop offset="0.75" stopColor={palette.rimMid} />
           <Stop offset="1" stopColor={palette.rimLight} />
         </LinearGradient>
-        <RadialGradient id={`face${uid}`} cx="38%" cy="32%" r="85%">
+        <RadialGradient id={`face${uid}`} cx="36%" cy="30%" r="88%">
           <Stop offset="0" stopColor={palette.faceLight} />
-          <Stop offset="0.55" stopColor={palette.faceMid} />
+          <Stop offset="0.45" stopColor={palette.faceMid} />
           <Stop offset="1" stopColor={palette.faceDeep} />
         </RadialGradient>
       </Defs>
-      {/* Bail ring at top — the charm pendant loop */}
-      <Ellipse cx={60} cy={17} rx={11} ry={13} fill={`url(#rim${uid})`} stroke={palette.edge} strokeWidth={1.2} />
-      <Ellipse cx={60} cy={17} rx={6} ry={7.5} fill={Colors.paper} />
-      {/* Connector strip bridging bail to coin */}
-      <Rect x={53} y={16} width={14} height={16} fill={`url(#rim${uid})`} />
+      {/* Bail ring (charm loop at top) */}
+      <Ellipse cx={60} cy={16} rx={12} ry={14} fill={`url(#rim${uid})`} stroke={palette.edge} strokeWidth={1.5} />
+      <Ellipse cx={60} cy={16} rx={6.5} ry={8} fill={Colors.paper} />
+      {/* Connector strip */}
+      <Rect x={52} y={15} width={16} height={18} fill={`url(#rim${uid})`} />
       {/* Outer coin rim */}
       <Circle cx={60} cy={68} r={47} fill={`url(#rim${uid})`} stroke={palette.edge} strokeWidth={1.5} />
-      {/* Milled coin edge */}
-      <Circle cx={60} cy={68} r={41.5} fill="none" stroke={palette.rimDeep} strokeWidth={5} strokeDasharray="2.6 3.4" opacity={0.5} />
+      {/* Rope/milled edge */}
+      <Circle cx={60} cy={68} r={41} fill="none" stroke={palette.rimDeep} strokeWidth={5.5} strokeDasharray="2.4 3.6" opacity={0.55} />
       {/* Dished face */}
-      <Circle cx={60} cy={68} r={35} fill={`url(#face${uid})`} stroke={palette.rimLight} strokeWidth={1.2} />
+      <Circle cx={60} cy={68} r={34.5} fill={`url(#face${uid})`} stroke={palette.rimLight} strokeWidth={1.5} />
       {/* Engraved pinline */}
-      <Circle cx={60} cy={68} r={29} fill="none" stroke={palette.ink} strokeWidth={1} opacity={0.25} />
+      <Circle cx={60} cy={68} r={28.5} fill="none" stroke={palette.ink} strokeWidth={1.2} opacity={0.28} />
+      {/* Decorative inner dot ring */}
+      {[0,60,120,180,240,300].map(deg => {
+        const rad = (deg * Math.PI) / 180;
+        return <Circle key={deg} cx={60 + 23 * Math.cos(rad)} cy={68 + 23 * Math.sin(rad)} r={1.4} fill={palette.ink} opacity={0.3} />;
+      })}
       {/* Tier pips */}
-      {pips.map(x => <Circle key={x} cx={x} cy={95} r={2.1} fill={palette.ink} opacity={0.5} />)}
-      {/* Specular highlight */}
-      <Ellipse cx={44} cy={46} rx={21} ry={9} fill={Colors.white} opacity={0.22} transform="rotate(-28 44 46)" />
+      {pips.map(x => <Circle key={x} cx={x} cy={96} r={2.2} fill={palette.ink} opacity={0.55} />)}
+      {/* Key specular highlight */}
+      <Ellipse cx={44} cy={44} rx={22} ry={10} fill={Colors.white} opacity={0.26} transform="rotate(-28 44 44)" />
+      {/* Bounce light */}
+      <Ellipse cx={78} cy={92} rx={14} ry={7} fill={Colors.white} opacity={0.10} transform="rotate(-20 78 92)" />
     </Svg>
   );
 }
 
 function SilverSvg({ uid, palette, size, pips }: { uid: string; palette: any; size: number; pips: number[] }) {
-  const rim  = 'M14,14 L106,14 L106,76 Q106,105 60,116 Q14,105 14,76 Z';
-  const mid  = 'M19,19 L101,19 L101,74 Q101,99 60,110 Q19,99 19,74 Z';
-  const face = 'M24,24 L96,24 L96,72 Q96,94 60,104 Q24,94 24,72 Z';
+  const rim  = 'M14,14 L106,14 L106,76 Q106,106 60,117 Q14,106 14,76 Z';
+  const mid  = 'M19,19 L101,19 L101,74 Q101,100 60,110 Q19,100 19,74 Z';
+  const face = 'M24,24 L96,24 L96,72 Q96,96 60,104 Q24,96 24,72 Z';
+  // Laurel dots along the inner border (approximate positions on the shield path)
+  const laurelDots = [
+    [28,30],[36,26],[44,24],[52,24],[68,24],[76,24],[84,26],[92,30],
+    [96,45],[96,60],[94,72],[87,84],[80,91],[72,97],[66,101],
+    [54,101],[48,97],[40,91],[33,84],[26,72],[24,60],[24,45],
+  ];
   return (
     <Svg width={size} height={size} viewBox="0 0 120 120">
       <Defs>
         <LinearGradient id={`rim${uid}`} x1="0.2" y1="0" x2="0.8" y2="1">
           <Stop offset="0" stopColor={palette.rimLight} />
-          <Stop offset="0.35" stopColor={palette.rimMid} />
-          <Stop offset="0.6" stopColor={palette.rimDeep} />
-          <Stop offset="0.85" stopColor={palette.rimMid} />
+          <Stop offset="0.3" stopColor={palette.rimMid} />
+          <Stop offset="0.55" stopColor={palette.rimDeep} />
+          <Stop offset="0.8" stopColor={palette.rimMid} />
           <Stop offset="1" stopColor={palette.rimLight} />
         </LinearGradient>
-        <RadialGradient id={`face${uid}`} cx="35%" cy="28%" r="85%">
+        <RadialGradient id={`face${uid}`} cx="34%" cy="26%" r="88%">
           <Stop offset="0" stopColor={palette.faceLight} />
-          <Stop offset="0.55" stopColor={palette.faceMid} />
+          <Stop offset="0.45" stopColor={palette.faceMid} />
           <Stop offset="1" stopColor={palette.faceDeep} />
         </RadialGradient>
       </Defs>
       {/* Outer shield rim */}
       <Path d={rim} fill={`url(#rim${uid})`} stroke={palette.edge} strokeWidth={1.5} />
-      {/* Milled inner ring */}
+      {/* Milled border */}
       <Path d={mid} fill="none" stroke={palette.rimDeep} strokeWidth={4} opacity={0.4} />
       {/* Shield face */}
-      <Path d={face} fill={`url(#face${uid})`} stroke={palette.rimLight} strokeWidth={1} />
-      {/* Heraldic dividers (horizontal + vertical cross) */}
-      <Path d="M24,60 L96,60" stroke={palette.ink} strokeWidth={0.9} opacity={0.2} />
-      <Path d="M60,24 L60,94" stroke={palette.ink} strokeWidth={0.9} opacity={0.2} />
-      {/* Inner pinline border */}
-      <Path d="M28,28 L92,28 L92,70 Q92,90 60,100 Q28,90 28,70 Z" fill="none" stroke={palette.ink} strokeWidth={0.8} opacity={0.18} />
+      <Path d={face} fill={`url(#face${uid})`} stroke={palette.rimLight} strokeWidth={1.2} />
+      {/* Heraldic cross dividers */}
+      <Path d="M24,59 L96,59" stroke={palette.ink} strokeWidth={0.9} opacity={0.22} />
+      <Path d="M60,24 L60,97" stroke={palette.ink} strokeWidth={0.9} opacity={0.22} />
+      {/* Laurel dots along inner face border */}
+      {laurelDots.map(([x, y], i) => (
+        <Circle key={i} cx={x} cy={y} r={1.6} fill={palette.ink} opacity={0.28} />
+      ))}
+      {/* Star accents at quadrant centres */}
+      {[[42,42],[78,42],[42,78],[78,78]].map(([x, y], i) => (
+        <Circle key={i} cx={x} cy={y} r={2.2} fill={palette.ink} opacity={0.25} />
+      ))}
       {/* Tier pips near shield tip */}
-      {pips.map(x => <Circle key={x} cx={x} cy={107} r={2} fill={palette.ink} opacity={0.5} />)}
+      {pips.map(x => <Circle key={x} cx={x} cy={108} r={2.1} fill={palette.ink} opacity={0.55} />)}
       {/* Specular highlight */}
-      <Ellipse cx={41} cy={37} rx={18} ry={8} fill={Colors.white} opacity={0.22} transform="rotate(-20 41 37)" />
+      <Ellipse cx={40} cy={36} rx={19} ry={9} fill={Colors.white} opacity={0.25} transform="rotate(-20 40 36)" />
+      <Ellipse cx={82} cy={90} rx={12} ry={6} fill={Colors.white} opacity={0.10} transform="rotate(-15 82 90)" />
     </Svg>
   );
 }
 
 function GoldSvg({ uid, palette, size, pips }: { uid: string; palette: any; size: number; pips: number[] }) {
-  const cupOuter = 'M22,14 L98,14 Q102,14 102,19 L93,68 Q92,73 87,73 L33,73 Q28,73 27,68 L18,19 Q18,14 22,14 Z';
-  const cupFace  = 'M27,19 L93,19 L88,67 L32,67 Z';
-  const handleL  = 'M18,30 Q3,38 3,54 Q3,68 18,62';
-  const handleR  = 'M102,30 Q117,38 117,54 Q117,68 102,62';
+  const cupOuter = 'M22,22 L98,22 Q102,22 103,28 L93,68 Q92,74 86,74 L34,74 Q28,74 27,68 L17,28 Q18,22 22,22 Z';
+  const cupFace  = 'M27,27 L93,27 L88,68 L32,68 Z';
+  // Wing-style ornate handles
+  const handleL  = 'M17,32 Q0,40 0,56 Q0,72 17,65 Q10,58 10,48 Q10,38 17,32 Z';
+  const handleR  = 'M103,32 Q120,40 120,56 Q120,72 103,65 Q110,58 110,48 Q110,38 103,32 Z';
+  // Crown teeth at top of cup
+  const crown1L  = 'M30,22 L28,12 L36,18 L40,10 L44,18 L50,14 L50,22 Z';
+  const crown1R  = 'M90,22 L92,12 L84,18 L80,10 L76,18 L70,14 L70,22 Z';
   return (
     <Svg width={size} height={size} viewBox="0 0 120 120">
       <Defs>
         <LinearGradient id={`rim${uid}`} x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor={palette.rimLight} />
-          <Stop offset="0.35" stopColor={palette.rimMid} />
-          <Stop offset="0.6" stopColor={palette.rimDeep} />
-          <Stop offset="0.85" stopColor={palette.rimMid} />
+          <Stop offset="0.3" stopColor={palette.rimMid} />
+          <Stop offset="0.55" stopColor={palette.rimDeep} />
+          <Stop offset="0.8" stopColor={palette.rimMid} />
           <Stop offset="1" stopColor={palette.rimLight} />
         </LinearGradient>
-        <RadialGradient id={`face${uid}`} cx="35%" cy="25%" r="90%">
+        <RadialGradient id={`face${uid}`} cx="34%" cy="24%" r="92%">
           <Stop offset="0" stopColor={palette.faceLight} />
-          <Stop offset="0.55" stopColor={palette.faceMid} />
+          <Stop offset="0.45" stopColor={palette.faceMid} />
           <Stop offset="1" stopColor={palette.faceDeep} />
         </RadialGradient>
         <LinearGradient id={`base${uid}`} x1="0" y1="0" x2="1" y2="0">
-          <Stop offset="0" stopColor={palette.rimMid} />
+          <Stop offset="0" stopColor={palette.rimDeep} />
+          <Stop offset="0.3" stopColor={palette.rimMid} />
           <Stop offset="0.5" stopColor={palette.rimLight} />
-          <Stop offset="1" stopColor={palette.rimMid} />
+          <Stop offset="0.7" stopColor={palette.rimMid} />
+          <Stop offset="1" stopColor={palette.rimDeep} />
         </LinearGradient>
       </Defs>
-      {/* Handles (rendered first — behind cup) */}
-      <Path d={handleL} stroke={`url(#rim${uid})`} strokeWidth={9} fill="none" strokeLinecap="round" />
-      <Path d={handleR} stroke={`url(#rim${uid})`} strokeWidth={9} fill="none" strokeLinecap="round" />
-      <Path d={handleL} stroke={palette.rimDeep} strokeWidth={3} fill="none" strokeLinecap="round" opacity={0.35} />
-      <Path d={handleR} stroke={palette.rimDeep} strokeWidth={3} fill="none" strokeLinecap="round" opacity={0.35} />
+      {/* Ornate wing handles (rendered first — behind cup) */}
+      <Path d={handleL} fill={`url(#rim${uid})`} stroke={palette.edge} strokeWidth={1} />
+      <Path d={handleR} fill={`url(#rim${uid})`} stroke={palette.edge} strokeWidth={1} />
+      {/* Handle inner shadow */}
+      <Path d="M17,38 Q6,45 6,56 Q6,65 17,60" stroke={palette.rimDeep} strokeWidth={2} fill="none" opacity={0.4} />
+      <Path d="M103,38 Q114,45 114,56 Q114,65 103,60" stroke={palette.rimDeep} strokeWidth={2} fill="none" opacity={0.4} />
+      {/* Crown teeth */}
+      <Path d={crown1L} fill={`url(#rim${uid})`} stroke={palette.edge} strokeWidth={1} />
+      <Path d={crown1R} fill={`url(#rim${uid})`} stroke={palette.edge} strokeWidth={1} />
       {/* Cup body */}
       <Path d={cupOuter} fill={`url(#rim${uid})`} stroke={palette.edge} strokeWidth={1.5} />
       {/* Cup face */}
       <Path d={cupFace} fill={`url(#face${uid})`} />
-      {/* Cup opening highlight line */}
-      <Path d="M29,21 L91,21" stroke={palette.rimLight} strokeWidth={1.5} opacity={0.55} />
+      {/* Cup opening highlight */}
+      <Path d="M30,30 L90,30" stroke={palette.rimLight} strokeWidth={2} opacity={0.55} />
       {/* Pinline inside cup */}
-      <Path d="M32,25 L88,25 L84,64 L36,64 Z" fill="none" stroke={palette.ink} strokeWidth={0.8} opacity={0.18} />
+      <Path d="M34,35 L86,35 L82,64 L38,64 Z" fill="none" stroke={palette.ink} strokeWidth={0.9} opacity={0.2} />
+      {/* Decorative stars on cup face */}
+      {[[60,46],[46,54],[74,54]].map(([x, y], i) => (
+        <Circle key={i} cx={x} cy={y} r={2} fill={palette.ink} opacity={0.22} />
+      ))}
       {/* Stem */}
-      <Rect x={52} y={73} width={16} height={17} fill={`url(#rim${uid})`} rx={2} />
-      <Rect x={55} y={73} width={10} height={17} fill={`url(#face${uid})`} />
+      <Rect x={52} y={74} width={16} height={17} fill={`url(#rim${uid})`} rx={2} />
+      <Rect x={55} y={74} width={10} height={17} fill={`url(#face${uid})`} />
       {/* Base plate */}
-      <Rect x={26} y={88} width={68} height={16} fill={`url(#rim${uid})`} rx={5} stroke={palette.edge} strokeWidth={1} />
-      <Rect x={30} y={91} width={60} height={10} fill={`url(#base${uid})`} rx={3} />
+      <Rect x={24} y={89} width={72} height={17} fill={`url(#rim${uid})`} rx={6} stroke={palette.edge} strokeWidth={1} />
+      <Rect x={29} y={92} width={62} height={11} fill={`url(#base${uid})`} rx={4} />
       {/* Tier pips on base */}
-      {pips.map(x => <Circle key={x} cx={x} cy={99} r={2} fill={palette.edge} opacity={0.7} />)}
-      {/* Specular highlight on cup face */}
-      <Ellipse cx={42} cy={30} rx={16} ry={7} fill={Colors.white} opacity={0.22} transform="rotate(-18 42 30)" />
+      {pips.map(x => <Circle key={x} cx={x} cy={101} r={2.2} fill={palette.edge} opacity={0.75} />)}
+      {/* Specular highlights */}
+      <Ellipse cx={41} cy={34} rx={17} ry={8} fill={Colors.white} opacity={0.26} transform="rotate(-18 41 34)" />
+      <Ellipse cx={82} cy={62} rx={10} ry={5} fill={Colors.white} opacity={0.12} transform="rotate(-10 82 62)" />
     </Svg>
   );
 }
 
 function EmeraldSvg({ uid, palette, size, pips }: { uid: string; palette: any; size: number; pips: number[] }) {
+  // Gem dots at each of the 8 outer star points
+  const gemPoints = [
+    [60, 10], [95.4, 24.6], [110, 60], [95.4, 95.4],
+    [60, 110], [24.6, 95.4], [10, 60], [24.6, 24.6],
+  ];
   return (
     <Svg width={size} height={size} viewBox="0 0 120 120">
       <Defs>
         <LinearGradient id={`rim${uid}`} x1="0.2" y1="0.1" x2="0.8" y2="0.9">
           <Stop offset="0" stopColor={palette.rimLight} />
-          <Stop offset="0.35" stopColor={palette.rimMid} />
-          <Stop offset="0.6" stopColor={palette.rimDeep} />
-          <Stop offset="0.85" stopColor={palette.rimMid} />
+          <Stop offset="0.3" stopColor={palette.rimMid} />
+          <Stop offset="0.55" stopColor={palette.rimDeep} />
+          <Stop offset="0.8" stopColor={palette.rimMid} />
           <Stop offset="1" stopColor={palette.rimLight} />
         </LinearGradient>
-        <RadialGradient id={`face${uid}`} cx="36%" cy="28%" r="85%">
+        <RadialGradient id={`face${uid}`} cx="34%" cy="26%" r="88%">
           <Stop offset="0" stopColor={palette.faceLight} />
-          <Stop offset="0.55" stopColor={palette.faceMid} />
+          <Stop offset="0.45" stopColor={palette.faceMid} />
           <Stop offset="1" stopColor={palette.faceDeep} />
         </RadialGradient>
+        <RadialGradient id={`glow${uid}`} cx="50%" cy="50%" r="50%">
+          <Stop offset="0" stopColor={palette.faceLight} stopOpacity="0.4" />
+          <Stop offset="1" stopColor={palette.faceLight} stopOpacity="0" />
+        </RadialGradient>
       </Defs>
+      {/* Outer glow halo behind the star */}
+      <Circle cx={60} cy={60} r={57} fill={`url(#glow${uid})`} />
       {/* Outer star rim */}
       <Polygon points={STAR_OUTER} fill={`url(#rim${uid})`} stroke={palette.edge} strokeWidth={1.5} />
       {/* Inner star face */}
       <Polygon points={STAR_FACE} fill={`url(#face${uid})`} stroke={palette.rimLight} strokeWidth={1.2} />
-      {/* Pinline on inner star */}
-      <Polygon points={STAR_FACE} fill="none" stroke={palette.ink} strokeWidth={0.8} opacity={0.2} />
+      {/* Pinline trace on inner star */}
+      <Polygon points={STAR_FACE} fill="none" stroke={palette.ink} strokeWidth={0.9} opacity={0.22} />
+      {/* Gem dot accent at each outer star point */}
+      {gemPoints.map(([x, y], i) => (
+        <Circle key={i} cx={x} cy={y} r={3.2} fill={palette.rimLight} stroke={palette.edge} strokeWidth={0.8} opacity={0.85} />
+      ))}
+      {/* Inner decorative dots (between star points) */}
+      {[22.5, 67.5, 112.5, 157.5, 202.5, 247.5, 292.5, 337.5].map((deg, i) => {
+        const rad = (deg * Math.PI) / 180;
+        return <Circle key={i} cx={60 + 30 * Math.cos(rad)} cy={60 + 30 * Math.sin(rad)} r={1.6} fill={palette.ink} opacity={0.3} />;
+      })}
       {/* Tier pips near bottom star point */}
-      {pips.map(x => <Circle key={x} cx={x} cy={105} r={2} fill={palette.ink} opacity={0.5} />)}
-      {/* Specular highlight */}
-      <Ellipse cx={44} cy={36} rx={18} ry={7} fill={Colors.white} opacity={0.22} transform="rotate(-30 44 36)" />
+      {pips.map(x => <Circle key={x} cx={x} cy={106} r={2.2} fill={palette.ink} opacity={0.55} />)}
+      {/* Specular highlights */}
+      <Ellipse cx={42} cy={34} rx={19} ry={8} fill={Colors.white} opacity={0.26} transform="rotate(-30 42 34)" />
+      <Ellipse cx={80} cy={88} rx={12} ry={6} fill={Colors.white} opacity={0.12} transform="rotate(-20 80 88)" />
     </Svg>
   );
 }
@@ -320,12 +389,12 @@ export default function BadgeMedallion({
       style={{
         width: size,
         height: size,
-        boxShadow: earned ? `0 ${size * 0.05}px ${size * 0.24}px 0 ${palette.glow}` : undefined,
+        boxShadow: earned ? `0 ${size * 0.06}px ${size * 0.30}px 0 ${palette.glow}` : undefined,
       } as any}
     >
       <SvgFace uid={uid} palette={palette} size={size} pips={pips} />
 
-      {/* Icon overlay, vertically offset to sit on the badge face */}
+      {/* Icon overlay, vertically offset to align with badge face centre */}
       <View style={[StyleSheet.absoluteFill, styles.iconWrap]}>
         <View style={{ opacity: earned ? 1 : 0.5, transform: [{ translateY: iconTranslateY }] }}>
           <Icon name={icon} size={size * 0.32} color={palette.ink} />
@@ -336,18 +405,21 @@ export default function BadgeMedallion({
       {!earned && size >= 40 && (
         <View style={[
           styles.lockRoundel,
-          { width: size * 0.28, height: size * 0.28, borderRadius: size * 0.14, bottom: size * 0.03 },
+          { width: size * 0.28, height: size * 0.28, borderRadius: size * 0.14, bottom: size * 0.04 },
         ]}>
           <Icon name="lock" size={size * 0.15} color={Colors.ink3} />
         </View>
       )}
 
-      {/* Sheen FX */}
+      {/* Double sheen sweep (earned badges) — two sequential passes */}
       {earned && fx !== 'none' && (
-        <SheenSweep size={size} delayMs={sheenDelayMs} gradId={`sheen${uid}`} clipRadius={sheenClipRadius} />
+        <>
+          <SheenSweep size={size} delayMs={sheenDelayMs} gradId={`sheenA${uid}`} clipRadius={sheenClipRadius} />
+          <SheenSweep size={size} delayMs={sheenDelayMs + 900} gradId={`sheenB${uid}`} clipRadius={sheenClipRadius} />
+        </>
       )}
 
-      {/* Twinkle FX — full budget only */}
+      {/* 12 glitter twinkles — full FX budget only */}
       {earned && fx === 'full' && TWINKLES.map((t, i) => (
         <Twinkle
           key={i}
