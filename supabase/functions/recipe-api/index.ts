@@ -17,9 +17,16 @@
 // { url } for instacartLink, or { error: string } with a non-2xx status.
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY') ?? '';
 const MODEL = 'claude-haiku-4-5-20251001';
+
+// Free AI captures per user per month. This is the early-access abuse/cost
+// guard — set generously so the "on the house" trial isn't throttled. Once real
+// IAP gates premium, lower this to the marketed 3 and let profiles.ai_unlimited
+// grant unlimited to paying users.
+const FREE_MONTHLY_AI_LIMIT = 25;
 
 const INSTACART_KEY = Deno.env.get('INSTACART_API_KEY') ?? '';
 const INSTACART_HOST = Deno.env.get('INSTACART_ENV') === 'development'
@@ -52,10 +59,10 @@ Deno.serve(async (req) => {
     }
 
     switch (body.action) {
-      case 'importUrl': return await importUrl(body.url);
-      case 'parseText': return await parseText(body.text);
-      case 'ocr': return await ocr(body.image);
-      case 'generate': return await generate(body.prompt, body.constraints);
+      case 'importUrl': return await importUrl(req, body.url);
+      case 'parseText': return await parseText(req, body.text);
+      case 'ocr': return await ocr(req, body.image);
+      case 'generate': return await generate(req, body.prompt, body.constraints);
       case 'instacartLink': return await instacartLink(body.items, body.title);
       default: return json({ error: `Unknown action: ${body.action}` }, 400);
     }
@@ -71,6 +78,48 @@ function json(data: unknown, status = 200) {
     status,
     headers: { ...CORS, 'Content-Type': 'application/json' },
   });
+}
+
+// ── AI usage metering ───────────────────────────────────────────────────────────
+// Counts and caps AI captures per signed-in user via the consume_ai_credit
+// Postgres function (atomic, behind RLS). Returns a 4xx Response to short-circuit
+// the caller, or null to proceed. Consumes one credit per call, so invoke it
+// exactly once — immediately before the Claude request, after any cheaper
+// non-AI path (e.g. JSON-LD import) has been ruled out.
+async function gateAi(req: Request): Promise<Response | null> {
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+    if (!supabaseUrl || !anonKey) return null; // misconfigured — fail open
+
+    // Forward the caller's JWT so auth.uid() resolves to them inside the RPC.
+    const authHeader = req.headers.get('Authorization') ?? `Bearer ${anonKey}`;
+    const client = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data, error } = await client.rpc('consume_ai_credit', { p_limit: FREE_MONTHLY_AI_LIMIT });
+    if (error) {
+      // A metering outage shouldn't break capture — fail open (cost is bounded).
+      console.error('ai metering rpc error:', error.message);
+      return null;
+    }
+
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row || row.status === 'ok') return null;
+    if (row.status === 'no_user') {
+      // AI requires an account so usage can be metered; everything else (manual
+      // entry, JSON-LD import, cooking) still works signed-out.
+      return json({ error: 'Create a free account to use AI capture.', code: 'auth_required' }, 401);
+    }
+    return json({
+      error: `You've used your ${FREE_MONTHLY_AI_LIMIT} free AI captures this month. Upgrade to Premium for unlimited.`,
+      code: 'ai_limit',
+    }, 402);
+  } catch (e) {
+    console.error('ai metering failed:', (e as Error)?.message);
+    return null; // fail open
+  }
 }
 
 // ── Claude ────────────────────────────────────────────────────────────────────
@@ -485,7 +534,7 @@ const RECIPE_SHAPE = `{
   "tags": ["string"]
 }`;
 
-async function importUrl(url?: string) {
+async function importUrl(req: Request, url?: string) {
   if (!url) return json({ error: 'url is required' }, 400);
 
   const controller = new AbortController();
@@ -523,6 +572,10 @@ async function importUrl(url?: string) {
     return json({ error: "This page has no embedded recipe data, and AI parsing isn't set up. Add the ANTHROPIC_API_KEY secret to import from pages like this." }, 503);
   }
 
+  // Only the AI fallback consumes a credit — the JSON-LD fast path above is free.
+  const gate = await gateAi(req);
+  if (gate) return gate;
+
   const pageText = htmlToText(html);
   const system = `You are a recipe parser. Extract the recipe from the provided page text and return ONLY valid JSON with this exact structure:
 ${RECIPE_SHAPE}
@@ -535,8 +588,11 @@ If you cannot find a value, use a sensible default. Return only JSON, no other t
   return json({ ...recipe, sourceUrl: url, imageUrl: photo });
 }
 
-async function parseText(text?: string) {
+async function parseText(req: Request, text?: string) {
   if (!text) return json({ error: 'text is required' }, 400);
+
+  const gate = await gateAi(req);
+  if (gate) return gate;
 
   const system = `You are a recipe parser. Parse the following text into a recipe and return ONLY valid JSON:
 ${RECIPE_SHAPE}`;
@@ -547,8 +603,11 @@ ${RECIPE_SHAPE}`;
   return json({ ...recipe, imageUrl });
 }
 
-async function ocr(image?: string) {
+async function ocr(req: Request, image?: string) {
   if (!image) return json({ error: 'image is required' }, 400);
+
+  const gate = await gateAi(req);
+  if (gate) return gate;
 
   const system = `You are a recipe OCR assistant. The user has taken a photo of a handwritten or printed recipe.
 Read all recipe text from the image and return ONLY valid JSON matching this structure:
@@ -572,8 +631,11 @@ If a value is unreadable, use a sensible default. Return only JSON, no other tex
   return json({ ...recipe, imageUrl });
 }
 
-async function generate(prompt?: string, constraints?: Record<string, unknown>) {
+async function generate(req: Request, prompt?: string, constraints?: Record<string, unknown>) {
   if (!prompt) return json({ error: 'prompt is required' }, 400);
+
+  const gate = await gateAi(req);
+  if (gate) return gate;
 
   const constraintText = [
     constraints?.servings ? `Serves: ${constraints.servings}` : '',

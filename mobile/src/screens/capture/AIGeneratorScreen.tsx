@@ -67,7 +67,12 @@ export default function AIGeneratorScreen({ navigation }: Props) {
       setDraft(recipe);
       hapticSuccess();
     } catch (e: any) {
-      setGenError(e.message ?? 'Generation failed — try a different prompt.');
+      if (e?.code === 'ai_limit') {
+        setGenerating(false);
+        navigation.navigate('Paywall', { source: 'settings' });
+        return;
+      }
+      setGenError(e?.message ?? 'Generation failed — try a different prompt.');
     }
     setGenerating(false);
   }

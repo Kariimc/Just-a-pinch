@@ -26,11 +26,17 @@ Grounded in the actual state of the code. Tick items as they're completed.
   GitHub Pages (Settings → Pages → Source: `/docs`) so the URLs resolve, give
   the privacy URL to both stores, and have the drafted text reviewed (it's a
   solid starting template, not legal advice).
-- [ ] **AI usage metering & gating.** The paywall advertises "3/month free" and
-  "unlimited premium," but there is no usage tracking anywhere (client or
-  server). Every user can call the AI endpoints freely — uncapped Anthropic
-  cost, and the feature doesn't match what's sold. Needs server-side per-user
-  metering keyed to subscription status.
+- [x] **AI usage metering & gating.** Built server-side: migration
+  `20260615000000_ai_usage_metering` adds an `ai_usage` counter + a
+  `profiles.ai_unlimited` premium flag + an atomic `consume_ai_credit()` RPC;
+  `recipe-api` calls it (`gateAi`) before every Claude request (the free JSON-LD
+  import path stays free), returning 402 `ai_limit` / 401 `auth_required`. The
+  app surfaces a `RecipeApiError.code` and routes a quota hit to the Paywall.
+  **Decisions to confirm:** (a) free cap is set to **25/mo** as an early-access
+  abuse guard so the "on the house" trial isn't throttled — lower to 3 once real
+  IAP gates premium (one constant, `FREE_MONTHLY_AI_LIMIT`); (b) AI capture now
+  **requires an account** (anon can't be metered) — everything else still works
+  signed-out. **Still to do:** apply the migration + redeploy `recipe-api`.
 
 ## 🟠 Backend / infrastructure
 

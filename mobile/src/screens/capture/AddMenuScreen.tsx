@@ -35,6 +35,21 @@ export default function AddMenuScreen({ navigation }: Props) {
   const [importStep, setImportStep] = useState<string[]>([]);
   const [ocrChooser, setOcrChooser] = useState(false);
 
+  // Routes a server quota response to the paywall; otherwise toasts the message.
+  function handleCaptureError(e: any, fallback: string) {
+    setImporting(false);
+    if (e?.code === 'ai_limit') {
+      showToast("You've hit your free AI limit this month", 'sparkle');
+      (navigation as any).navigate('Paywall', { source: 'settings' });
+      return;
+    }
+    if (e?.code === 'auth_required') {
+      showToast(e?.message ?? 'Create a free account to use AI', 'info');
+      return;
+    }
+    showToast(e?.message ?? fallback, 'wifi');
+  }
+
   async function handleImportUrl() {
     if (!url.trim()) return;
     setImporting(true);
@@ -59,8 +74,7 @@ export default function AddMenuScreen({ navigation }: Props) {
       showToast(`"${recipe.title}" saved to your library`);
       navigation.navigate('RecipeDetail', { recipeId: recipe.id });
     } catch (e: any) {
-      setImporting(false);
-      showToast(e.message ?? 'Could not read that recipe. Try a different link.', 'wifi');
+      handleCaptureError(e, 'Could not read that recipe. Try a different link.');
     }
   }
 
@@ -88,8 +102,7 @@ export default function AddMenuScreen({ navigation }: Props) {
       showToast(`"${recipe.title}" saved to your library`);
       navigation.navigate('RecipeEditor', { recipeId: recipe.id });
     } catch (e: any) {
-      setImporting(false);
-      showToast(e.message ?? "Couldn't parse that text. Try cleaning it up.", 'wifi');
+      handleCaptureError(e, "Couldn't parse that text. Try cleaning it up.");
     }
   }
 
@@ -131,9 +144,8 @@ export default function AddMenuScreen({ navigation }: Props) {
       setImporting(false);
       showToast(`"${recipe.title}" saved to your library`);
       navigation.navigate('RecipeEditor', { recipeId: recipe.id });
-    } catch {
-      setImporting(false);
-      showToast('Could not read that photo. Try a clearer image.', 'wifi');
+    } catch (e: any) {
+      handleCaptureError(e, 'Could not read that photo. Try a clearer image.');
     }
   }
 
