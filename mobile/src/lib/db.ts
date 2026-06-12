@@ -106,6 +106,7 @@ export async function dbGetProfile(): Promise<UserProfile | null> {
   return {
     id: data.id,
     name: data.name ?? '',
+    lastName: data.last_name ?? undefined,
     email: user.email ?? '',
     avatarUri: data.avatar_uri ?? undefined,
     dietaryPrefs: data.dietary_prefs ?? [],
@@ -120,6 +121,7 @@ export async function dbSaveProfile(profile: UserProfile): Promise<void> {
   const { error } = await supabase.from('profiles').upsert({
     id: profile.id,
     name: profile.name,
+    last_name: profile.lastName ?? null,
     avatar_uri: profile.avatarUri ?? null,
     dietary_prefs: profile.dietaryPrefs,
     skill_level: profile.skillLevel,

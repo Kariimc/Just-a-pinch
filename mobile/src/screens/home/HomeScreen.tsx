@@ -102,6 +102,7 @@ export default function HomeScreen() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [featured, setFeatured] = useState<Recipe[]>([]);
   const [userName, setUserName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -112,6 +113,7 @@ export default function HomeScreen() {
     const metaName = (user?.user_metadata?.name as string | undefined)?.trim();
     const resolved = p?.name?.trim() || metaName || user?.email?.split('@')[0] || 'Chef';
     setUserName(resolved.split(' ')[0]);
+    setLastName(p?.lastName?.trim() ?? '');
     setFeatured(f);
     setLoading(false);
   }
@@ -125,6 +127,12 @@ export default function HomeScreen() {
   const dinner = recipes.filter(r => r.tags.includes('dinner')).slice(0, 4);
   const displayed = dinner.length ? dinner : recipes.slice(0, 4);
   const familyRecipes = recipes.filter(r => r.isFamily);
+
+  // "ANDERSON'S" on the cookbook cover; names already ending in s get just
+  // the apostrophe ("CHILES'"). No last name → "OUR FAMILY COOKBOOK".
+  const coverName = lastName
+    ? `${lastName.toUpperCase()}${lastName.toLowerCase().endsWith('s') ? '’' : '’S'}`
+    : 'OUR';
 
   return (
     <View style={styles.container}>
@@ -333,9 +341,10 @@ export default function HomeScreen() {
           >
             <CookbookCover style={StyleSheet.absoluteFill} />
             <View style={styles.familyOverlay}>
-              <Text style={styles.familyTitle}>{familyRecipes[0].title}</Text>
+              <Text style={styles.familyName}>{coverName}</Text>
+              <Text style={styles.familyTitle}>FAMILY COOKBOOK</Text>
               <Text style={styles.familySub}>
-                {familyRecipes.length} famil{familyRecipes.length === 1 ? 'y recipe' : 'y recipes'} · handed down
+                {familyRecipes.length} RECIPE{familyRecipes.length === 1 ? '' : 'S'} · HANDED DOWN
               </Text>
             </View>
           </TouchableOpacity>
@@ -427,18 +436,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5A62320', borderRadius: Radius.pill,
   },
   comingSoonTxt: { fontFamily: Fonts.uiBold, fontSize: 10, color: '#C88A00', letterSpacing: 0.3 },
-  familyCard: { marginTop: 12, borderRadius: Radius.lg, overflow: 'hidden', height: 150 },
+  familyCard: { marginTop: 12, borderRadius: Radius.lg, overflow: 'hidden', height: 190 },
+  // Centred title block sits in the clear field of the engraved cover; the
+  // bottom ~55px stays free for the spice still-life baked into the SVG.
   familyOverlay: {
     ...StyleSheet.absoluteFill,
-    justifyContent: 'flex-end', padding: 16,
+    alignItems: 'center', justifyContent: 'center', paddingBottom: 42, paddingHorizontal: 56,
+  },
+  familyName: {
+    fontFamily: Fonts.displayMedium, fontSize: 26, color: '#EDE8D6',
+    letterSpacing: 2.5, textAlign: 'center',
   },
   familyTitle: {
-    fontFamily: Fonts.displayMedium, fontSize: 22, color: '#fff',
-    textShadowColor: 'rgba(0,0,0,0.45)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6,
+    fontFamily: Fonts.displayMedium, fontSize: 19, color: '#EDE8D6',
+    letterSpacing: 3.5, marginTop: 4, textAlign: 'center',
   },
   familySub: {
-    fontFamily: Fonts.uiRegular, fontSize: 13, color: 'rgba(255,255,255,0.92)', marginTop: 3,
-    textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 5,
+    fontFamily: Fonts.uiSemiBold, fontSize: 9.5, color: '#D9D3BC',
+    letterSpacing: 2.4, marginTop: 9, textAlign: 'center',
   },
   familyEmpty: {
     flexDirection: 'row', alignItems: 'center', gap: 13, marginTop: 12,

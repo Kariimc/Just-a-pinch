@@ -37,22 +37,36 @@ export default function SettingsScreen({ navigation }: Props) {
     notificationMinute: 0,
     subscriptionPlan: 'free',
     subscriptionBilling: 'annual',
+    largerText: false,
+    speakSteps: false,
   });
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [badges, setBadges] = useState<BadgeSummary | null>(null);
   const [saving, setSaving] = useState(false);
   const [editingName, setEditingName] = useState(false);
-  const [nameInput, setNameInput] = useState('');
+  const [firstInput, setFirstInput] = useState('');
+  const [lastInput, setLastInput] = useState('');
 
   useFocusEffect(useCallback(() => {
     getSettings().then(setSettings);
-    getProfile().then(p => { setProfile(p); setNameInput(p?.name ?? ''); });
+    getProfile().then(p => {
+      setProfile(p);
+      // Older profiles stored "First Last" in one field — split it once here
+      // so the inputs prefill sensibly; saving writes the split form back.
+      const words = (p?.name ?? '').trim().split(/\s+/).filter(Boolean);
+      setFirstInput(words[0] ?? '');
+      setLastInput(p?.lastName ?? words.slice(1).join(' '));
+    });
     getBadgeSummary().then(setBadges);
   }, []));
 
   async function saveName() {
     if (!profile) return;
-    const updated = { ...profile, name: nameInput.trim() || profile.name };
+    const updated = {
+      ...profile,
+      name: firstInput.trim() || profile.name,
+      lastName: lastInput.trim() || undefined,
+    };
     setProfile(updated);
     setEditingName(false);
     await saveProfile(updated);
@@ -87,6 +101,14 @@ export default function SettingsScreen({ navigation }: Props) {
     const updated = { ...profile, householdSize: Math.max(1, profile.householdSize + delta) };
     setProfile(updated);
     await saveProfile(updated);
+  }
+
+  // Accessibility toggles apply immediately — no Save tap needed.
+  async function toggleAccessibility(key: 'largerText' | 'speakSteps', value: boolean) {
+    hapticLight();
+    const updated = { ...settings, [key]: value };
+    setSettings(updated);
+    await saveSettings(updated);
   }
 
   function adjustHour(delta: number) {
@@ -229,23 +251,34 @@ export default function SettingsScreen({ navigation }: Props) {
         <View style={styles.card}>
           <View style={styles.row}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarTxt}>{(nameInput?.[0] ?? user?.email?.[0] ?? '?').toUpperCase()}</Text>
+              <Text style={styles.avatarTxt}>{(firstInput?.[0] ?? user?.email?.[0] ?? '?').toUpperCase()}</Text>
             </View>
             <View style={styles.rowLeft}>
               {editingName ? (
-                <TextInput
-                  style={styles.nameInput}
-                  value={nameInput}
-                  onChangeText={setNameInput}
-                  autoFocus
-                  returnKeyType="done"
-                  onSubmitEditing={saveName}
-                  onBlur={saveName}
-                  placeholder="Your name"
-                  placeholderTextColor={Colors.ink3}
-                />
+                <View style={styles.nameInputs}>
+                  <TextInput
+                    style={styles.nameInput}
+                    value={firstInput}
+                    onChangeText={setFirstInput}
+                    autoFocus
+                    returnKeyType="next"
+                    placeholder="First name"
+                    placeholderTextColor={Colors.ink3}
+                  />
+                  <TextInput
+                    style={styles.nameInput}
+                    value={lastInput}
+                    onChangeText={setLastInput}
+                    returnKeyType="done"
+                    onSubmitEditing={saveName}
+                    placeholder="Last name"
+                    placeholderTextColor={Colors.ink3}
+                  />
+                </View>
               ) : (
-                <Text style={styles.rowTitle}>{nameInput || profile?.name || 'Cooking offline'}</Text>
+                <Text style={styles.rowTitle}>
+                  {[firstInput, lastInput].filter(Boolean).join(' ') || profile?.name || 'Cooking offline'}
+                </Text>
               )}
               <Text style={styles.rowSub}>{user?.email ?? 'Recipes stored on this device only'}</Text>
             </View>
@@ -322,6 +355,42 @@ export default function SettingsScreen({ navigation }: Props) {
                 <Icon name="plus" size={15} color={Colors.ink} />
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+
+        {/* Accessibility */}
+        <Text style={styles.sectionLabel}>Accessibility</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <View style={styles.accessIcon}>
+              <Icon name="textsize" size={19} color={Colors.accentDeep} />
+            </View>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>Larger text</Text>
+              <Text style={styles.rowSub}>Bigger step text in cooking mode</Text>
+            </View>
+            <Switch
+              value={settings.largerText}
+              onValueChange={v => toggleAccessibility('largerText', v)}
+              trackColor={{ false: Colors.line2, true: Colors.accent }}
+              thumbColor={Colors.surface}
+            />
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <View style={styles.accessIcon}>
+              <Icon name="soundwave" size={19} color={Colors.accentDeep} />
+            </View>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>Read steps aloud</Text>
+              <Text style={styles.rowSub}>Speak each step in cooking mode</Text>
+            </View>
+            <Switch
+              value={settings.speakSteps}
+              onValueChange={v => toggleAccessibility('speakSteps', v)}
+              trackColor={{ false: Colors.line2, true: Colors.accent }}
+              thumbColor={Colors.surface}
+            />
           </View>
         </View>
 
@@ -482,15 +551,23 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
   },
   avatarTxt: { fontFamily: Fonts.uiBold, color: '#fff', fontSize: 16 },
+  nameInputs: { gap: 6, marginBottom: 2 },
   nameInput: {
     fontFamily: Fonts.uiSemiBold, fontSize: 15.5, color: Colors.ink,
     borderBottomWidth: 1.5, borderBottomColor: Colors.accent,
-    paddingVertical: 2, marginBottom: 2,
+    paddingVertical: 2,
+    // The green underline is the focus affordance — suppress the browser's
+    // default black focus outline that react-native-web leaves on inputs.
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null),
   },
   editNameBtn: { padding: 8 },
   badgeCluster: { flexDirection: 'row', alignItems: 'center' },
   badgeOverlap: { marginLeft: -11 },
   premiumIcon: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.accentSoft,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  accessIcon: {
     width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.accentSoft,
     alignItems: 'center', justifyContent: 'center',
   },

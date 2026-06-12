@@ -201,6 +201,7 @@ async function healProfile(profile: UserProfile | null): Promise<UserProfile | n
   const healed: UserProfile = {
     id: profile?.id ?? user.id,
     name,
+    lastName: profile?.lastName,
     email: profile?.email || user.email || '',
     dietaryPrefs: profile?.dietaryPrefs ?? [],
     skillLevel: profile?.skillLevel ?? 'confident',

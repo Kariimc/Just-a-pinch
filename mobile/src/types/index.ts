@@ -89,6 +89,9 @@ export interface PantryItem {
 export interface UserProfile {
   id: string;
   name: string;
+  // Surname, kept separate so the family-cookbook cover can read
+  // "{lastName}'s Family Cookbook". `name` stays the first/display name.
+  lastName?: string;
   email: string;
   avatarUri?: string;
   dietaryPrefs: string[];

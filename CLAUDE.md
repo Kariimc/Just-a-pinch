@@ -104,6 +104,17 @@ node --check backend/server.js
 
 No simulator in cloud sessions — flag device-level claims as unverified.
 
+## 2026-06-12 later additions
+
+- Profiles now have `last_name` (migration `20260614000000`, applied live;
+  mapped in db.ts + healProfile). Settings edits first/last name separately;
+  the home "family cookbook" hero renders "{LASTNAME}'S FAMILY COOKBOOK" on
+  `CookbookCover` (engraved olive/cream SVG styled after the user's Etsy
+  reference; falls back to "OUR" with no last name).
+- Accessibility: `AppSettings.largerText` + `speakSteps` (local), toggles in
+  Settings → Accessibility, applied in cooking mode (bigger step text;
+  expo-speech reads each step aloud — header soundwave button toggles it live).
+
 ## 2026-06-12 device QA round
 
 First hardware walkthrough surfaced: CLEARTEXT failures on all capture paths

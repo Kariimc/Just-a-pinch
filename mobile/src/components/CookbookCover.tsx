@@ -1,79 +1,120 @@
 import React from 'react';
 import { ViewStyle } from 'react-native';
 import Svg, {
-  Defs, LinearGradient, Stop, Rect, Path, Circle, G,
+  Defs, RadialGradient, Stop, Rect, Path, Circle, G,
 } from 'react-native-svg';
 
-// A whimsical, hand-illustrated family-cookbook cover: a cloth-bound green
-// board with a gold double-rule frame and playful kitchen doodles (a steaming
-// pot, a whisk, a herb sprig, little sparkles). A built-in bottom scrim keeps
-// overlaid white title text readable. Pure vector — crisp at any size, themed,
-// no bundled image. Drawn in a 340×150 box, sliced to cover the card.
+// Family-cookbook cover, engraving style: muted olive cloth, cream botanical
+// line art (garlic bulb, laurel sprigs, star anise, spice jar), and a bottom
+// still-life of spice bowls (terracotta accents), peppercorns, cinnamon
+// sticks, and a mortar & pestle inside a double-rule frame. The centre field
+// is intentionally clear — HomeScreen overlays "{Lastname}'s Family Cookbook"
+// there in the serif display font. Pure vector; drawn in a 390×190 box and
+// sliced to cover the card.
 interface Props {
   style?: ViewStyle;
 }
 
-// Warm gold used for the frame and line-art doodles.
-const GOLD = '#F4E2BC';
+const CREAM = '#E9E4D0';      // engraving line work
+const TERRA = '#C07640';      // terracotta spice accent
+const TERRA_LIGHT = '#CB854E';
+const PEPPER = '#2E2A20';     // peppercorns
 
 export default function CookbookCover({ style }: Props) {
   return (
-    <Svg width="100%" height="100%" viewBox="0 0 340 150" preserveAspectRatio="xMidYMid slice" style={style}>
+    <Svg width="100%" height="100%" viewBox="0 0 390 190" preserveAspectRatio="xMidYMid slice" style={style}>
       <Defs>
-        <LinearGradient id="cookBg" x1="0" y1="0" x2="0.3" y2="1">
-          <Stop offset="0" stopColor="#37A862" />
-          <Stop offset="0.55" stopColor="#1F7A43" />
-          <Stop offset="1" stopColor="#114B29" />
-        </LinearGradient>
-        <LinearGradient id="cookScrim" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0.45" stopColor="#06160C" stopOpacity="0" />
-          <Stop offset="1" stopColor="#04120A" stopOpacity="0.6" />
-        </LinearGradient>
+        <RadialGradient id="cbBg" cx="50%" cy="42%" r="95%">
+          <Stop offset="0" stopColor="#6B7551" />
+          <Stop offset="0.6" stopColor="#5C6847" />
+          <Stop offset="1" stopColor="#47523A" />
+        </RadialGradient>
       </Defs>
 
-      {/* Cloth board + soft top sheen */}
-      <Rect x="0" y="0" width="340" height="150" fill="url(#cookBg)" />
-      <Rect x="0" y="0" width="340" height="66" fill="#FFFFFF" opacity="0.05" />
+      {/* Olive cloth board */}
+      <Rect width="390" height="190" fill="url(#cbBg)" />
 
-      {/* Gold double-rule frame */}
-      <Rect x="12" y="12" width="316" height="126" rx="13" fill="none" stroke={GOLD} strokeOpacity="0.5" strokeWidth="2" />
-      <Rect x="16.5" y="16.5" width="307" height="117" rx="10" fill="none" stroke={GOLD} strokeOpacity="0.24" strokeWidth="1" />
+      {/* Double-rule frame */}
+      <Rect x="14" y="12" width="362" height="166" rx="3" fill="none" stroke={CREAM} strokeOpacity="0.55" strokeWidth="1.6" />
+      <Rect x="19" y="17" width="352" height="156" rx="2" fill="none" stroke={CREAM} strokeOpacity="0.28" strokeWidth="0.8" />
 
-      {/* Doodles — kept in the top two-thirds; the scrim fades the rest */}
-      <G stroke={GOLD} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" fill="none">
-        {/* Steaming pot, centre */}
-        <Path d="M151 84 L153 60 L187 60 L189 84 Q170 92 151 84 Z" fill={GOLD} fillOpacity="0.13" />
-        <Path d="M146 60 Q170 50 194 60" />
-        <Path d="M150 60 L150 65 M190 60 L190 65" />
-        <Path d="M163 49 q-6 -7 0 -13 q6 -6 0 -12" strokeOpacity="0.85" />
-        <Path d="M177 49 q6 -7 0 -13 q-6 -6 0 -12" strokeOpacity="0.85" />
-
-        {/* Herb sprig, upper-left */}
-        <Path d="M60 92 Q70 64 92 50" />
-        <Path d="M74 70 q9 -9 18 -7 q-4 11 -18 7 Z" fill={GOLD} fillOpacity="0.16" />
-        <Path d="M67 80 q-9 -6 -16 -3 q5 10 16 3 Z" fill={GOLD} fillOpacity="0.16" />
-
-        {/* Whisk, upper-right */}
-        <Path d="M257 30 L246 56" />
-        <Path d="M255 33 Q236 42 244 60" strokeWidth="1.8" />
-        <Path d="M257 33 Q246 44 248 60" strokeWidth="1.8" />
-        <Path d="M259 33 Q256 46 252 60" strokeWidth="1.8" />
-        <Path d="M244 60 L252 60" strokeWidth="1.8" />
+      {/* Garlic bulb, top centre */}
+      <G stroke={CREAM} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <Path d="M195 26 q1 4 3 6" />
+        <Path d="M195 26 q-7 8 -11 13 q-5 7 -1 13 q4 6 12 6 q8 0 12 -6 q4 -6 -1 -13 q-4 -5 -11 -13 Z" fill={CREAM} fillOpacity="0.08" />
+        <Path d="M195 30 L195 58 M188 38 q-3 10 1 19 M202 38 q3 10 -1 19" />
       </G>
 
-      {/* Sparkles + crumbs */}
-      <G fill={GOLD}>
-        <Path d="M118 32 Q121 35 124 32 Q121 35 124 38 Q121 35 118 38 Q121 35 118 32 Z" />
-        <Path d="M214 26 Q216.5 28.5 219 26 Q216.5 28.5 219 31 Q216.5 28.5 214 31 Q216.5 28.5 214 26 Z" />
-        <Path d="M286 74 Q289 77 292 74 Q289 77 292 80 Q289 77 286 80 Q289 77 286 74 Z" opacity="0.85" />
-        <Circle cx="103" cy="60" r="1.6" opacity="0.6" />
-        <Circle cx="232" cy="58" r="1.6" opacity="0.6" />
-        <Circle cx="276" cy="48" r="1.6" opacity="0.55" />
-        <Circle cx="49" cy="58" r="1.6" opacity="0.55" />
+      {/* Left laurel sprig */}
+      <G stroke={CREAM} strokeWidth="1.4" fill={CREAM} fillOpacity="0.10" strokeLinecap="round" strokeLinejoin="round">
+        <Path d="M44 150 Q38 110 52 64" fill="none" />
+        <Path d="M48 132 q-12 -4 -15 -14 q12 -2 15 14 Z" />
+        <Path d="M45 112 q12 -7 11 -18 q-13 2 -11 18 Z" />
+        <Path d="M44 92 q-12 -4 -14 -15 q12 -1 14 15 Z" />
+        <Path d="M46 74 q11 -7 10 -17 q-12 2 -10 17 Z" />
+      </G>
+      {/* Right laurel sprig */}
+      <G stroke={CREAM} strokeWidth="1.4" fill={CREAM} fillOpacity="0.10" strokeLinecap="round" strokeLinejoin="round">
+        <Path d="M346 150 Q352 110 338 64" fill="none" />
+        <Path d="M342 132 q12 -4 15 -14 q-12 -2 -15 14 Z" />
+        <Path d="M345 112 q-12 -7 -11 -18 q13 2 11 18 Z" />
+        <Path d="M346 92 q12 -4 14 -15 q-12 -1 -14 15 Z" />
+        <Path d="M344 74 q-11 -7 -10 -17 q12 2 10 17 Z" />
       </G>
 
-      {/* Bottom scrim for legible title text */}
-      <Rect x="0" y="0" width="340" height="150" fill="url(#cookScrim)" />
+      {/* Star anise, top-left */}
+      <G stroke={CREAM} strokeWidth="1.3" fill="none" strokeLinecap="round" x="78" y="42">
+        <Path d="M0 -9 L0 9 M-8 -4.5 L8 4.5 M-8 4.5 L8 -4.5" />
+        <Circle r="2.6" fill={CREAM} fillOpacity="0.25" />
+      </G>
+      {/* Spice jar, top-right */}
+      <G stroke={CREAM} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" x="306" y="30">
+        <Rect x="-7" y="6" width="14" height="22" rx="4" fill={CREAM} fillOpacity="0.08" />
+        <Rect x="-5" y="0" width="10" height="6" rx="1.5" fill={CREAM} fillOpacity="0.16" />
+        <Path d="M-4 16 L4 16 M-4 20 L4 20" strokeOpacity="0.6" />
+      </G>
+
+      {/* Bottom still-life: bowl of ground spice (terracotta mound) */}
+      <G stroke={CREAM} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <Path d="M96 151 q14 -11 28 0 L96 151 Z" fill={TERRA} stroke={TERRA} strokeWidth="1" />
+        <Path d="M92 152 L132 152 Q130 165 112 165 Q94 165 92 152 Z" fill={CREAM} fillOpacity="0.10" />
+      </G>
+      {/* Bowl of chickpeas */}
+      <G stroke={CREAM} strokeWidth="1.4" strokeLinecap="round">
+        <Circle cx="161" cy="152" r="3.4" fill={TERRA} stroke="none" />
+        <Circle cx="168" cy="149.5" r="3.4" fill={TERRA_LIGHT} stroke="none" />
+        <Circle cx="175" cy="152" r="3.4" fill={TERRA} stroke="none" />
+        <Path d="M152 156 L184 156 Q182 167 168 167 Q154 167 152 156 Z" fill={CREAM} fillOpacity="0.10" />
+      </G>
+      {/* Bowl of peppercorns */}
+      <G stroke={CREAM} strokeWidth="1.4">
+        <G fill={PEPPER} stroke="none">
+          <Circle cx="212" cy="149" r="2" /><Circle cx="218" cy="147" r="2" /><Circle cx="224" cy="149" r="2" />
+          <Circle cx="230" cy="147" r="2" /><Circle cx="215" cy="144" r="2" /><Circle cx="227" cy="144" r="2" />
+          <Circle cx="221" cy="141" r="2" />
+        </G>
+        <Path d="M204 152 L240 152 Q238 165 222 165 Q206 165 204 152 Z" fill={CREAM} fillOpacity="0.10" />
+      </G>
+      {/* Cinnamon sticks */}
+      <G stroke={CREAM} strokeWidth="1.4" fill={CREAM} fillOpacity="0.08" strokeLinecap="round">
+        <Path d="M252 164 L282 146 q3 -2 5 1 q1 3 -2 5 L255 170 q-3 2 -5 -1 q-1 -3 2 -5 Z" />
+        <Path d="M260 170 L290 152 q3 -2 5 1 q1 3 -2 5 L263 176 q-3 2 -5 -1 q-1 -3 2 -5 Z" />
+      </G>
+      {/* Mortar & pestle */}
+      <G stroke={CREAM} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <Path d="M327 137 L341 122 q3 -3 6 0 q3 3 0 6 L333 142" fill={CREAM} fillOpacity="0.14" />
+        <Path d="M306 145 L346 145 Q344 164 326 164 Q308 164 306 145 Z" fill={CREAM} fillOpacity="0.12" />
+      </G>
+      {/* Basil leaves, bottom-left */}
+      <G stroke={CREAM} strokeWidth="1.3" fill={CREAM} fillOpacity="0.10" strokeLinejoin="round">
+        <Path d="M62 162 q-10 -10 -4 -18 q9 4 4 18 Z" />
+        <Path d="M68 164 q2 -13 12 -15 q1 10 -12 15 Z" />
+      </G>
+      {/* Scattered seeds */}
+      <G fill={CREAM} opacity="0.5">
+        <Circle cx="142" cy="163" r="1.3" /><Circle cx="196" cy="160" r="1.3" /><Circle cx="247" cy="158" r="1.3" />
+        <Circle cx="299" cy="161" r="1.3" /><Circle cx="86" cy="166" r="1.3" />
+      </G>
     </Svg>
   );
 }

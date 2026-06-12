@@ -11,6 +11,9 @@ export interface AppSettings {
   subscriptionPlan: 'free' | 'trial';
   subscriptionBilling: 'monthly' | 'annual';
   trialStartedAt?: number;
+  // Accessibility — read by cooking mode.
+  largerText: boolean;   // bigger step text
+  speakSteps: boolean;   // read each step aloud (text-to-speech)
 }
 
 const DEFAULTS: AppSettings = {
@@ -19,6 +22,8 @@ const DEFAULTS: AppSettings = {
   notificationMinute: 0,
   subscriptionPlan: 'free',
   subscriptionBilling: 'annual',
+  largerText: false,
+  speakSteps: false,
 };
 
 export async function getSettings(): Promise<AppSettings> {
