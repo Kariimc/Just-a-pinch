@@ -20,9 +20,12 @@ Grounded in the actual state of the code. Tick items as they're completed.
   (`SocialAuthButtons`, `lib/socialAuth.ts`) but token acquisition is stubbed.
   Needs provider credentials, Supabase providers enabled, and a custom dev
   build. Offering Google on iOS forces Sign in with Apple too.
-- [ ] **Privacy Policy + Terms.** Currently non-tappable text on the SignUp
-  screen. Both stores require a hosted privacy policy URL. Author the documents
-  and wire real links.
+- [x] **Privacy Policy + Terms.** Documents written (`docs/privacy.html`,
+  `docs/terms.html`) and tappable links wired in (SignUp checkbox + Settings →
+  About), all reading from `mobile/src/lib/legal.ts`. **Still to do:** enable
+  GitHub Pages (Settings → Pages → Source: `/docs`) so the URLs resolve, give
+  the privacy URL to both stores, and have the drafted text reviewed (it's a
+  solid starting template, not legal advice).
 - [ ] **AI usage metering & gating.** The paywall advertises "3/month free" and
   "unlimited premium," but there is no usage tracking anywhere (client or
   server). Every user can call the AI endpoints freely — uncapped Anthropic

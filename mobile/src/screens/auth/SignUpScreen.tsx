@@ -11,6 +11,7 @@ import { showToast } from '../../components/Toast';
 import { showActionSheet } from '../../components/ActionSheet';
 import Icon from '../../components/Icon';
 import SocialAuthButtons from '../../components/SocialAuthButtons';
+import { openPrivacy, openTerms } from '../../lib/legal';
 import { supabase } from '../../lib/supabase';
 import { authRedirectUrl } from '../../lib/authRedirect';
 import { setOnboarded } from '../../store/storage';
@@ -110,14 +111,17 @@ export default function SignUpScreen({ navigation }: Props) {
       ) : null}
 
       {/* Terms */}
-      <TouchableOpacity style={styles.termsRow} onPress={() => setAgreed(a => !a)}>
-        <View style={[styles.check, agreed && styles.checkOn]}>
-          {agreed && <Icon name="check" size={15} color="#fff" />}
-        </View>
+      <View style={styles.termsRow}>
+        <TouchableOpacity onPress={() => setAgreed(a => !a)} hitSlop={6}>
+          <View style={[styles.check, agreed && styles.checkOn]}>
+            {agreed && <Icon name="check" size={15} color="#fff" />}
+          </View>
+        </TouchableOpacity>
         <Text style={styles.termsText}>
-          I agree to the <Text style={styles.termsLink}>Terms</Text> &amp; <Text style={styles.termsLink}>Privacy Policy</Text>.
+          I agree to the <Text style={styles.termsLink} onPress={openTerms}>Terms</Text>
+          {' '}&amp; <Text style={styles.termsLink} onPress={openPrivacy}>Privacy Policy</Text>.
         </Text>
-      </TouchableOpacity>
+      </View>
 
       <Button label="Create account" onPress={handleCreate} loading={loading} style={{ marginTop: 10 }} />
 

@@ -16,6 +16,7 @@ import { getProfile, saveProfile, deleteAccount } from '../../store/storage';
 import { getBadgeSummary, BadgeSummary } from '../../store/badges';
 import BadgeMedallion from '../../components/BadgeMedallion';
 import { requestNotificationPermission, scheduleDailyReminder, cancelDailyReminder } from '../../lib/notifications';
+import { openPrivacy, openTerms } from '../../lib/legal';
 import { useAuth } from '../../context/AuthContext';
 import { hapticLight } from '../../lib/haptics';
 
@@ -567,6 +568,20 @@ export default function SettingsScreen({ navigation }: Props) {
           >
             <View style={styles.rowLeft}>
               <Text style={styles.rowTitle}>Help &amp; feedback</Text>
+            </View>
+            <Icon name="fwd" size={18} color={Colors.ink3} />
+          </TouchableOpacity>
+          <View style={styles.divider} />
+          <TouchableOpacity style={styles.row} onPress={openPrivacy}>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>Privacy Policy</Text>
+            </View>
+            <Icon name="fwd" size={18} color={Colors.ink3} />
+          </TouchableOpacity>
+          <View style={styles.divider} />
+          <TouchableOpacity style={styles.row} onPress={openTerms}>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>Terms of Service</Text>
             </View>
             <Icon name="fwd" size={18} color={Colors.ink3} />
           </TouchableOpacity>
