@@ -40,6 +40,7 @@ import SettingsScreen from '../screens/settings/SettingsScreen';
 import BadgesScreen from '../screens/settings/BadgesScreen';
 import PaywallScreen from '../screens/paywall/PaywallScreen';
 import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
+import CommunityScreen from '../screens/community/CommunityScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -218,6 +219,7 @@ function Navigator() {
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="Badges" component={BadgesScreen} />
       <Stack.Screen name="Paywall" component={PaywallScreen} />
+      <Stack.Screen name="Community" component={CommunityScreen} />
     </Stack.Navigator>
   );
 }

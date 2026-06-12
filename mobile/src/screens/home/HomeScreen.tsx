@@ -238,9 +238,28 @@ export default function HomeScreen() {
       </Tappable>
       </Animated.View>
 
+      {/* Community */}
+      <Animated.View entering={enter(3)}>
+      <Tappable
+        scaleTo={0.97}
+        haptic
+        style={styles.communityCard}
+        onPress={() => navigation.navigate('Community')}
+      >
+        <View style={styles.communityIconWrap}>
+          <Icon name="people" size={22} color="#fff" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.communityTitle}>Community Recipes</Text>
+          <Text style={styles.communitySub}>See what the Just a Pinch family is cooking</Text>
+        </View>
+        <Icon name="fwd" size={20} color={Colors.accentDeep} />
+      </Tappable>
+      </Animated.View>
+
       {/* Today's Picks */}
       {featured.length > 0 && (
-        <Animated.View entering={enter(3)}>
+        <Animated.View entering={enter(4)}>
           <View style={styles.sectionHeader}>
             <Text style={styles.secTitle}>Today's picks</Text>
           </View>
@@ -263,7 +282,7 @@ export default function HomeScreen() {
 
       {/* Recently added */}
       {recent.length > 0 && (
-        <Animated.View entering={enter(4)}>
+        <Animated.View entering={enter(5)}>
           <View style={styles.sectionHeader}>
             <Text style={styles.secTitle}>Recently added</Text>
             <TouchableOpacity onPress={() => (navigation as any).navigate('Recipes')}>
@@ -384,6 +403,19 @@ const styles = StyleSheet.create({
   },
   aiTitle: { fontFamily: Fonts.uiBold, fontSize: 15.5, color: Colors.ink },
   aiSub: { fontFamily: Fonts.uiRegular, fontSize: 13, color: Colors.ink2, marginTop: 2 },
+  communityCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 14,
+    padding: 16,
+    backgroundColor: Colors.surface2,
+    borderRadius: Radius.lg,
+  },
+  communityIconWrap: {
+    width: 48, height: 48, borderRadius: Radius.sm,
+    backgroundColor: Colors.accentDeep,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  communityTitle: { fontFamily: Fonts.uiBold, fontSize: 15.5, color: Colors.ink },
+  communitySub: { fontFamily: Fonts.uiRegular, fontSize: 13, color: Colors.ink2, marginTop: 2 },
   familyCard: { marginTop: 12, borderRadius: Radius.lg, overflow: 'hidden', height: 150 },
   familyOverlay: {
     ...StyleSheet.absoluteFill,

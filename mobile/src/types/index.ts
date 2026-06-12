@@ -116,6 +116,7 @@ export type RootStackParamList = {
   Settings: undefined;
   Badges: undefined;
   Paywall: { source?: 'onboarding' | 'settings' } | undefined;
+  Community: undefined;
 };
 
 export type TabParamList = {

@@ -23,6 +23,7 @@ import AnimatedCheck from '../../components/AnimatedCheck';
 import { showToast } from '../../components/Toast';
 import { Springs } from '../../theme/motion';
 import { hapticLight, hapticSuccess } from '../../lib/haptics';
+import { shareRecipe as shareToCommunity } from '../../lib/community';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RecipeDetail'>;
 type Tab = 'ingredients' | 'method' | 'nutrition';
@@ -34,6 +35,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [tab, setTab] = useState<Tab>('ingredients');
   const [servings, setServings] = useState(4);
+  const [authorName, setAuthorName] = useState('');
   const [unit, setUnit] = useState<Unit>('us');
   const [checkedIngr, setCheckedIngr] = useState<Set<string>>(new Set());
 
@@ -68,6 +70,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
         setServings(prev => (prev === 4 ? r.servings : prev));
       }
       if (p?.preferMetric) setUnit('metric');
+      if (p?.name) setAuthorName(p.name.split(' ')[0]);
     });
     return () => { active = false; };
   }, [recipeId]));
@@ -132,12 +135,36 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
     }
   }
 
+  function shareToJapCommunity() {
+    if (!recipe) return;
+    Alert.alert(
+      'Share to Community',
+      `Share "${recipe.title}" with the Just a Pinch community? Anyone can see and save it.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Share',
+          onPress: async () => {
+            try {
+              await shareToCommunity(recipe, authorName || 'Anonymous');
+              showToast('Shared to the community!', 'people');
+            } catch (e) {
+              const msg = e instanceof Error ? e.message : 'Could not share';
+              showToast(msg === 'Sign in to share recipes' ? 'Sign in to share recipes' : 'Could not share recipe', 'wifi');
+            }
+          },
+        },
+      ],
+    );
+  }
+
   function openMenu() {
     if (!recipe) return;
     const actions = [
       { label: 'Edit recipe', fn: () => navigation.navigate('RecipeEditor', { recipeId: recipe.id }) },
       { label: 'Add to meal plan', fn: () => navigation.navigate('AddToMealPlan', { recipeId: recipe.id }) },
       { label: 'Share', fn: shareRecipe },
+      { label: 'Share to Community', fn: shareToJapCommunity },
       { label: 'Delete', fn: confirmDelete, destructive: true },
     ];
     if (Platform.OS === 'ios') {
