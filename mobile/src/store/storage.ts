@@ -190,15 +190,27 @@ export async function savePantryItems(items: PantryItem[]): Promise<void> {
 // Fill missing name/email from the auth user. Covers accounts that confirmed
 // email and logged in without ever running the quiz (no profile row), and
 // rows saved before the name was captured — so greetings never come up blank.
+// Legacy rows hold "First Last" in `name` (signup metadata) with no lastName —
+// split it so the family-cookbook cover gets a surname without re-entry.
+function splitLegacyName(p: UserProfile): UserProfile {
+  const n = p.name?.trim() ?? '';
+  if (p.lastName?.trim() || !n.includes(' ')) return p;
+  const words = n.split(/\s+/);
+  return { ...p, name: words[0], lastName: words.slice(1).join(' ') };
+}
+
 async function healProfile(profile: UserProfile | null): Promise<UserProfile | null> {
-  if (profile?.name?.trim() && profile.email) return profile;
+  if (profile?.name?.trim() && profile.email) {
+    const fixed = splitLegacyName(profile);
+    if (fixed !== profile) await saveProfile(fixed);
+    return fixed;
+  }
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return profile;
 
   const metaName = (user.user_metadata?.name as string | undefined)?.trim();
   const name = profile?.name?.trim() || metaName || user.email?.split('@')[0] || '';
-  if (profile && name === profile.name && profile.email) return profile;
-  const healed: UserProfile = {
+  const healed: UserProfile = splitLegacyName({
     id: profile?.id ?? user.id,
     name,
     lastName: profile?.lastName,
@@ -209,7 +221,7 @@ async function healProfile(profile: UserProfile | null): Promise<UserProfile | n
     preferMetric: profile?.preferMetric ?? false,
     darkMode: profile?.darkMode ?? false,
     avatarUri: profile?.avatarUri,
-  };
+  });
   await saveProfile(healed);
   return healed;
 }
@@ -228,9 +240,11 @@ export async function getProfile(): Promise<UserProfile | null> {
 }
 
 export async function saveProfile(profile: UserProfile): Promise<void> {
-  if (await authed()) {
-    try { await dbSaveProfile(profile); } catch { /* fall through */ }
-  }
+  // Like saveRecipe: never gate the write on getSession() — it reports null
+  // during web boot, the DB write would be skipped, and the next getProfile()
+  // would clobber the local edit with the stale DB row. dbSaveProfile
+  // resolves the user itself and throws when truly signed out.
+  try { await dbSaveProfile(profile); } catch { /* offline / signed out */ }
   await set(KEYS.profile, profile);
 }
 

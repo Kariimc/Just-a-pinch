@@ -118,8 +118,14 @@ export async function dbGetProfile(): Promise<UserProfile | null> {
 }
 
 export async function dbSaveProfile(profile: UserProfile): Promise<void> {
+  // Resolve the id server-side: RLS requires auth.uid() = id, and a locally
+  // created profile can carry a stale/placeholder id that would make every
+  // upsert fail silently. getUser() also works during the web boot window
+  // where getSession() still reports null.
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not signed in');
   const { error } = await supabase.from('profiles').upsert({
-    id: profile.id,
+    id: user.id,
     name: profile.name,
     last_name: profile.lastName ?? null,
     avatar_uri: profile.avatarUri ?? null,

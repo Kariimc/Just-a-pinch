@@ -63,10 +63,21 @@ export default function SettingsScreen({ navigation }: Props) {
   }, []));
 
   async function saveName() {
-    if (!profile) return;
+    // No profile yet (fresh install / skipped quiz)? Build one rather than
+    // dropping the edit on the floor.
+    const base: UserProfile = profile ?? {
+      id: user?.id ?? 'local',
+      name: '',
+      email: user?.email ?? '',
+      dietaryPrefs: [],
+      skillLevel: 'confident',
+      householdSize: 2,
+      preferMetric: false,
+      darkMode: false,
+    };
     const updated = {
-      ...profile,
-      name: firstInput.trim() || profile.name,
+      ...base,
+      name: firstInput.trim() || base.name,
       lastName: lastInput.trim() || undefined,
     };
     setProfile(updated);
