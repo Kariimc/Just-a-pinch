@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert, Platform, Linking,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Platform, Linking, TextInput,
 } from 'react-native';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,11 +10,13 @@ import { RootStackParamList, UserProfile } from '../../types';
 import { Colors, Fonts, Radius, Spacing } from '../../theme';
 import Icon from '../../components/Icon';
 import { showToast } from '../../components/Toast';
+import { confirmSheet } from '../../components/ActionSheet';
 import { getSettings, saveSettings, AppSettings } from '../../store/settingsStorage';
-import { getProfile, saveProfile } from '../../store/storage';
+import { getProfile, saveProfile, deleteAccount } from '../../store/storage';
 import { getBadgeSummary, BadgeSummary } from '../../store/badges';
 import BadgeMedallion from '../../components/BadgeMedallion';
 import { requestNotificationPermission, scheduleDailyReminder, cancelDailyReminder } from '../../lib/notifications';
+import { openPrivacy, openTerms } from '../../lib/legal';
 import { useAuth } from '../../context/AuthContext';
 import { hapticLight } from '../../lib/haptics';
 
@@ -37,25 +39,59 @@ export default function SettingsScreen({ navigation }: Props) {
     notificationMinute: 0,
     subscriptionPlan: 'free',
     subscriptionBilling: 'annual',
+    largerText: false,
+    speakSteps: false,
+    darkMode: false,
   });
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [badges, setBadges] = useState<BadgeSummary | null>(null);
   const [saving, setSaving] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [firstInput, setFirstInput] = useState('');
+  const [lastInput, setLastInput] = useState('');
 
   useFocusEffect(useCallback(() => {
     getSettings().then(setSettings);
-    getProfile().then(setProfile);
+    getProfile().then(p => {
+      setProfile(p);
+      // Older profiles stored "First Last" in one field — split it once here
+      // so the inputs prefill sensibly; saving writes the split form back.
+      const words = (p?.name ?? '').trim().split(/\s+/).filter(Boolean);
+      setFirstInput(words[0] ?? '');
+      setLastInput(p?.lastName ?? words.slice(1).join(' '));
+    });
     getBadgeSummary().then(setBadges);
   }, []));
+
+  async function saveName() {
+    // No profile yet (fresh install / skipped quiz)? Build one rather than
+    // dropping the edit on the floor.
+    const base: UserProfile = profile ?? {
+      id: user?.id ?? 'local',
+      name: '',
+      email: user?.email ?? '',
+      dietaryPrefs: [],
+      skillLevel: 'confident',
+      householdSize: 2,
+      preferMetric: false,
+      darkMode: false,
+    };
+    const updated = {
+      ...base,
+      name: firstInput.trim() || base.name,
+      lastName: lastInput.trim() || undefined,
+    };
+    setProfile(updated);
+    setEditingName(false);
+    await saveProfile(updated);
+    showToast('Name updated');
+  }
 
   async function handleNotificationsToggle(value: boolean) {
     if (value && Platform.OS !== 'web') {
       const granted = await requestNotificationPermission();
       if (!granted) {
-        Alert.alert(
-          'Permission required',
-          'Enable notifications in your device Settings to use this feature.',
-        );
+        showToast('Enable notifications in your device Settings first', 'info');
         return;
       }
     }
@@ -76,6 +112,28 @@ export default function SettingsScreen({ navigation }: Props) {
     const updated = { ...profile, householdSize: Math.max(1, profile.householdSize + delta) };
     setProfile(updated);
     await saveProfile(updated);
+  }
+
+  // Accessibility toggles apply immediately — no Save tap needed.
+  async function toggleAccessibility(key: 'largerText' | 'speakSteps', value: boolean) {
+    hapticLight();
+    const updated = { ...settings, [key]: value };
+    setSettings(updated);
+    await saveSettings(updated);
+  }
+
+  // The theme is baked into screen styles at startup, so flipping it needs a
+  // fresh boot: web reloads itself; native asks for a relaunch.
+  async function toggleDarkMode(value: boolean) {
+    hapticLight();
+    const updated = { ...settings, darkMode: value };
+    setSettings(updated);
+    await saveSettings(updated);
+    if (Platform.OS === 'web') {
+      (window as any).location.reload();
+    } else {
+      showToast('Close and reopen the app to apply');
+    }
   }
 
   function adjustHour(delta: number) {
@@ -99,29 +157,121 @@ export default function SettingsScreen({ navigation }: Props) {
       showToast('Settings saved');
       navigation.goBack();
     } catch {
-      Alert.alert('Error', 'Could not save settings. Please try again.');
+      showToast('Could not save settings. Please try again.', 'wifi');
     } finally {
       setSaving(false);
     }
   }
 
   function handleLogOut() {
-    Alert.alert('Log out', 'Your recipes stay synced to your account.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Log out', style: 'destructive',
-        onPress: async () => {
-          await signOut();
-          navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Welcome' }] }));
-        },
+    confirmSheet({
+      title: 'Log out',
+      message: 'Your recipes stay synced to your account.',
+      confirmLabel: 'Log out',
+      onConfirm: async () => {
+        await signOut();
+        navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Welcome' }] }));
       },
-    ]);
+    });
+  }
+
+  function handleDeleteAccount() {
+    confirmSheet({
+      title: 'Delete account?',
+      message: 'This permanently erases your account and all your recipes, plans and lists. This cannot be undone.',
+      confirmLabel: 'Delete account',
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteAccount();
+          showToast('Your account has been deleted');
+          navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Welcome' }] }));
+        } catch (e: any) {
+          showToast(e?.message ?? 'Could not delete your account', 'info');
+        }
+      },
+    });
   }
 
   const version = Constants.expoConfig?.version ?? '1.0.0';
 
+  const WATERMARKS = [
+    { emoji: '🍳', top: '6%', left: '5%', size: 52, rotate: '-18deg', opacity: 0.07 },
+    { emoji: '🥕', top: '3%', right: '8%', size: 44, rotate: '22deg', opacity: 0.08 },
+    { emoji: '🫙', top: '14%', left: '72%', size: 38, rotate: '-8deg', opacity: 0.07 },
+    { emoji: '🥑', top: '22%', left: '2%', size: 46, rotate: '30deg', opacity: 0.07 },
+    { emoji: '🍋', top: '18%', right: '3%', size: 40, rotate: '-25deg', opacity: 0.08 },
+    { emoji: '🧄', top: '31%', left: '60%', size: 50, rotate: '14deg', opacity: 0.07 },
+    { emoji: '🫐', top: '38%', left: '8%', size: 42, rotate: '-12deg', opacity: 0.07 },
+    { emoji: '🥩', top: '44%', right: '5%', size: 48, rotate: '20deg', opacity: 0.07 },
+    { emoji: '🥐', top: '52%', left: '3%', size: 44, rotate: '10deg', opacity: 0.08 },
+    { emoji: '🧅', top: '55%', left: '65%', size: 38, rotate: '-20deg', opacity: 0.07 },
+    { emoji: '🍅', top: '62%', right: '2%', size: 46, rotate: '28deg', opacity: 0.07 },
+    { emoji: '🥚', top: '68%', left: '6%', size: 40, rotate: '-15deg', opacity: 0.08 },
+    { emoji: '🧂', top: '72%', left: '55%', size: 42, rotate: '18deg', opacity: 0.07 },
+    { emoji: '🍯', top: '78%', right: '6%', size: 44, rotate: '-22deg', opacity: 0.07 },
+    { emoji: '🥦', top: '82%', left: '2%', size: 48, rotate: '12deg', opacity: 0.07 },
+    { emoji: '🍴', top: '88%', left: '68%', size: 36, rotate: '-8deg', opacity: 0.08 },
+    { emoji: '🫚', top: '93%', left: '10%', size: 42, rotate: '25deg', opacity: 0.07 },
+    { emoji: '🥣', top: '10%', left: '35%', size: 36, rotate: '-30deg', opacity: 0.06 },
+    { emoji: '🍄', top: '48%', left: '38%', size: 34, rotate: '16deg', opacity: 0.06 },
+    { emoji: '🧁', top: '76%', left: '30%', size: 40, rotate: '-10deg', opacity: 0.07 },
+    // 30 additional watermarks for density
+    { emoji: '🍕', top: '4%', left: '22%', size: 36, rotate: '15deg', opacity: 0.07 },
+    { emoji: '🫕', top: '7%', right: '20%', size: 40, rotate: '-5deg', opacity: 0.07 },
+    { emoji: '🍜', top: '11%', left: '50%', size: 44, rotate: '28deg', opacity: 0.07 },
+    { emoji: '🥗', top: '15%', left: '18%', size: 38, rotate: '-20deg', opacity: 0.07 },
+    { emoji: '🥜', top: '27%', left: '42%', size: 34, rotate: '-25deg', opacity: 0.07 },
+    { emoji: '🫛', top: '33%', right: '18%', size: 42, rotate: '18deg', opacity: 0.07 },
+    { emoji: '🥫', top: '36%', left: '22%', size: 38, rotate: '-12deg', opacity: 0.07 },
+    { emoji: '🧆', top: '41%', right: '26%', size: 40, rotate: '22deg', opacity: 0.07 },
+    { emoji: '🍇', top: '46%', left: '52%', size: 46, rotate: '-8deg', opacity: 0.07 },
+    { emoji: '🍊', top: '55%', right: '14%', size: 44, rotate: '-18deg', opacity: 0.07 },
+    { emoji: '🫑', top: '59%', left: '40%', size: 40, rotate: '20deg', opacity: 0.07 },
+    { emoji: '🌿', top: '64%', left: '12%', size: 46, rotate: '-10deg', opacity: 0.07 },
+    { emoji: '🍈', top: '67%', right: '22%', size: 38, rotate: '25deg', opacity: 0.07 },
+    { emoji: '🥘', top: '71%', left: '32%', size: 44, rotate: '-15deg', opacity: 0.07 },
+    { emoji: '🫘', top: '74%', right: '8%', size: 36, rotate: '8deg', opacity: 0.07 },
+    { emoji: '🌶️', top: '77%', left: '56%', size: 42, rotate: '-22deg', opacity: 0.07 },
+    { emoji: '🍌', top: '81%', left: '16%', size: 40, rotate: '18deg', opacity: 0.07 },
+    { emoji: '🧇', top: '84%', right: '16%', size: 38, rotate: '-12deg', opacity: 0.07 },
+    { emoji: '🧈', top: '86%', left: '38%', size: 34, rotate: '28deg', opacity: 0.07 },
+    { emoji: '🫒', top: '89%', left: '60%', size: 42, rotate: '-8deg', opacity: 0.07 },
+    { emoji: '🌽', top: '92%', right: '26%', size: 48, rotate: '15deg', opacity: 0.07 },
+    { emoji: '🥝', top: '95%', left: '26%', size: 36, rotate: '-20deg', opacity: 0.07 },
+    { emoji: '🫖', top: '1%', left: '54%', size: 40, rotate: '12deg', opacity: 0.07 },
+    { emoji: '🥥', top: '25%', left: '76%', size: 38, rotate: '-18deg', opacity: 0.07 },
+    { emoji: '🥬', top: '42%', left: '80%', size: 44, rotate: '22deg', opacity: 0.07 },
+    { emoji: '🍎', top: '60%', left: '76%', size: 42, rotate: '-10deg', opacity: 0.07 },
+    { emoji: '🫓', top: '78%', left: '74%', size: 36, rotate: '16deg', opacity: 0.07 },
+    { emoji: '🍋', top: '21%', left: '44%', size: 32, rotate: '-14deg', opacity: 0.06 },
+    { emoji: '🫐', top: '34%', left: '78%', size: 34, rotate: '20deg', opacity: 0.06 },
+    { emoji: '🧄', top: '57%', left: '16%', size: 30, rotate: '-28deg', opacity: 0.06 },
+  ];
+
   return (
     <View style={[styles.root, { paddingTop: insets.top + 6 }]}>
+      {/* Food watermarks */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        {WATERMARKS.map((w, i) => (
+          <Text
+            key={i}
+            style={[
+              styles.watermark,
+              {
+                top: w.top as any,
+                left: w.left as any,
+                right: w.right as any,
+                fontSize: w.size,
+                opacity: w.opacity,
+                transform: [{ rotate: w.rotate }],
+              },
+            ]}
+          >
+            {w.emoji}
+          </Text>
+        ))}
+      </View>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
@@ -143,12 +293,43 @@ export default function SettingsScreen({ navigation }: Props) {
         <View style={styles.card}>
           <View style={styles.row}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarTxt}>{(profile?.name?.[0] ?? user?.email?.[0] ?? '?').toUpperCase()}</Text>
+              <Text style={styles.avatarTxt}>{(firstInput?.[0] ?? user?.email?.[0] ?? '?').toUpperCase()}</Text>
             </View>
             <View style={styles.rowLeft}>
-              <Text style={styles.rowTitle}>{profile?.name || 'Cooking offline'}</Text>
+              {editingName ? (
+                <View style={styles.nameInputs}>
+                  <TextInput
+                    style={styles.nameInput}
+                    value={firstInput}
+                    onChangeText={setFirstInput}
+                    autoFocus
+                    returnKeyType="next"
+                    placeholder="First name"
+                    placeholderTextColor={Colors.ink3}
+                  />
+                  <TextInput
+                    style={styles.nameInput}
+                    value={lastInput}
+                    onChangeText={setLastInput}
+                    returnKeyType="done"
+                    onSubmitEditing={saveName}
+                    placeholder="Last name"
+                    placeholderTextColor={Colors.ink3}
+                  />
+                </View>
+              ) : (
+                <Text style={styles.rowTitle}>
+                  {[firstInput, lastInput].filter(Boolean).join(' ') || profile?.name || 'Cooking offline'}
+                </Text>
+              )}
               <Text style={styles.rowSub}>{user?.email ?? 'Recipes stored on this device only'}</Text>
             </View>
+            <TouchableOpacity
+              onPress={() => editingName ? saveName() : setEditingName(true)}
+              style={styles.editNameBtn}
+            >
+              <Icon name={editingName ? 'check' : 'pencil'} size={16} color={Colors.ink3} />
+            </TouchableOpacity>
           </View>
           <View style={styles.divider} />
           <TouchableOpacity style={styles.row} onPress={() => navigation.navigate('Badges')}>
@@ -180,6 +361,14 @@ export default function SettingsScreen({ navigation }: Props) {
               <View style={styles.divider} />
               <TouchableOpacity style={styles.row} onPress={handleLogOut}>
                 <Text style={[styles.rowTitle, { color: Colors.error }]}>Log out</Text>
+              </TouchableOpacity>
+              <View style={styles.divider} />
+              <TouchableOpacity style={styles.row} onPress={handleDeleteAccount}>
+                <View style={styles.rowLeft}>
+                  <Text style={[styles.rowTitle, { color: Colors.error }]}>Delete account</Text>
+                  <Text style={styles.rowSub}>Permanently erase your account and data</Text>
+                </View>
+                <Icon name="trash" size={18} color={Colors.error} />
               </TouchableOpacity>
             </>
           )}
@@ -216,6 +405,60 @@ export default function SettingsScreen({ navigation }: Props) {
                 <Icon name="plus" size={15} color={Colors.ink} />
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+
+        {/* Accessibility */}
+        <Text style={styles.sectionLabel}>Accessibility</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <View style={styles.accessIcon}>
+              <Icon name="textsize" size={19} color={Colors.accentDeep} />
+            </View>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>Larger text</Text>
+              <Text style={styles.rowSub}>Bigger step text in cooking mode</Text>
+            </View>
+            <Switch
+              value={settings.largerText}
+              onValueChange={v => toggleAccessibility('largerText', v)}
+              trackColor={{ false: Colors.line2, true: Colors.accent }}
+              thumbColor={Colors.surface}
+            />
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <View style={styles.accessIcon}>
+              <Icon name="soundwave" size={19} color={Colors.accentDeep} />
+            </View>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>Read steps aloud</Text>
+              <Text style={styles.rowSub}>Speak each step in cooking mode</Text>
+            </View>
+            <Switch
+              value={settings.speakSteps}
+              onValueChange={v => toggleAccessibility('speakSteps', v)}
+              trackColor={{ false: Colors.line2, true: Colors.accent }}
+              thumbColor={Colors.surface}
+            />
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <View style={styles.accessIcon}>
+              <Icon name="contrast" size={19} color={Colors.accentDeep} />
+            </View>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>Dark mode</Text>
+              <Text style={styles.rowSub}>
+                {Platform.OS === 'web' ? 'Easier on the eyes — reloads the app' : 'Applies after you reopen the app'}
+              </Text>
+            </View>
+            <Switch
+              value={settings.darkMode}
+              onValueChange={toggleDarkMode}
+              trackColor={{ false: Colors.line2, true: Colors.accent }}
+              thumbColor={Colors.surface}
+            />
           </View>
         </View>
 
@@ -328,6 +571,20 @@ export default function SettingsScreen({ navigation }: Props) {
             </View>
             <Icon name="fwd" size={18} color={Colors.ink3} />
           </TouchableOpacity>
+          <View style={styles.divider} />
+          <TouchableOpacity style={styles.row} onPress={openPrivacy}>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>Privacy Policy</Text>
+            </View>
+            <Icon name="fwd" size={18} color={Colors.ink3} />
+          </TouchableOpacity>
+          <View style={styles.divider} />
+          <TouchableOpacity style={styles.row} onPress={openTerms}>
+            <View style={styles.rowLeft}>
+              <Text style={styles.rowTitle}>Terms of Service</Text>
+            </View>
+            <Icon name="fwd" size={18} color={Colors.ink3} />
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
@@ -336,6 +593,7 @@ export default function SettingsScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.paper },
+  watermark: { position: 'absolute' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg, paddingBottom: 10,
@@ -375,9 +633,23 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
   },
   avatarTxt: { fontFamily: Fonts.uiBold, color: '#fff', fontSize: 16 },
+  nameInputs: { gap: 6, marginBottom: 2 },
+  nameInput: {
+    fontFamily: Fonts.uiSemiBold, fontSize: 15.5, color: Colors.ink,
+    borderBottomWidth: 1.5, borderBottomColor: Colors.accent,
+    paddingVertical: 2,
+    // The green underline is the focus affordance — suppress the browser's
+    // default black focus outline that react-native-web leaves on inputs.
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null),
+  },
+  editNameBtn: { padding: 8 },
   badgeCluster: { flexDirection: 'row', alignItems: 'center' },
   badgeOverlap: { marginLeft: -11 },
   premiumIcon: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.accentSoft,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  accessIcon: {
     width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.accentSoft,
     alignItems: 'center', justifyContent: 'center',
   },

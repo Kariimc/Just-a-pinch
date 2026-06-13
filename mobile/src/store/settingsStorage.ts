@@ -11,6 +11,12 @@ export interface AppSettings {
   subscriptionPlan: 'free' | 'trial';
   subscriptionBilling: 'monthly' | 'annual';
   trialStartedAt?: number;
+  // Accessibility — read by cooking mode.
+  largerText: boolean;   // bigger step text
+  speakSteps: boolean;   // read each step aloud (text-to-speech)
+  // Applied at startup (App.tsx flips the theme before screens load);
+  // changing it needs a reload — web reloads itself, native asks the user.
+  darkMode: boolean;
 }
 
 const DEFAULTS: AppSettings = {
@@ -19,6 +25,9 @@ const DEFAULTS: AppSettings = {
   notificationMinute: 0,
   subscriptionPlan: 'free',
   subscriptionBilling: 'annual',
+  largerText: false,
+  speakSteps: false,
+  darkMode: false,
 };
 
 export async function getSettings(): Promise<AppSettings> {

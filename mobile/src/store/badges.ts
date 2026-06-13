@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { IconName } from '../components/Icon';
 import { BadgeMetals } from '../theme';
-import { getRecipes, getMealPlan } from './storage';
+import { getRecipes, getMealPlan, setStorageMutationListener } from './storage';
+import { notifyBadgeUnlock } from '../lib/badgeUnlockBus';
 
 // Badges are device-local (no Supabase table): most progress is derived live
 // from recipe/plan data, so it follows the account wherever recipes sync.
@@ -132,7 +133,14 @@ const EARNED_KEY = '@jap_badges_earned';
 interface EarnedEntry {
   earnedAt: number;
   celebrated: boolean;
+  // Unlock panel shown. Entries written before the panel existed lack the
+  // field and are treated as already announced, so upgrades stay quiet.
+  notified?: boolean;
 }
+
+// Session guard: a recompute can run again before the AsyncStorage write
+// lands, and the panel must never pop twice for one badge.
+const announced = new Set<string>();
 
 async function readJson<T>(key: string, fallback: T): Promise<T> {
   try {
@@ -155,6 +163,7 @@ export async function bumpBadgeStat(stat: CumulativeStat, by = 1): Promise<void>
     counters[stat] = (counters[stat] ?? 0) + by;
     await writeJson(COUNTERS_KEY, counters);
   } catch { /* ignore */ }
+  scheduleBadgeCheck();
 }
 
 export async function getBadgeProgress(): Promise<BadgeProgress[]> {
@@ -188,7 +197,7 @@ export async function getBadgeProgress(): Promise<BadgeProgress[]> {
     // Once earned, always earned — deleting recipes never revokes a badge.
     const earned = !!earnedMap[def.id] || current >= def.target;
     if (earned && !earnedMap[def.id]) {
-      earnedMap[def.id] = { earnedAt: now, celebrated: false };
+      earnedMap[def.id] = { earnedAt: now, celebrated: false, notified: false };
       dirty = true;
     }
     const entry = earnedMap[def.id];
@@ -201,11 +210,37 @@ export async function getBadgeProgress(): Promise<BadgeProgress[]> {
     };
   });
 
+  // Announce fresh unlocks exactly once — pops the slide-in panel.
+  for (const b of all) {
+    const entry = earnedMap[b.id];
+    if (entry?.notified === false && !announced.has(b.id)) {
+      announced.add(b.id);
+      entry.notified = true;
+      dirty = true;
+      notifyBadgeUnlock(b);
+    }
+  }
+
   if (dirty) {
     try { await writeJson(EARNED_KEY, earnedMap); } catch { /* ignore */ }
   }
   return all;
 }
+
+// Debounced recompute so a badge earned mid-action pops its unlock panel
+// right away instead of waiting for the user to visit a badge surface.
+let checkTimer: ReturnType<typeof setTimeout> | null = null;
+export function scheduleBadgeCheck(): void {
+  if (checkTimer) clearTimeout(checkTimer);
+  checkTimer = setTimeout(() => {
+    checkTimer = null;
+    getBadgeProgress().catch(() => {});
+  }, 500);
+}
+
+// Recipe saves (covers imports, AI saves and cook finishes) and meal-plan
+// writes all advance derived stats — recheck after each.
+setStorageMutationListener(scheduleBadgeCheck);
 
 export async function markBadgesCelebrated(ids: string[]): Promise<void> {
   try {

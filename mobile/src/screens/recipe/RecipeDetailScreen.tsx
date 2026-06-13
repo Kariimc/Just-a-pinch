@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert,
-  ActionSheetIOS, Platform, Share,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Image,
+  Platform, Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -21,8 +21,10 @@ import Icon from '../../components/Icon';
 import Skeleton from '../../components/Skeleton';
 import AnimatedCheck from '../../components/AnimatedCheck';
 import { showToast } from '../../components/Toast';
+import { showActionSheet, confirmSheet } from '../../components/ActionSheet';
 import { Springs } from '../../theme/motion';
 import { hapticLight, hapticSuccess } from '../../lib/haptics';
+import { shareRecipe as shareToCommunity } from '../../lib/community';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RecipeDetail'>;
 type Tab = 'ingredients' | 'method' | 'nutrition';
@@ -34,6 +36,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [tab, setTab] = useState<Tab>('ingredients');
   const [servings, setServings] = useState(4);
+  const [authorName, setAuthorName] = useState('');
   const [unit, setUnit] = useState<Unit>('us');
   const [checkedIngr, setCheckedIngr] = useState<Set<string>>(new Set());
 
@@ -44,12 +47,17 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   const onScroll = useAnimatedScrollHandler(e => { scrollY.value = e.contentOffset.y; });
 
   // Hero parallax: scrolls at 45% speed, stretches past 1x on overscroll pull.
-  const heroStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: interpolate(scrollY.value, [-300, 0, 248], [-150, 0, 112], Extrapolation.CLAMP) },
-      { scale: interpolate(scrollY.value, [-300, 0], [2.2, 1], Extrapolation.CLAMP) },
-    ],
-  }));
+  // Scroll-driven transforms drift and jank on react-native-web, so the hero
+  // stays fixed there and the effect runs on native only.
+  const heroStyle = useAnimatedStyle(() => {
+    if (Platform.OS === 'web') return {};
+    return {
+      transform: [
+        { translateY: interpolate(scrollY.value, [-300, 0, 248], [-150, 0, 112], Extrapolation.CLAMP) },
+        { scale: interpolate(scrollY.value, [-300, 0], [2.2, 1], Extrapolation.CLAMP) },
+      ],
+    };
+  });
   const bookmarkStyle = useAnimatedStyle(() => ({ transform: [{ scale: bookmarkScale.value }] }));
   const servingsStyle = useAnimatedStyle(() => ({ transform: [{ scale: servingsScale.value }] }));
 
@@ -68,6 +76,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
         setServings(prev => (prev === 4 ? r.servings : prev));
       }
       if (p?.preferMetric) setUnit('metric');
+      if (p?.name) setAuthorName(p.name.split(' ')[0]);
     });
     return () => { active = false; };
   }, [recipeId]));
@@ -101,17 +110,16 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
 
   function confirmDelete() {
     if (!recipe) return;
-    Alert.alert('Delete recipe', `Delete "${recipe.title}" forever?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: async () => {
-          await deleteRecipe(recipe.id);
-          showToast('Recipe deleted', 'trash');
-          navigation.goBack();
-        },
+    confirmSheet({
+      title: 'Delete recipe',
+      message: `Delete "${recipe.title}" forever?`,
+      confirmLabel: 'Delete',
+      onConfirm: async () => {
+        await deleteRecipe(recipe.id);
+        showToast('Recipe deleted', 'trash');
+        navigation.goBack();
       },
-    ]);
+    });
   }
 
   async function shareRecipe() {
@@ -132,33 +140,37 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
     }
   }
 
+  function shareToJapCommunity() {
+    if (!recipe) return;
+    confirmSheet({
+      title: 'Share to Community',
+      message: `Share "${recipe.title}" with the Just a Pinch community? Anyone can see and save it.`,
+      confirmLabel: 'Share',
+      destructive: false,
+      onConfirm: async () => {
+        try {
+          await shareToCommunity(recipe, authorName || 'Anonymous');
+          showToast('Shared to the community!', 'people');
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : 'Could not share';
+          showToast(msg === 'Sign in to share recipes' ? 'Sign in to share recipes' : 'Could not share recipe', 'wifi');
+        }
+      },
+    });
+  }
+
   function openMenu() {
     if (!recipe) return;
-    const actions = [
-      { label: 'Edit recipe', fn: () => navigation.navigate('RecipeEditor', { recipeId: recipe.id }) },
-      { label: 'Add to meal plan', fn: () => navigation.navigate('AddToMealPlan', { recipeId: recipe.id }) },
-      { label: 'Share', fn: shareRecipe },
-      { label: 'Delete', fn: confirmDelete, destructive: true },
-    ];
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: ['Cancel', ...actions.map(a => a.label)],
-          cancelButtonIndex: 0,
-          destructiveButtonIndex: actions.findIndex(a => a.destructive) + 1,
-        },
-        idx => { if (idx > 0) actions[idx - 1].fn(); },
-      );
-    } else {
-      Alert.alert(recipe.title, undefined, [
-        ...actions.map(a => ({
-          text: a.label,
-          style: (a.destructive ? 'destructive' : 'default') as 'destructive' | 'default',
-          onPress: a.fn,
-        })),
-        { text: 'Cancel', style: 'cancel' as const },
-      ]);
-    }
+    showActionSheet({
+      title: recipe.title,
+      actions: [
+        { label: 'Edit recipe', onPress: () => navigation.navigate('RecipeEditor', { recipeId: recipe.id }) },
+        { label: 'Add to meal plan', onPress: () => navigation.navigate('AddToMealPlan', { recipeId: recipe.id }) },
+        { label: 'Share', onPress: shareRecipe },
+        { label: 'Share to Community', onPress: shareToJapCommunity },
+        { label: 'Delete', onPress: confirmDelete, destructive: true },
+      ],
+    });
   }
 
   if (!recipe) {
@@ -193,7 +205,19 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
         <Animated.View style={[{ height: 248 }, heroStyle]}>
           {recipe.imageUri
             ? <Image source={{ uri: recipe.imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-            : <FoodPlaceholder variant={recipe.imageColor as any} style={StyleSheet.absoluteFill} />}
+            : (
+              <TouchableOpacity
+                style={StyleSheet.absoluteFill}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('RecipeEditor', { recipeId: recipe.id })}
+              >
+                <FoodPlaceholder variant={recipe.imageColor as any} style={StyleSheet.absoluteFill} />
+                <View style={styles.addPhotoHint}>
+                  <Icon name="camera" size={16} color="rgba(255,255,255,0.9)" />
+                  <Text style={styles.addPhotoTxt}>Add a cover photo</Text>
+                </View>
+              </TouchableOpacity>
+            )}
         </Animated.View>
 
         <View style={styles.body}>
@@ -368,6 +392,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
           />
         </View>
       )}
+
     </View>
   );
 }
@@ -518,7 +543,15 @@ const styles = StyleSheet.create({
   stickyBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     padding: 12, paddingHorizontal: 18,
-    backgroundColor: 'rgba(250,246,239,0.96)',
+    backgroundColor: Colors.glassPaper,
     borderTopWidth: 1, borderTopColor: Colors.line,
   },
+
+  addPhotoHint: {
+    position: 'absolute', bottom: 12, alignSelf: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.38)', borderRadius: 20,
+    paddingHorizontal: 12, paddingVertical: 6,
+  },
+  addPhotoTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 13, color: 'rgba(255,255,255,0.9)' },
 });

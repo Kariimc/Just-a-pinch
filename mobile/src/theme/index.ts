@@ -1,5 +1,7 @@
 export const Colors = {
-  // Accents
+  // Accents — the single brand green. Every green in the app derives from
+  // this ramp (splash, icons, badges, confetti included); don't add others.
+  // Instacart's own greens are the one deliberate exception (partner brand).
   accent: '#2E9E57',
   accentDeep: '#1E7A41',
   accentSoft: '#E4F2E8',
@@ -29,7 +31,41 @@ export const Colors = {
   instacart: '#0AAD0A',
   white: '#FFFFFF',
   transparent: 'transparent',
+
+  // Translucent bars (tab bar, sticky CTAs) — flipped by applyDarkTheme.
+  glass: 'rgba(255,255,255,0.92)',
+  glassPaper: 'rgba(250,246,239,0.96)',
+
+  // Set true by applyDarkTheme; lets render-time code (status bar) branch.
+  isDark: false,
 };
+
+// Flips the shared Colors object to the dark ramp, in place. Screens build
+// their StyleSheets from Colors at module-import time, so this MUST run
+// before any screen module loads — App.tsx reads the setting and calls this
+// before lazy-importing Root. Toggling later therefore needs an app reload
+// (web: location.reload(); native: relaunch).
+export function applyDarkTheme() {
+  Object.assign(Colors, {
+    isDark: true,
+    paper: Colors.darkPaper,
+    surface: Colors.darkSurface,
+    surface2: Colors.darkSurface2,
+    ink: Colors.darkInk,
+    ink2: Colors.darkInk2,
+    ink3: Colors.darkInk3,
+    line: Colors.darkLine,
+    line2: Colors.darkLine2,
+    // Greens tuned for dark paper: brighter link/icon green, deep soft wash,
+    // pale green ink so accentSoft chips stay readable.
+    accentDeep: '#5BBF82',
+    accentSoft: '#1F3A2A',
+    accentInk: '#A8DDBC',
+    error: '#E06A6A',
+    glass: 'rgba(28,24,18,0.94)',
+    glassPaper: 'rgba(21,18,13,0.96)',
+  });
+}
 
 // Font family names as loaded by expo-font
 export const Fonts = {

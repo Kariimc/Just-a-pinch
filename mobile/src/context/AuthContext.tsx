@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { Alert } from 'react-native';
 import * as Linking from 'expo-linking';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { handleAuthLink } from '../lib/authRedirect';
+import { showToast } from '../components/Toast';
 import { resetToMain } from '../navigation/navigationRef';
+import { setSentryUser } from '../lib/sentry';
 
 interface AuthContextType {
   user: User | null;
@@ -34,11 +35,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
+      setSentryUser(session?.user?.id ?? null);
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+      setSentryUser(session?.user?.id ?? null);
       if (event === 'PASSWORD_RECOVERY') setRecovering(true);
     });
 
@@ -55,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (result === 'recovery') setRecovering(true);
         else if (result === 'signin') resetToMain();
       } catch (e: any) {
-        Alert.alert('Link expired', e?.message ?? 'That link is no longer valid. Request a new one.');
+        showToast(e?.message ?? 'That link is no longer valid. Request a new one.', 'info');
       }
     }
     Linking.getInitialURL().then(process);

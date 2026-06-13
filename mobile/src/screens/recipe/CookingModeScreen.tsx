@@ -4,9 +4,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInRight, FadeInLeft, FadeOut } from 'react-native-reanimated';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useKeepAwake } from 'expo-keep-awake';
+import * as Speech from 'expo-speech';
 import { RootStackParamList, Recipe, Step } from '../../types';
 import { Colors, Radius, Fonts } from '../../theme';
 import { getRecipe, saveRecipe } from '../../store/storage';
+import { getSettings, saveSettings } from '../../store/settingsStorage';
 import { hapticStep, hapticSuccess } from '../../lib/haptics';
 import { scheduleTimerNotification, cancelTimerNotification } from '../../lib/notifications';
 import Icon from '../../components/Icon';
@@ -34,12 +36,35 @@ export default function CookingModeScreen({ route, navigation }: Props) {
   const [showIngr, setShowIngr] = useState(false);
   const [timers, setTimers] = useState<TimerState[]>([]);
   const [checkedIngr, setCheckedIngr] = useState<Set<string>>(new Set());
+  const [largerText, setLargerText] = useState(false);
+  const [speakOn, setSpeakOn] = useState(false);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dirRef = useRef<1 | -1>(1);  // which side the next step slides in from
 
   useEffect(() => {
     getRecipe(recipeId).then(r => { if (r) setRecipe(r); });
+    getSettings().then(s => { setLargerText(s.largerText); setSpeakOn(s.speakSteps); });
   }, [recipeId]);
+
+  // Read the current step aloud whenever it changes (and on entry) while the
+  // voice toggle is on; always cut any ongoing speech first so steps never
+  // overlap. Silence everything on exit.
+  useEffect(() => {
+    Speech.stop();
+    const text = recipe?.steps[stepIndex]?.text;
+    if (speakOn && text) {
+      Speech.speak(`Step ${stepIndex + 1}. ${text}`, { rate: 0.95 });
+    }
+  }, [speakOn, stepIndex, recipe]);
+  useEffect(() => () => { Speech.stop(); }, []);
+
+  async function toggleSpeak() {
+    hapticStep();
+    const next = !speakOn;
+    setSpeakOn(next);  // the effect above speaks/stops accordingly
+    const s = await getSettings();
+    await saveSettings({ ...s, speakSteps: next });
+  }
 
   useEffect(() => {
     tickRef.current = setInterval(() => {
@@ -131,9 +156,18 @@ export default function CookingModeScreen({ route, navigation }: Props) {
         <View style={styles.stepPill}>
           <Text style={styles.stepPillTxt}>Step {stepIndex + 1} of {steps.length}</Text>
         </View>
-        <TouchableOpacity style={styles.ctrlBtn} onPress={() => setShowIngr(true)}>
-          <Icon name="list" size={20} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={[styles.ctrlBtn, speakOn && styles.ctrlBtnOn]}
+            onPress={toggleSpeak}
+            accessibilityLabel={speakOn ? 'Stop reading steps aloud' : 'Read steps aloud'}
+          >
+            <Icon name="soundwave" size={20} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.ctrlBtn} onPress={() => setShowIngr(true)}>
+            <Icon name="list" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Progress dots */}
@@ -150,7 +184,7 @@ export default function CookingModeScreen({ route, navigation }: Props) {
           entering={(dirRef.current === 1 ? FadeInRight : FadeInLeft).duration(280)}
           exiting={FadeOut.duration(120)}
         >
-          <Text style={styles.stepText}>{current?.text}</Text>
+          <Text style={[styles.stepText, largerText && styles.stepTextLarge]}>{current?.text}</Text>
           {current?.timerSeconds ? (
             <TouchableOpacity style={styles.timerBtn} onPress={() => startTimer(current)}>
               <Icon name="timer" size={18} color="#fff" />
@@ -233,6 +267,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#13110C' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 22 },
   ctrlBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
+  ctrlBtnOn: { backgroundColor: Colors.accent },
+  headerRight: { flexDirection: 'row', gap: 8 },
   stepPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99 },
   stepPillTxt: { fontFamily: Fonts.uiBold, fontSize: 13, color: '#fff' },
   dots: { flexDirection: 'row', gap: 6, paddingHorizontal: 22, marginTop: 18 },
@@ -240,6 +276,7 @@ const styles = StyleSheet.create({
   body: { flex: 1, paddingHorizontal: 26 },
   bodyContent: { flexGrow: 1, justifyContent: 'center', paddingVertical: 24 },
   stepText: { fontFamily: Fonts.displayMedium, fontSize: 34, color: '#fff', lineHeight: 43 },
+  stepTextLarge: { fontSize: 44, lineHeight: 56 },
   timerBtn: { marginTop: 24, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: Colors.accent, paddingHorizontal: 18, paddingVertical: 13, borderRadius: 99 },
   timerBtnTxt: { fontFamily: Fonts.uiBold, color: '#fff', fontSize: 16 },
   activeTimers: { marginTop: 16, gap: 8 },

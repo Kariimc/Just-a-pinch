@@ -26,10 +26,12 @@ export default function RecipeCard({ recipe, onPress, variant = 'grid' }: Props)
     );
   }
 
-  // Horizontal card: 215px wide, used in "What's for dinner" scroller
+  // Horizontal card: 215px wide, used in "What's for dinner" scroller.
+  // Shadow.card, not cardSoft — the 18px drop of cardSoft gets sliced by the
+  // horizontal scroller's vertical clipping and reads as a hard dark edge.
   if (variant === 'horizontal') {
     return (
-      <Tappable style={[styles.hCard, Shadow.cardSoft]} onPress={onPress}>
+      <Tappable style={[styles.hCard, Shadow.card]} onPress={onPress}>
         {recipe.imageUri
           ? <Image source={{ uri: recipe.imageUri }} style={styles.hImage} />
           : <FoodPlaceholder variant={recipe.imageColor as any} style={styles.hImage} />}

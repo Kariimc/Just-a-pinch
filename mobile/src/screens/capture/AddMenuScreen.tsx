@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, TextInput,
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ActionSheetIOS,
+  ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -13,6 +13,7 @@ import { uid } from '../../utils/id';
 import BottomSheet from '../../components/BottomSheet';
 import Icon, { IconName } from '../../components/Icon';
 import { hapticSuccess } from '../../lib/haptics';
+import { showToast } from '../../components/Toast';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddMenu'>;
 
@@ -32,6 +33,22 @@ export default function AddMenuScreen({ navigation }: Props) {
   const [pastedText, setPastedText] = useState('');
   const [importing, setImporting] = useState(false);
   const [importStep, setImportStep] = useState<string[]>([]);
+  const [ocrChooser, setOcrChooser] = useState(false);
+
+  // Routes a server quota response to the paywall; otherwise toasts the message.
+  function handleCaptureError(e: any, fallback: string) {
+    setImporting(false);
+    if (e?.code === 'ai_limit') {
+      showToast("You've hit your free AI limit this month", 'sparkle');
+      (navigation as any).navigate('Paywall', { source: 'settings' });
+      return;
+    }
+    if (e?.code === 'auth_required') {
+      showToast(e?.message ?? 'Create a free account to use AI', 'info');
+      return;
+    }
+    showToast(e?.message ?? fallback, 'wifi');
+  }
 
   async function handleImportUrl() {
     if (!url.trim()) return;
@@ -54,13 +71,10 @@ export default function AddMenuScreen({ navigation }: Props) {
       await saveRecipe(recipe);
       hapticSuccess();
       setImporting(false);
-      Alert.alert('Saved!', `"${recipe.title}" is in your library.`, [
-        { text: 'View recipe', onPress: () => navigation.navigate('RecipeDetail', { recipeId: recipe.id }) },
-        { text: 'Done', onPress: () => navigation.goBack() },
-      ]);
+      showToast(`"${recipe.title}" saved to your library`);
+      navigation.navigate('RecipeDetail', { recipeId: recipe.id });
     } catch (e: any) {
-      setImporting(false);
-      Alert.alert('Import failed', e.message ?? 'Could not read that recipe. Try a different link.');
+      handleCaptureError(e, 'Could not read that recipe. Try a different link.');
     }
   }
 
@@ -74,7 +88,7 @@ export default function AddMenuScreen({ navigation }: Props) {
       setImportStep(prev => [...prev, 'Building recipe…']);
       const recipe: Recipe = {
         id: uid(), title: data.title ?? 'Pasted recipe', description: data.description,
-        imageColor: 'greens', servings: data.servings ?? 4,
+        imageUri: data.imageUrl, imageColor: 'greens', servings: data.servings ?? 4,
         prepMinutes: data.prepMinutes ?? 15, cookMinutes: data.cookMinutes ?? 30,
         ingredients: (data.ingredients ?? []).map(i => ({ ...i, id: uid(), checked: false })),
         steps: (data.steps ?? []).map((s, idx) => ({ ...s, id: uid(), number: s.number ?? idx + 1 })),
@@ -85,29 +99,29 @@ export default function AddMenuScreen({ navigation }: Props) {
       await saveRecipe(recipe);
       hapticSuccess();
       setImporting(false);
-      Alert.alert('Saved!', `"${recipe.title}" is in your library.`, [
-        { text: 'View & edit', onPress: () => navigation.navigate('RecipeEditor', { recipeId: recipe.id }) },
-        { text: 'Done', onPress: () => navigation.goBack() },
-      ]);
+      showToast(`"${recipe.title}" saved to your library`);
+      navigation.navigate('RecipeEditor', { recipeId: recipe.id });
     } catch (e: any) {
-      setImporting(false);
-      Alert.alert('Import failed', e.message ?? "Couldn't parse that text. Try cleaning it up.");
+      handleCaptureError(e, "Couldn't parse that text. Try cleaning it up.");
     }
   }
 
   async function launchOCR(useCamera: boolean) {
+    setOcrChooser(false);
+    setSheetVisible(false);
     const perm = useCamera
       ? await ImagePicker.requestCameraPermissionsAsync()
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) { Alert.alert('Permission needed', 'Please allow access in Settings.'); return; }
+    if (!perm.granted) { showToast('Please allow access in Settings.', 'wifi'); setSheetVisible(true); return; }
 
     const result = useCamera
       ? await ImagePicker.launchCameraAsync({ allowsEditing: true, quality: 0.7, base64: true })
       : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, quality: 0.7, base64: true });
 
-    if (result.canceled || !result.assets[0]) return;
+    // Backed out of the picker — bring the menu back instead of a blank screen.
+    if (result.canceled || !result.assets[0]) { setSheetVisible(true); return; }
     const base64 = result.assets[0].base64;
-    if (!base64) { Alert.alert('Could not read image'); return; }
+    if (!base64) { showToast('Could not read image', 'wifi'); return; }
 
     setImporting(true);
     setImportStep(['Reading image…']);
@@ -117,7 +131,7 @@ export default function AddMenuScreen({ navigation }: Props) {
       setImportStep(prev => [...prev, 'Building recipe…']);
       const recipe: Recipe = {
         id: uid(), title: data.title ?? 'Scanned recipe', description: data.description,
-        imageColor: 'cream', servings: data.servings ?? 4,
+        imageUri: data.imageUrl, imageColor: 'cream', servings: data.servings ?? 4,
         prepMinutes: data.prepMinutes ?? 15, cookMinutes: data.cookMinutes ?? 30,
         ingredients: (data.ingredients ?? []).map(i => ({ ...i, id: uid(), checked: false })),
         steps: (data.steps ?? []).map((s, idx) => ({ ...s, id: uid(), number: s.number ?? idx + 1 })),
@@ -128,39 +142,30 @@ export default function AddMenuScreen({ navigation }: Props) {
       await saveRecipe(recipe);
       hapticSuccess();
       setImporting(false);
-      Alert.alert('Scanned!', `"${recipe.title}" is in your library.`, [
-        { text: 'View & edit', onPress: () => navigation.navigate('RecipeEditor', { recipeId: recipe.id }) },
-        { text: 'Done', onPress: () => navigation.goBack() },
-      ]);
-    } catch {
-      setImporting(false);
-      Alert.alert('Scan failed', 'Could not read that photo. Try a clearer image.');
+      showToast(`"${recipe.title}" saved to your library`);
+      navigation.navigate('RecipeEditor', { recipeId: recipe.id });
+    } catch (e: any) {
+      handleCaptureError(e, 'Could not read that photo. Try a clearer image.');
     }
   }
 
+  // No camera on web — straight to the file picker. On native the menu sheet
+  // swaps to an in-sheet chooser (no system dialogs anywhere in the app).
   function handleOCRTap() {
-    setSheetVisible(false);
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['Cancel', 'Take Photo', 'Choose from Library'], cancelButtonIndex: 0 },
-        idx => { if (idx === 0) { setSheetVisible(true); return; } launchOCR(idx === 1); }
-      );
-    } else {
-      Alert.alert('Scan recipe', undefined, [
-        { text: 'Take Photo', onPress: () => launchOCR(true) },
-        { text: 'Choose from Library', onPress: () => launchOCR(false) },
-        { text: 'Cancel', style: 'cancel', onPress: () => setSheetVisible(true) },
-      ]);
+    if (Platform.OS === 'web') {
+      launchOCR(false);
+      return;
     }
+    setOcrChooser(true);
   }
 
   function handleMenuItem(key: string) {
+    if (key === 'ocr') { handleOCRTap(); return; }
     setSheetVisible(false);
     if (key === 'url') setUrlMode(true);
     else if (key === 'text') setTextMode(true);
     else if (key === 'ai') (navigation as any).navigate('AIGenerator');
     else if (key === 'manual') (navigation as any).navigate('RecipeEditor');
-    else if (key === 'ocr') handleOCRTap();
   }
 
   // Import progress
@@ -259,19 +264,52 @@ export default function AddMenuScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
       <BottomSheet visible={sheetVisible} onClose={() => navigation.goBack()}>
-        <Text style={styles.sheetTitle}>Add a recipe</Text>
-        {MENU_ITEMS.map(item => (
-          <TouchableOpacity key={item.key} style={styles.menuRow} onPress={() => handleMenuItem(item.key)}>
-            <View style={[styles.menuIconWrap, item.ai && styles.menuIconWrapAI]}>
-              <Icon name={item.icon} size={22} color={item.ai ? '#fff' : Colors.ink2} />
+        {ocrChooser ? (
+          <>
+            <View style={styles.chooserHeader}>
+              <TouchableOpacity onPress={() => setOcrChooser(false)} hitSlop={12}>
+                <Icon name="back" size={20} color={Colors.ink} />
+              </TouchableOpacity>
+              <Text style={styles.sheetTitle}>Scan a recipe</Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.menuTitle}>{item.title}</Text>
-              <Text style={styles.menuSub}>{item.sub}</Text>
-            </View>
-            <Icon name="fwd" size={20} color={Colors.ink3} />
-          </TouchableOpacity>
-        ))}
+            <TouchableOpacity style={styles.menuRow} onPress={() => launchOCR(true)}>
+              <View style={styles.menuIconWrap}>
+                <Icon name="camera" size={22} color={Colors.ink2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.menuTitle}>Take a photo</Text>
+                <Text style={styles.menuSub}>Point at a recipe card or cookbook page</Text>
+              </View>
+              <Icon name="fwd" size={20} color={Colors.ink3} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuRow} onPress={() => launchOCR(false)}>
+              <View style={styles.menuIconWrap}>
+                <Icon name="grid" size={22} color={Colors.ink2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.menuTitle}>Choose from library</Text>
+                <Text style={styles.menuSub}>Pick a photo you already took</Text>
+              </View>
+              <Icon name="fwd" size={20} color={Colors.ink3} />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Text style={styles.sheetTitle}>Add a recipe</Text>
+            {MENU_ITEMS.map(item => (
+              <TouchableOpacity key={item.key} style={styles.menuRow} onPress={() => handleMenuItem(item.key)}>
+                <View style={[styles.menuIconWrap, item.ai && styles.menuIconWrapAI]}>
+                  <Icon name={item.icon} size={22} color={item.ai ? '#fff' : Colors.ink2} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.menuTitle}>{item.title}</Text>
+                  <Text style={styles.menuSub}>{item.sub}</Text>
+                </View>
+                <Icon name="fwd" size={20} color={Colors.ink3} />
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
       </BottomSheet>
     </View>
   );
@@ -280,6 +318,7 @@ export default function AddMenuScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: 'transparent' },
   sheetTitle: { fontFamily: Fonts.uiBold, fontSize: 19, color: Colors.ink, marginBottom: 6 },
+  chooserHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   menuRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.line,
