@@ -24,6 +24,35 @@ RevenueCat project: `Just A Pinch` (project id `projadf9ee76`)
 
 ---
 
+## ⚠️ BRANCH DIVERGENCE — read first (decision pending)
+
+Builds (EAS / GitHub Actions) come from **`main`**, but `main` has
+`revenueCatApiKeyAndroid: ""` (empty) — so any build from `main` CANNOT do
+Android purchases yet. This session's work (the key + dead-code cleanup +
+community feature) lives on **`claude/cool-mccarthy-okwf7q`**, which diverged
+from `main` at `bdf09ea`.
+
+The two branches independently built overlapping things (Sentry, privacy page,
+the paywall code), so they are NOT clean supersets of each other:
+
+| | `main` (build source) | `claude/cool-mccarthy-okwf7q` |
+|---|---|---|
+| RevenueCat Android key | empty | set |
+| Dead-code cleanup | no | yes |
+| Community feature | missing | present |
+| GitHub Actions build workflow (#30) | yes | no |
+| Sentry Gradle 8 build fix (#31) | yes | no |
+
+**To get a key-enabled Android build, the key must land on `main`.** Two paths:
+- **Minimal:** branch off `main`, add just the one-line key, PR → merge. Fast,
+  no conflicts. (Decided to defer for now.)
+- **Full reconcile:** merge the session branch into `main` — conflict-heavy
+  (both sides built Sentry/privacy/paywall separately); needs careful review.
+
+Status: **deferred** — revisit before the next Android build.
+
+---
+
 ## ⏳ Resolving on its own (no action needed)
 
 - [ ] RevenueCat "Credentials need attention" on the Play Store app.
