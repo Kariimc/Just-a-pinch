@@ -40,6 +40,7 @@ import SettingsScreen from '../screens/settings/SettingsScreen';
 import BadgesScreen from '../screens/settings/BadgesScreen';
 import PaywallScreen from '../screens/paywall/PaywallScreen';
 import ResetPasswordScreen from '../screens/auth/ResetPasswordScreen';
+import CommunityScreen from '../screens/community/CommunityScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator();
@@ -218,6 +219,7 @@ function Navigator() {
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="Badges" component={BadgesScreen} />
       <Stack.Screen name="Paywall" component={PaywallScreen} />
+      <Stack.Screen name="Community" component={CommunityScreen} />
     </Stack.Navigator>
   );
 }
@@ -225,7 +227,9 @@ function Navigator() {
 export default function AppNavigator() {
   return (
     <AuthProvider>
-      <NavigationContainer ref={navigationRef}>
+      {/* linking must be explicitly disabled: with no config, tab buttons on web
+          still get hrefs like /Main/Recipes that escape the GitHub Pages base path */}
+      <NavigationContainer ref={navigationRef} linking={{ enabled: false, prefixes: [] }}>
         <Navigator />
       </NavigationContainer>
     </AuthProvider>
@@ -234,7 +238,7 @@ export default function AppNavigator() {
 
 const styles = StyleSheet.create({
   tabbar: {
-    backgroundColor: 'rgba(255,255,255,0.92)',
+    backgroundColor: Colors.glass,
     borderTopWidth: 1,
     borderTopColor: Colors.line,
     paddingTop: 9,

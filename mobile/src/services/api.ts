@@ -20,18 +20,31 @@ interface ImportResult {
   nutrition?: NutritionInfo;
 }
 
+// Carries the server's machine-readable `code` (e.g. 'ai_limit', 'auth_required')
+// alongside the human message, so screens can route a quota hit to the paywall.
+export class RecipeApiError extends Error {
+  code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'RecipeApiError';
+    this.code = code;
+  }
+}
+
 async function invokeRecipeApi<T>(payload: Record<string, unknown>, fallbackError: string): Promise<T> {
   const { data, error } = await supabase.functions.invoke('recipe-api', { body: payload });
   if (error) {
-    // FunctionsHttpError carries the server response — surface its message.
+    // FunctionsHttpError carries the server response — surface its message + code.
     let message = fallbackError;
+    let code: string | undefined;
     try {
       const ctx = await (error as { context?: Response }).context?.json();
       if (ctx?.error) message = String(ctx.error);
+      if (ctx?.code) code = String(ctx.code);
     } catch { /* keep fallback */ }
-    throw new Error(message);
+    throw new RecipeApiError(message, code);
   }
-  if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+  if ((data as { error?: string })?.error) throw new RecipeApiError((data as { error: string }).error);
   return data as T;
 }
 
@@ -49,4 +62,18 @@ export async function ocrImage(base64: string): Promise<Partial<ImportResult>> {
 
 export async function parseTextRecipe(text: string): Promise<Partial<ImportResult>> {
   return invokeRecipeApi<Partial<ImportResult>>({ action: 'parseText', text }, 'Parse failed');
+}
+
+// Creates an Instacart shopping-list page from the items and returns its URL.
+// Opening it lands the user in the Instacart app/site with every item matched
+// to real products, one tap from the cart.
+export async function createInstacartLink(
+  items: Array<{ name: string; quantity?: string; unit?: string }>,
+  title?: string,
+): Promise<string> {
+  const { url } = await invokeRecipeApi<{ url: string }>(
+    { action: 'instacartLink', items, title },
+    'Could not build the Instacart cart',
+  );
+  return url;
 }

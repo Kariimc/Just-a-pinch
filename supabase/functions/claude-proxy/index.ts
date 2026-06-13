@@ -14,7 +14,22 @@ serve(async (req) => {
   }
 
   try {
-    const { system, user } = await req.json();
+    const { system, user, imageBase64, imageMediaType } = await req.json();
+
+    // When an image is supplied (recipe card OCR), send it as a vision block.
+    const content = imageBase64
+      ? [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: imageMediaType ?? 'image/jpeg',
+              data: imageBase64,
+            },
+          },
+          { type: 'text', text: user ?? 'Extract the recipe from this image.' },
+        ]
+      : user;
 
     const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -25,9 +40,9 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 2048,
+        max_tokens: 4096,
         system,
-        messages: [{ role: 'user', content: user }],
+        messages: [{ role: 'user', content }],
       }),
     });
 
@@ -40,9 +55,9 @@ serve(async (req) => {
     }
 
     const data = await anthropicRes.json();
-    const content = data.content?.[0]?.text ?? '';
+    const content_out = data.content?.[0]?.text ?? '';
 
-    return new Response(JSON.stringify({ content }), {
+    return new Response(JSON.stringify({ content: content_out }), {
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
   } catch (err) {

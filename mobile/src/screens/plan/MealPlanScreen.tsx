@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,6 +16,7 @@ import BottomSheet from '../../components/BottomSheet';
 import EmptyState from '../../components/EmptyState';
 import Icon from '../../components/Icon';
 import { showToast } from '../../components/Toast';
+import { showActionSheet } from '../../components/ActionSheet';
 import { hapticLight, hapticSuccess } from '../../lib/haptics';
 
 const MEAL_TYPES: MealPlanEntry['mealType'][] = ['breakfast', 'lunch', 'dinner'];
@@ -28,6 +29,7 @@ export default function MealPlanScreen() {
 
   const [entries, setEntries] = useState<MealPlanEntry[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(new Date());
   const [defaultServings, setDefaultServings] = useState(2);
 
@@ -46,6 +48,7 @@ export default function MealPlanScreen() {
     setEntries(e);
     setRecipes(r);
     if (p?.householdSize) setDefaultServings(p.householdSize);
+    setLoading(false);
   }
 
   useFocusEffect(useCallback(() => { load(); }, []));
@@ -78,6 +81,26 @@ export default function MealPlanScreen() {
     setPickerServings(defaultServings);
     setPickerDay(selectedDay);
     setPickerVisible(true);
+  }
+
+  // The ⋮ on a planned meal (and a long-press anywhere on the card).
+  function openEntryMenu(entry: MealPlanEntry, recipe: Recipe) {
+    hapticLight();
+    showActionSheet({
+      title: recipe.title,
+      actions: [
+        { label: 'View recipe', onPress: () => navigation.navigate('RecipeDetail', { recipeId: recipe.id }) },
+        {
+          label: `Remove from ${entry.mealType}`,
+          destructive: true,
+          onPress: async () => {
+            await deleteMealEntry(entry.id);
+            await load();
+            showToast('Removed from plan', 'trash');
+          },
+        },
+      ],
+    });
   }
 
   async function confirmAdd() {
@@ -228,16 +251,7 @@ export default function MealPlanScreen() {
                 <TouchableOpacity
                   style={styles.mealCard}
                   onPress={() => navigation.navigate('RecipeDetail', { recipeId: recipe.id })}
-                  onLongPress={() => {
-                    Alert.alert('Remove', `Remove ${recipe.title} from ${mealType}?`, [
-                      { text: 'Cancel' },
-                      { text: 'Remove', style: 'destructive', onPress: async () => {
-                        await deleteMealEntry(entry!.id);
-                        await load();
-                        showToast('Removed from plan', 'trash');
-                      }},
-                    ]);
-                  }}
+                  onLongPress={() => openEntryMenu(entry!, recipe)}
                 >
                   {recipe.imageUri
                     ? <Image source={{ uri: recipe.imageUri }} style={styles.mealThumb} />
@@ -246,7 +260,9 @@ export default function MealPlanScreen() {
                     <Text style={styles.mealTitle} numberOfLines={1}>{recipe.title}</Text>
                     <Text style={styles.mealSub}>{formatTime(recipe.prepMinutes + recipe.cookMinutes)} · serves {entry?.servings}</Text>
                   </View>
-                  <Icon name="moreV" size={20} color={Colors.ink3} />
+                  <TouchableOpacity onPress={() => openEntryMenu(entry!, recipe)} hitSlop={12}>
+                    <Icon name="moreV" size={20} color={Colors.ink3} />
+                  </TouchableOpacity>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity style={styles.emptySlot} onPress={() => openPickerForSlot(mealType)}>
@@ -257,7 +273,9 @@ export default function MealPlanScreen() {
           );
         })}
 
-        {recipes.length === 0 && (
+        {/* Only after loading — otherwise the CTA flashes during the fetch
+            and vanishes once recipes arrive. */}
+        {!loading && recipes.length === 0 && (
           <EmptyState
             icon="calendar"
             title="Plan your week"

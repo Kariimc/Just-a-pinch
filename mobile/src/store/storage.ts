@@ -37,6 +37,13 @@ async function authed(): Promise<boolean> {
   return !!session;
 }
 
+// Fires after writes that can advance badge progress. badges.ts registers the
+// sole listener at module init; a callback keeps the dependency one-way.
+let onMutation: (() => void) | null = null;
+export function setStorageMutationListener(cb: (() => void) | null): void {
+  onMutation = cb;
+}
+
 // ── Recipes ──────────────────────────────────────────────────────────────────
 
 export async function getRecipes(): Promise<Recipe[]> {
@@ -66,14 +73,16 @@ export async function getRecipe(id: string): Promise<Recipe | null> {
 }
 
 export async function saveRecipe(recipe: Recipe): Promise<void> {
-  if (await authed()) {
-    try { await dbSaveRecipe(recipe); } catch { /* fall through to local */ }
-  }
+  // Skip the getSession() check — getSession() can return null on web before
+  // the SDK hydrates from localStorage, even when the user is authenticated.
+  // dbSaveRecipe calls getUser() (server-authoritative) and throws if not auth'd.
+  try { await dbSaveRecipe(recipe); } catch { /* not signed in or offline */ }
   const all = (await get<Recipe[]>(KEYS.recipes)) ?? [];
   const idx = all.findIndex(r => r.id === recipe.id);
   if (idx >= 0) all[idx] = recipe;
   else all.unshift(recipe);
   await set(KEYS.recipes, all);
+  onMutation?.();
 }
 
 export async function deleteRecipe(id: string): Promise<void> {
@@ -119,14 +128,13 @@ export async function getMealPlan(): Promise<MealPlanEntry[]> {
 }
 
 export async function saveMealEntry(entry: MealPlanEntry): Promise<void> {
-  if (await authed()) {
-    try { await dbSaveMealEntry(entry); } catch { /* fall through */ }
-  }
+  try { await dbSaveMealEntry(entry); } catch { /* not signed in or offline */ }
   const all = (await get<MealPlanEntry[]>(KEYS.mealPlan)) ?? [];
   const idx = all.findIndex(e => e.id === entry.id);
   if (idx >= 0) all[idx] = entry;
   else all.push(entry);
   await set(KEYS.mealPlan, all);
+  onMutation?.();
 }
 
 export async function deleteMealEntry(id: string): Promise<void> {
@@ -153,9 +161,7 @@ export async function getShoppingItems(): Promise<ShoppingItem[]> {
 }
 
 export async function saveShoppingItems(items: ShoppingItem[]): Promise<void> {
-  if (await authed()) {
-    try { await dbSaveShoppingItems(items); } catch { /* fall through */ }
-  }
+  try { await dbSaveShoppingItems(items); } catch { /* not signed in or offline */ }
   await set(KEYS.shopping, items);
 }
 
@@ -184,17 +190,30 @@ export async function savePantryItems(items: PantryItem[]): Promise<void> {
 // Fill missing name/email from the auth user. Covers accounts that confirmed
 // email and logged in without ever running the quiz (no profile row), and
 // rows saved before the name was captured — so greetings never come up blank.
+// Legacy rows hold "First Last" in `name` (signup metadata) with no lastName —
+// split it so the family-cookbook cover gets a surname without re-entry.
+function splitLegacyName(p: UserProfile): UserProfile {
+  const n = p.name?.trim() ?? '';
+  if (p.lastName?.trim() || !n.includes(' ')) return p;
+  const words = n.split(/\s+/);
+  return { ...p, name: words[0], lastName: words.slice(1).join(' ') };
+}
+
 async function healProfile(profile: UserProfile | null): Promise<UserProfile | null> {
-  if (profile?.name?.trim() && profile.email) return profile;
+  if (profile?.name?.trim() && profile.email) {
+    const fixed = splitLegacyName(profile);
+    if (fixed !== profile) await saveProfile(fixed);
+    return fixed;
+  }
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return profile;
 
   const metaName = (user.user_metadata?.name as string | undefined)?.trim();
   const name = profile?.name?.trim() || metaName || user.email?.split('@')[0] || '';
-  if (profile && name === profile.name && profile.email) return profile;
-  const healed: UserProfile = {
+  const healed: UserProfile = splitLegacyName({
     id: profile?.id ?? user.id,
     name,
+    lastName: profile?.lastName,
     email: profile?.email || user.email || '',
     dietaryPrefs: profile?.dietaryPrefs ?? [],
     skillLevel: profile?.skillLevel ?? 'confident',
@@ -202,7 +221,7 @@ async function healProfile(profile: UserProfile | null): Promise<UserProfile | n
     preferMetric: profile?.preferMetric ?? false,
     darkMode: profile?.darkMode ?? false,
     avatarUri: profile?.avatarUri,
-  };
+  });
   await saveProfile(healed);
   return healed;
 }
@@ -221,9 +240,11 @@ export async function getProfile(): Promise<UserProfile | null> {
 }
 
 export async function saveProfile(profile: UserProfile): Promise<void> {
-  if (await authed()) {
-    try { await dbSaveProfile(profile); } catch { /* fall through */ }
-  }
+  // Like saveRecipe: never gate the write on getSession() — it reports null
+  // during web boot, the DB write would be skipped, and the next getProfile()
+  // would clobber the local edit with the stale DB row. dbSaveProfile
+  // resolves the user itself and throws when truly signed out.
+  try { await dbSaveProfile(profile); } catch { /* offline / signed out */ }
   await set(KEYS.profile, profile);
 }
 
@@ -245,4 +266,32 @@ export async function isOnboarded(): Promise<boolean> {
 
 export async function setOnboarded(): Promise<void> {
   await AsyncStorage.setItem(KEYS.onboarded, 'true');
+}
+
+// ── Account deletion ──────────────────────────────────────────────────────────
+
+// Wipes every local trace of the user (recipes, plan, shopping, profile,
+// settings, badges, onboarding) — all of this app's '@jap_' keys.
+export async function clearLocalData(): Promise<void> {
+  const keys = await AsyncStorage.getAllKeys();
+  const ours = keys.filter(k => k.startsWith('@jap_'));
+  if (ours.length) await AsyncStorage.multiRemove(ours);
+}
+
+// Permanently deletes the signed-in user's account. A privileged edge function
+// removes the auth user (cascading to all their server data); we then drop the
+// session and clear this device's local copy. Throws a readable message on
+// failure so the caller can surface it.
+export async function deleteAccount(): Promise<void> {
+  const { error } = await supabase.functions.invoke('delete-account', { body: {} });
+  if (error) {
+    let message = 'Could not delete your account. Please try again.';
+    try {
+      const ctx = await (error as { context?: Response }).context?.json();
+      if (ctx?.error) message = String(ctx.error);
+    } catch { /* keep fallback */ }
+    throw new Error(message);
+  }
+  await supabase.auth.signOut();
+  await clearLocalData();
 }

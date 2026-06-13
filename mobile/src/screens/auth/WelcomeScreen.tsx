@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useWindowDimensions, NativeSyntheticEvent, NativeScrollEvent, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types';
@@ -33,12 +33,16 @@ export default function WelcomeScreen({ navigation }: Props) {
   const [index, setIndex] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
 
-  function onScrollEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
+  function onScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
     const i = Math.round(e.nativeEvent.contentOffset.x / width);
     setIndex(Math.max(0, Math.min(SLIDES.length - 1, i)));
   }
 
   function goNext() {
+    if (index >= SLIDES.length - 1) {
+      navigation.navigate('SignUp');
+      return;
+    }
     const next = index + 1;
     scrollRef.current?.scrollTo({ x: next * width, animated: true });
     setIndex(next);
@@ -57,7 +61,8 @@ export default function WelcomeScreen({ navigation }: Props) {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={onScrollEnd}
+        onScroll={onScroll}
+        scrollEventThrottle={Platform.OS === 'web' ? 16 : 64}
         style={{ flex: 1 }}
       >
         {SLIDES.map(slide => (

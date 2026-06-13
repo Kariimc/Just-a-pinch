@@ -16,9 +16,9 @@ const supabase = createClient(
 );
 
 // ── Utility: call Claude via Supabase Edge Function ─────────────────────────
-async function callClaude(systemPrompt, userMessage) {
+async function callClaude(systemPrompt, userMessage, imageBase64) {
   const res = await supabase.functions.invoke('claude-proxy', {
-    body: { system: systemPrompt, user: userMessage },
+    body: { system: systemPrompt, user: userMessage, imageBase64 },
   });
   if (res.error) throw new Error(res.error.message ?? 'Supabase function error');
   return res.data?.content ?? '';
@@ -111,7 +111,7 @@ app.post('/api/import/ocr', async (req, res) => {
 
   try {
     const system = `You are a recipe OCR assistant. The user has taken a photo of a handwritten or printed recipe.
-Extract all recipe text from the image description and return ONLY valid JSON matching this structure:
+Read all recipe text from the image and return ONLY valid JSON matching this structure:
 {
   "title": "string",
   "description": "string or null",
@@ -121,9 +121,11 @@ Extract all recipe text from the image description and return ONLY valid JSON ma
   "ingredients": [{"quantity":"string","unit":"string","name":"string"}],
   "steps": [{"number":number,"text":"string"}],
   "tags": ["string"]
-}`;
-    // For OCR we pass the base64 image — the Supabase edge function handles vision
-    const raw = await callClaude(system, `[IMAGE_BASE64]: ${image.slice(0, 100)}...`);
+}
+If a value is unreadable, use a sensible default. Return only JSON, no other text.`;
+    // Strip a data-URL prefix if the client included one
+    const base64 = image.replace(/^data:image\/\w+;base64,/, '');
+    const raw = await callClaude(system, 'Extract the recipe from this photo.', base64);
     const recipe = parseRecipeJSON(raw);
     return res.json(recipe);
   } catch (err) {

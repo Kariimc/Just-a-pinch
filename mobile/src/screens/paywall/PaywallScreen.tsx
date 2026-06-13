@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
-  Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View,
+  ScrollView, StyleSheet, Text, TouchableOpacity, View, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -10,12 +10,18 @@ import { RootStackParamList } from '../../types';
 import { Colors, Fonts, Radius, Spacing } from '../../theme';
 import { StaggerMs } from '../../theme/motion';
 import Icon, { IconName } from '../../components/Icon';
+import { confirmSheet } from '../../components/ActionSheet';
 import Button from '../../components/Button';
 import Tappable from '../../components/Tappable';
 import Sheen from '../../components/Sheen';
 import { showToast } from '../../components/Toast';
-import { AppSettings, getSettings, saveSettings } from '../../store/settingsStorage';
+import { AppSettings, getSettings, saveSettings, isPremium } from '../../store/settingsStorage';
 import { hapticLight, hapticSuccess } from '../../lib/haptics';
+import {
+  PurchasesNotConfigured, PremiumOffer, BillingPeriod,
+  purchasesAvailable, getPremiumOffers, purchase, restorePurchases,
+} from '../../lib/purchases';
+import { openPrivacy, openTerms } from '../../lib/legal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Paywall'>;
 
@@ -45,20 +51,95 @@ const COMPARISON: { label: string; free: string; premium: string }[] = [
   { label: 'Family sharing', free: '—', premium: '✓' },
 ];
 
+// Fallback prices shown when live store prices aren't available yet (web,
+// Expo Go, or before products are approved). Real builds replace these with
+// the localized priceString straight from the store.
+const FALLBACK_PRICE: Record<BillingPeriod, { price: string; per: string }> = {
+  monthly: { price: '$4.99', per: 'per month' },
+  annual: { price: '$39.99', per: 'per year · $3.33/mo' },
+};
+
 export default function PaywallScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const source = route.params?.source ?? 'settings';
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [billing, setBilling] = useState<'monthly' | 'annual'>('annual');
+  const [offers, setOffers] = useState<PremiumOffer[] | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useFocusEffect(useCallback(() => {
     getSettings().then(s => {
       setSettings(s);
       setBilling(s.subscriptionBilling);
     });
+    // Pull live, localized store prices when IAP is available. Silent no-op
+    // otherwise — the screen falls back to FALLBACK_PRICE.
+    if (purchasesAvailable()) {
+      getPremiumOffers().then(setOffers).catch(() => setOffers(null));
+    }
   }, []));
 
-  const trialActive = settings?.subscriptionPlan === 'trial';
+  const premiumActive = settings ? isPremium(settings) : false;
+  const isPaid = settings?.subscriptionPlan === 'premium';
+
+  const offerFor = (period: BillingPeriod) => offers?.find(o => o.period === period);
+  const priceFor = (period: BillingPeriod) =>
+    offerFor(period)?.priceString ?? FALLBACK_PRICE[period].price;
+
+  async function setPlan(plan: AppSettings['subscriptionPlan']) {
+    if (!settings) return settings;
+    const updated: AppSettings = { ...settings, subscriptionPlan: plan, subscriptionBilling: billing };
+    await saveSettings(updated);
+    setSettings(updated);
+    return updated;
+  }
+
+  // Primary CTA. Runs the real store purchase when IAP is configured; otherwise
+  // falls back to the early-access "on the house" trial flag.
+  async function handleSubscribe() {
+    if (busy || !settings) return;
+    if (!purchasesAvailable()) { await startTrial(); return; }
+    const offer = offerFor(billing);
+    if (!offer) { await startTrial(); return; }
+    setBusy(true);
+    try {
+      const ok = await purchase(offer);
+      if (ok) {
+        // RevenueCat's webhook flips profiles.ai_unlimited server-side; mirror
+        // it locally for instant UI.
+        await setPlan('premium');
+        hapticSuccess();
+        showToast('Welcome to Premium!', 'sparkle');
+        leave();
+      }
+    } catch (e) {
+      if (e instanceof PurchasesNotConfigured) { await startTrial(); }
+      else { showToast('Purchase could not be completed', 'info'); }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRestore() {
+    if (busy) return;
+    if (!purchasesAvailable()) { showToast('No previous purchases found', 'info'); return; }
+    setBusy(true);
+    try {
+      const ok = await restorePurchases();
+      if (ok) {
+        await setPlan('premium');
+        hapticSuccess();
+        showToast('Premium restored', 'sparkle');
+        leave();
+      } else {
+        showToast('No previous purchases found', 'info');
+      }
+    } catch {
+      showToast('Could not restore purchases', 'info');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function leave() {
     if (source === 'onboarding') {
@@ -83,21 +164,36 @@ export default function PaywallScreen({ navigation, route }: Props) {
     leave();
   }
 
-  function cancelTrial() {
-    Alert.alert('Switch to free?', 'You can restart your trial any time.', [
-      { text: 'Keep Premium', style: 'cancel' },
-      {
-        text: 'Switch to free',
-        style: 'destructive',
-        onPress: async () => {
-          if (!settings) return;
-          const updated: AppSettings = { ...settings, subscriptionPlan: 'free' };
-          await saveSettings(updated);
-          setSettings(updated);
-          showToast('Back on the free plan');
-        },
+  // Trial (early access) can be dropped locally. A real paid subscription is
+  // managed in the App Store / Play Store — we can't and shouldn't cancel it
+  // from here, so we point the user there.
+  function manageSubscription() {
+    if (isPaid) {
+      confirmSheet({
+        title: 'Manage subscription',
+        message:
+          Platform.OS === 'ios'
+            ? 'Manage or cancel Premium from Settings → Apple Account → Subscriptions.'
+            : 'Manage or cancel Premium from the Play Store → Payments & subscriptions.',
+        confirmLabel: 'Got it',
+        cancelLabel: 'Close',
+        onConfirm: () => {},
+      });
+      return;
+    }
+    confirmSheet({
+      title: 'Switch to free?',
+      message: 'You can restart your trial any time.',
+      confirmLabel: 'Switch to free',
+      cancelLabel: 'Keep Premium',
+      onConfirm: async () => {
+        if (!settings) return;
+        const updated: AppSettings = { ...settings, subscriptionPlan: 'free' };
+        await saveSettings(updated);
+        setSettings(updated);
+        showToast('Back on the free plan');
       },
-    ]);
+    });
   }
 
   return (
@@ -131,21 +227,31 @@ export default function PaywallScreen({ navigation, route }: Props) {
         </View>
 
         <View style={styles.content}>
-          {trialActive ? (
+          {premiumActive ? (
             /* Manage state */
             <Animated.View entering={enter(0)} style={styles.activeCard}>
               <View style={styles.activeCheck}>
                 <Icon name="check" size={22} color={Colors.surface} />
               </View>
-              <Text style={styles.activeTitle}>Premium trial active</Text>
+              <Text style={styles.activeTitle}>
+                {isPaid ? 'Premium active' : 'Premium trial active'}
+              </Text>
               <Text style={styles.activeSub}>
-                Started {settings?.trialStartedAt ? fmtDate(settings.trialStartedAt) : 'today'} ·{' '}
-                {settings?.subscriptionBilling === 'annual' ? 'annual' : 'monthly'} plan selected
+                {isPaid
+                  ? `${settings?.subscriptionBilling === 'annual' ? 'Annual' : 'Monthly'} plan`
+                  : `Started ${settings?.trialStartedAt ? fmtDate(settings.trialStartedAt) : 'today'} · ${settings?.subscriptionBilling === 'annual' ? 'annual' : 'monthly'} plan selected`}
               </Text>
-              <Text style={styles.activeNote}>
-                Payments aren't live during early access — Premium is on the house for now.
-              </Text>
-              <Button label="Switch to free plan" variant="outline" onPress={cancelTrial} style={{ marginTop: Spacing.md }} />
+              {!isPaid && (
+                <Text style={styles.activeNote}>
+                  Payments aren't live during early access — Premium is on the house for now.
+                </Text>
+              )}
+              <Button
+                label={isPaid ? 'Manage subscription' : 'Switch to free plan'}
+                variant="outline"
+                onPress={manageSubscription}
+                style={{ marginTop: Spacing.md }}
+              />
             </Animated.View>
           ) : (
             <>
@@ -158,8 +264,8 @@ export default function PaywallScreen({ navigation, route }: Props) {
                   onPress={() => { hapticLight(); setBilling('monthly'); }}
                 >
                   <Text style={styles.planName}>Monthly</Text>
-                  <Text style={styles.planPrice}>$3.99</Text>
-                  <Text style={styles.planPer}>per month</Text>
+                  <Text style={styles.planPrice}>{priceFor('monthly')}</Text>
+                  <Text style={styles.planPer}>{FALLBACK_PRICE.monthly.per}</Text>
                 </Tappable>
                 <Tappable
                   scaleTo={0.97}
@@ -168,11 +274,11 @@ export default function PaywallScreen({ navigation, route }: Props) {
                   onPress={() => { hapticLight(); setBilling('annual'); }}
                 >
                   <View style={styles.saveBadge}>
-                    <Text style={styles.saveBadgeTxt}>SAVE 37%</Text>
+                    <Text style={styles.saveBadgeTxt}>SAVE 33%</Text>
                   </View>
                   <Text style={styles.planName}>Annual</Text>
-                  <Text style={styles.planPrice}>$29.99</Text>
-                  <Text style={styles.planPer}>per year · $2.50/mo</Text>
+                  <Text style={styles.planPrice}>{priceFor('annual')}</Text>
+                  <Text style={styles.planPer}>{FALLBACK_PRICE.annual.per}</Text>
                 </Tappable>
               </Animated.View>
 
@@ -223,21 +329,37 @@ export default function PaywallScreen({ navigation, route }: Props) {
       </ScrollView>
 
       {/* Footer CTA */}
-      {!trialActive && (
+      {!premiumActive && (
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 14) + 6 }]}>
-          <Button label="Start 14-day free trial" onPress={startTrial} />
+          <Button
+            label={
+              purchasesAvailable() && offers
+                ? `Subscribe · ${priceFor(billing)}${billing === 'annual' ? '/yr' : '/mo'}`
+                : 'Start free trial'
+            }
+            onPress={handleSubscribe}
+            loading={busy}
+          />
           {source === 'onboarding' && (
             <TouchableOpacity onPress={leave} hitSlop={8} style={styles.freeLink}>
               <Text style={styles.freeLinkTxt}>Continue with the free plan</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
-            onPress={() => showToast('No previous purchases found', 'info')}
+            onPress={handleRestore}
             hitSlop={8}
             style={styles.restoreLink}
           >
             <Text style={styles.restoreTxt}>Restore purchases</Text>
           </TouchableOpacity>
+          {/* App Store / Play subscription disclosure */}
+          <Text style={styles.legalTxt}>
+            Subscriptions renew automatically until cancelled. Cancel anytime in your
+            store account.{' '}
+            <Text style={styles.legalLink} onPress={openTerms}>Terms</Text>
+            {' · '}
+            <Text style={styles.legalLink} onPress={openPrivacy}>Privacy</Text>
+          </Text>
         </View>
       )}
     </View>
@@ -364,4 +486,9 @@ const styles = StyleSheet.create({
   freeLinkTxt: { fontFamily: Fonts.uiBold, fontSize: 14, color: Colors.accentDeep },
   restoreLink: { alignSelf: 'center', marginTop: 10 },
   restoreTxt: { fontFamily: Fonts.uiRegular, fontSize: 12.5, color: Colors.ink3 },
+  legalTxt: {
+    fontFamily: Fonts.uiRegular, fontSize: 11, color: Colors.ink3,
+    textAlign: 'center', marginTop: 10, lineHeight: 16, paddingHorizontal: 6,
+  },
+  legalLink: { color: Colors.accentDeep, fontFamily: Fonts.uiSemiBold },
 });

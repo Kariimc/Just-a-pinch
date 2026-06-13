@@ -3,7 +3,7 @@ import { View, Image, Text, StyleSheet } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types';
 import { supabase } from '../../lib/supabase';
-import { Fonts } from '../../theme';
+import { Colors, Fonts } from '../../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
 
@@ -42,8 +42,9 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    // Matches the native splash background so the handoff is seamless
-    backgroundColor: '#1E7A41',
+    // Matches the native splash background (app.json) so the handoff is
+    // seamless — keep in sync with Colors.accent (the brand olive).
+    backgroundColor: Colors.accent,
   },
   logo: {
     width: 220,

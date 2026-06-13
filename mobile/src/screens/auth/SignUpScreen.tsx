@@ -1,13 +1,17 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, TouchableOpacity,
-  ScrollView, Alert,
+  ScrollView,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../types';
 import { Colors, Radius, Fonts } from '../../theme';
 import Button from '../../components/Button';
+import { showToast } from '../../components/Toast';
+import { showActionSheet } from '../../components/ActionSheet';
 import Icon from '../../components/Icon';
+import SocialAuthButtons from '../../components/SocialAuthButtons';
+import { openPrivacy, openTerms } from '../../lib/legal';
 import { supabase } from '../../lib/supabase';
 import { authRedirectUrl } from '../../lib/authRedirect';
 import { setOnboarded } from '../../store/storage';
@@ -27,7 +31,7 @@ export default function SignUpScreen({ navigation }: Props) {
     setError('');
     if (!name || !email || !password) { setError('Please fill in all fields'); return; }
     if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
-    if (!agreed) { Alert.alert('Please agree to the Terms & Privacy Policy'); return; }
+    if (!agreed) { showToast('Please agree to the Terms & Privacy Policy', 'info'); return; }
     setLoading(true);
     const { data, error: signUpError } = await supabase.auth.signUp({
       email, password, options: { data: { name }, emailRedirectTo: authRedirectUrl },
@@ -38,11 +42,13 @@ export default function SignUpScreen({ navigation }: Props) {
     // When "Confirm email" is on, Supabase returns no session — the user is
     // NOT logged in yet. Don't fake entry into the app; tell them to confirm.
     if (!data.session) {
-      Alert.alert(
-        'Almost there',
-        `We sent a confirmation link to ${email}. Tap it, then come back and log in.`,
-        [{ text: 'Go to log in', onPress: () => navigation.replace('LogIn') }],
-      );
+      showActionSheet({
+        title: 'Almost there',
+        message: `We sent a confirmation link to ${email}. Tap it, then come back and log in.`,
+        actions: [{ label: 'Go to log in', onPress: () => navigation.replace('LogIn') }],
+        cancelLabel: null,
+        onCancel: () => navigation.replace('LogIn'),
+      });
       return;
     }
     navigation.replace('PersonalizationQuiz');
@@ -105,16 +111,21 @@ export default function SignUpScreen({ navigation }: Props) {
       ) : null}
 
       {/* Terms */}
-      <TouchableOpacity style={styles.termsRow} onPress={() => setAgreed(a => !a)}>
-        <View style={[styles.check, agreed && styles.checkOn]}>
-          {agreed && <Icon name="check" size={15} color="#fff" />}
-        </View>
+      <View style={styles.termsRow}>
+        <TouchableOpacity onPress={() => setAgreed(a => !a)} hitSlop={6}>
+          <View style={[styles.check, agreed && styles.checkOn]}>
+            {agreed && <Icon name="check" size={15} color="#fff" />}
+          </View>
+        </TouchableOpacity>
         <Text style={styles.termsText}>
-          I agree to the <Text style={styles.termsLink}>Terms</Text> &amp; <Text style={styles.termsLink}>Privacy Policy</Text>.
+          I agree to the <Text style={styles.termsLink} onPress={openTerms}>Terms</Text>
+          {' '}&amp; <Text style={styles.termsLink} onPress={openPrivacy}>Privacy Policy</Text>.
         </Text>
-      </TouchableOpacity>
+      </View>
 
       <Button label="Create account" onPress={handleCreate} loading={loading} style={{ marginTop: 10 }} />
+
+      <SocialAuthButtons onSuccess={() => navigation.replace('PersonalizationQuiz')} />
 
       <View style={styles.loginRow}>
         <Text style={styles.loginTxt}>Have an account? </Text>

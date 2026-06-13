@@ -18,6 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import RecipeCard from '../../components/RecipeCard';
 import Chip from '../../components/Chip';
 import FoodPlaceholder from '../../components/FoodPlaceholder';
+import CookbookCover from '../../components/CookbookCover';
 import Icon from '../../components/Icon';
 import Tappable from '../../components/Tappable';
 import Sheen from '../../components/Sheen';
@@ -101,6 +102,7 @@ export default function HomeScreen() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [featured, setFeatured] = useState<Recipe[]>([]);
   const [userName, setUserName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -111,6 +113,7 @@ export default function HomeScreen() {
     const metaName = (user?.user_metadata?.name as string | undefined)?.trim();
     const resolved = p?.name?.trim() || metaName || user?.email?.split('@')[0] || 'Chef';
     setUserName(resolved.split(' ')[0]);
+    setLastName(p?.lastName?.trim() ?? '');
     setFeatured(f);
     setLoading(false);
   }
@@ -124,6 +127,12 @@ export default function HomeScreen() {
   const dinner = recipes.filter(r => r.tags.includes('dinner')).slice(0, 4);
   const displayed = dinner.length ? dinner : recipes.slice(0, 4);
   const familyRecipes = recipes.filter(r => r.isFamily);
+
+  // "ANDERSON'S" on the cookbook cover; names already ending in s get just
+  // the apostrophe ("CHILES'"). No last name → "OUR FAMILY COOKBOOK".
+  const coverName = lastName
+    ? `${lastName.toUpperCase()}${lastName.toLowerCase().endsWith('s') ? '’' : '’S'}`
+    : 'OUR';
 
   return (
     <View style={styles.container}>
@@ -199,7 +208,12 @@ export default function HomeScreen() {
               <Text style={styles.seeAll}>See all</Text>
             </TouchableOpacity>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginTop: 12 }}
+            contentContainerStyle={styles.cardRow}
+          >
             <View style={{ flexDirection: 'row', gap: 13 }}>
               {displayed.map(r => (
                 <View key={r.id} style={{ width: 215 }}>
@@ -238,13 +252,42 @@ export default function HomeScreen() {
       </Tappable>
       </Animated.View>
 
+      {/* Community */}
+      <Animated.View entering={enter(3)}>
+      <Tappable
+        scaleTo={0.97}
+        haptic
+        style={styles.communityCard}
+        onPress={() => navigation.navigate('Community')}
+      >
+        <View style={styles.communityIconWrap}>
+          <Icon name="people" size={22} color="#fff" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.communityTitle}>Community Recipes</Text>
+            <View style={styles.comingSoonChip}>
+              <Text style={styles.comingSoonTxt}>Soon</Text>
+            </View>
+          </View>
+          <Text style={styles.communitySub}>Share, discover, and rate — launching soon</Text>
+        </View>
+        <Icon name="fwd" size={20} color={Colors.accentDeep} />
+      </Tappable>
+      </Animated.View>
+
       {/* Today's Picks */}
       {featured.length > 0 && (
-        <Animated.View entering={enter(3)}>
+        <Animated.View entering={enter(4)}>
           <View style={styles.sectionHeader}>
             <Text style={styles.secTitle}>Today's picks</Text>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginTop: 12 }}
+            contentContainerStyle={styles.cardRow}
+          >
             <View style={{ flexDirection: 'row', gap: 13 }}>
               {featured.map(r => (
                 <View key={r.id} style={{ width: 215 }}>
@@ -263,7 +306,7 @@ export default function HomeScreen() {
 
       {/* Recently added */}
       {recent.length > 0 && (
-        <Animated.View entering={enter(4)}>
+        <Animated.View entering={enter(5)}>
           <View style={styles.sectionHeader}>
             <Text style={styles.secTitle}>Recently added</Text>
             <TouchableOpacity onPress={() => (navigation as any).navigate('Recipes')}>
@@ -300,24 +343,25 @@ export default function HomeScreen() {
       {/* Family shelf */}
       {familyRecipes.length > 0 ? (
         <>
-          <Text style={[styles.secTitle, { marginTop: 24 }]}>From the family shelf</Text>
+          <Text style={[styles.secTitle, { marginTop: 24 }]}>From the family cookbook</Text>
           <TouchableOpacity
             style={[styles.familyCard, Shadow.cardSoft]}
             activeOpacity={0.9}
             onPress={() => navigation.navigate('RecipeDetail', { recipeId: familyRecipes[0].id })}
           >
-            <FoodPlaceholder variant="cream" style={StyleSheet.absoluteFill} />
+            <CookbookCover style={StyleSheet.absoluteFill} />
             <View style={styles.familyOverlay}>
-              <Text style={styles.familyTitle}>{familyRecipes[0].title}</Text>
+              <Text style={styles.familyName}>{coverName}</Text>
+              <Text style={styles.familyTitle}>FAMILY COOKBOOK</Text>
               <Text style={styles.familySub}>
-                {familyRecipes.length} famil{familyRecipes.length === 1 ? 'y recipe' : 'y recipes'} · handed down
+                {familyRecipes.length} RECIPE{familyRecipes.length === 1 ? '' : 'S'} · HANDED DOWN
               </Text>
             </View>
           </TouchableOpacity>
         </>
       ) : recipes.length > 0 ? (
         <>
-          <Text style={[styles.secTitle, { marginTop: 24 }]}>From the family shelf</Text>
+          <Text style={[styles.secTitle, { marginTop: 24 }]}>From the family cookbook</Text>
           <TouchableOpacity
             style={styles.familyEmpty}
             activeOpacity={0.8}
@@ -325,7 +369,7 @@ export default function HomeScreen() {
           >
             <Icon name="people" size={22} color={Colors.accentDeep} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.familyEmptyTitle}>Start your family shelf</Text>
+              <Text style={styles.familyEmptyTitle}>Start your family cookbook</Text>
               <Text style={styles.familyEmptySub}>Scan a handwritten card to keep it forever.</Text>
             </View>
             <Icon name="fwd" size={18} color={Colors.ink3} />
@@ -369,6 +413,9 @@ const styles = StyleSheet.create({
   },
   searchTxt: { fontFamily: Fonts.uiRegular, fontSize: 15, color: Colors.ink3 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 22 },
+  // Room for the card shadow to render before the scroller clips it —
+  // without this the drop shadow ends in a hard straight edge.
+  cardRow: { paddingTop: 2, paddingBottom: 14 },
   secTitle: { fontFamily: Fonts.uiBold, fontSize: 19, letterSpacing: -0.2, color: Colors.ink },
   seeAll: { fontFamily: Fonts.uiBold, fontSize: 12.5, color: Colors.accentDeep },
   aiCard: {
@@ -384,14 +431,44 @@ const styles = StyleSheet.create({
   },
   aiTitle: { fontFamily: Fonts.uiBold, fontSize: 15.5, color: Colors.ink },
   aiSub: { fontFamily: Fonts.uiRegular, fontSize: 13, color: Colors.ink2, marginTop: 2 },
-  familyCard: { marginTop: 12, borderRadius: Radius.lg, overflow: 'hidden', height: 150 },
+  communityCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 14,
+    padding: 16,
+    backgroundColor: Colors.surface2,
+    borderRadius: Radius.lg,
+  },
+  communityIconWrap: {
+    width: 48, height: 48, borderRadius: Radius.sm,
+    backgroundColor: Colors.accentDeep,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  communityTitle: { fontFamily: Fonts.uiBold, fontSize: 15.5, color: Colors.ink },
+  communitySub: { fontFamily: Fonts.uiRegular, fontSize: 13, color: Colors.ink2, marginTop: 2 },
+  comingSoonChip: {
+    paddingHorizontal: 7, paddingVertical: 2,
+    backgroundColor: '#F5A62320', borderRadius: Radius.pill,
+  },
+  comingSoonTxt: { fontFamily: Fonts.uiBold, fontSize: 10, color: '#C88A00', letterSpacing: 0.3 },
+  familyCard: { marginTop: 12, borderRadius: Radius.lg, overflow: 'hidden', height: 190 },
+  // Centred title block sits in the clear field of the engraved cover; the
+  // bottom ~55px stays free for the spice still-life baked into the SVG.
   familyOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(20,14,6,0.65)',
-    justifyContent: 'flex-end', padding: 16,
+    alignItems: 'center', justifyContent: 'center',
+    paddingTop: 18, paddingBottom: 42, paddingHorizontal: 56,
   },
-  familyTitle: { fontFamily: Fonts.displayMedium, fontSize: 22, color: '#fff' },
-  familySub: { fontFamily: Fonts.uiRegular, fontSize: 13, color: 'rgba(255,255,255,0.9)', marginTop: 3 },
+  familyName: {
+    fontFamily: Fonts.displayMedium, fontSize: 26, color: '#EDE8D6',
+    letterSpacing: 2.5, textAlign: 'center',
+  },
+  familyTitle: {
+    fontFamily: Fonts.displayMedium, fontSize: 19, color: '#EDE8D6',
+    letterSpacing: 3.5, marginTop: 4, textAlign: 'center',
+  },
+  familySub: {
+    fontFamily: Fonts.uiSemiBold, fontSize: 9.5, color: '#D9D3BC',
+    letterSpacing: 2.4, marginTop: 9, textAlign: 'center',
+  },
   familyEmpty: {
     flexDirection: 'row', alignItems: 'center', gap: 13, marginTop: 12,
     padding: 16, backgroundColor: Colors.surface,

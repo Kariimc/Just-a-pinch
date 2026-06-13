@@ -8,6 +8,7 @@ import { RootStackParamList } from '../../types';
 import { Colors, Radius, Fonts } from '../../theme';
 import Button from '../../components/Button';
 import Icon from '../../components/Icon';
+import SocialAuthButtons from '../../components/SocialAuthButtons';
 import { supabase } from '../../lib/supabase';
 import { authRedirectUrl } from '../../lib/authRedirect';
 import { setOnboarded } from '../../store/storage';
@@ -106,8 +107,10 @@ export default function LoginScreen({ navigation }: Props) {
 
       <Button label="Log In" onPress={handleLogin} loading={loading} />
 
+      <SocialAuthButtons onSuccess={() => navigation.replace('Main')} />
+
       <View style={styles.row}>
-        <Text style={styles.sub}>New here? </Text>
+        <Text style={[styles.sub, { marginTop: 0 }]}>New here? </Text>
         <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
           <Text style={styles.link}>Create an account</Text>
         </TouchableOpacity>
@@ -140,6 +143,6 @@ const styles = StyleSheet.create({
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8 },
   errorTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 13, color: Colors.error },
   forgotRow: { alignItems: 'flex-end', marginTop: 12, marginBottom: 16 },
-  row: { flexDirection: 'row', justifyContent: 'center', marginTop: 18 },
+  row: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 18 },
   link: { fontFamily: Fonts.uiBold, fontSize: 13.5, color: Colors.accentDeep },
 });
