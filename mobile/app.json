@@ -52,8 +52,8 @@
       [
         "@sentry/react-native/expo",
         {
-          "organization": "",
-          "project": ""
+          "organization": "kariim-chiles",
+          "project": "just-a-pinch"
         }
       ],
       [
