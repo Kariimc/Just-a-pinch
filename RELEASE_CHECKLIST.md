@@ -11,11 +11,17 @@ Grounded in the actual state of the code. Tick items as they're completed.
   `auth.admin.deleteUser` (cascades to every table), then drops the session and
   clears all local `@jap_` data. **Still to do:** `supabase functions deploy
   delete-account` and set `verify_jwt = true` on it.
-- [ ] **Real payments / subscriptions.** The Paywall is a local fake — it writes
-  `subscriptionPlan: 'trial'` to AsyncStorage and states "Payments aren't live
-  during early access." "Restore purchases" only shows a toast. No StoreKit /
-  Play Billing / RevenueCat. Decide: implement real IAP **or** launch free and
-  hide the purchase UI.
+- [x] **Real payments / subscriptions.** Wired via RevenueCat (StoreKit + Play
+  Billing). `lib/purchases.ts` handles configure/offers/purchase/restore; the
+  Paywall shows live store prices, real Subscribe + Restore, an auto-renewal
+  disclosure, and a manage state; the `revenuecat-webhook` edge function flips
+  the authoritative `profiles.ai_unlimited` server-side. Pricing: **$4.99/mo,
+  $39.99/yr** (entitlement `premium`). Native-module-safe — falls back to the
+  early-access trial flag in Expo Go / web. **Still to do (full guide in
+  `PAYMENTS_SETUP.md`):** create the store products + RevenueCat offering, add
+  the API keys to `app.json` extra, deploy `revenuecat-webhook --no-verify-jwt`
+  + set `REVENUECAT_WEBHOOK_AUTH`, test on an EAS build with sandbox accounts,
+  then lower `FREE_MONTHLY_AI_LIMIT` 25 → 3.
 - [ ] **Apple & Google sign-in (real OAuth).** Buttons + handlers are in place
   (`SocialAuthButtons`, `lib/socialAuth.ts`) but token acquisition is stubbed.
   Needs provider credentials, Supabase providers enabled, and a custom dev

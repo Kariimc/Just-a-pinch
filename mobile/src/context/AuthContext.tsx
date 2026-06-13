@@ -6,6 +6,7 @@ import { handleAuthLink } from '../lib/authRedirect';
 import { showToast } from '../components/Toast';
 import { resetToMain } from '../navigation/navigationRef';
 import { setSentryUser } from '../lib/sentry';
+import { configurePurchases } from '../lib/purchases';
 
 interface AuthContextType {
   user: User | null;
@@ -36,12 +37,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setSentryUser(session?.user?.id ?? null);
+      // Bind the RevenueCat customer to this user (no-op until IAP is built).
+      configurePurchases();
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setSentryUser(session?.user?.id ?? null);
+      if (event === 'SIGNED_IN') configurePurchases();
       if (event === 'PASSWORD_RECOVERY') setRecovering(true);
     });
 

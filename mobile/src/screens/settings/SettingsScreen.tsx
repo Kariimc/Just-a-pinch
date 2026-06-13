@@ -474,12 +474,18 @@ export default function SettingsScreen({ navigation }: Props) {
             </View>
             <View style={styles.rowLeft}>
               <Text style={styles.rowTitle}>
-                {settings.subscriptionPlan === 'trial' ? 'Premium trial' : 'Just a Pinch Premium'}
+                {settings.subscriptionPlan === 'premium'
+                  ? 'Premium'
+                  : settings.subscriptionPlan === 'trial'
+                    ? 'Premium trial'
+                    : 'Just a Pinch Premium'}
               </Text>
               <Text style={styles.rowSub}>
-                {settings.subscriptionPlan === 'trial'
+                {settings.subscriptionPlan === 'premium'
                   ? `Active · ${settings.subscriptionBilling} plan`
-                  : 'See plans & start a free trial'}
+                  : settings.subscriptionPlan === 'trial'
+                    ? `Active · ${settings.subscriptionBilling} plan`
+                    : 'See plans & subscribe'}
               </Text>
             </View>
             <Icon name="fwd" size={18} color={Colors.ink3} />
