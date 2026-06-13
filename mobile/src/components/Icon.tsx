@@ -7,8 +7,8 @@ export type IconName =
   | 'more' | 'moreV' | 'back' | 'fwd' | 'down' | 'up' | 'x' | 'check'
   | 'minus' | 'camera' | 'link' | 'sparkle' | 'filter' | 'grid' | 'list'
   | 'trash' | 'pencil' | 'timer' | 'mic' | 'volume' | 'pause' | 'play'
-  | 'drag' | 'leaf' | 'bookmark' | 'people' | 'fridge' | 'lock' | 'apple'
-  | 'google' | 'scale' | 'chefhat' | 'bolt' | 'download' | 'globe' | 'info'
+  | 'drag' | 'leaf' | 'bookmark' | 'people' | 'fridge' | 'lock'
+  | 'scale' | 'chefhat' | 'bolt' | 'download' | 'globe' | 'info'
   | 'wifi' | 'sun' | 'plate' | 'receipt' | 'eyeoff' | 'refresh' | 'cloud'
   | 'tag' | 'note' | 'arrowR' | 'access' | 'ear' | 'soundwave' | 'textsize'
   | 'contrast' | 'captions' | 'carrot' | 'handtap';
@@ -170,21 +170,6 @@ export default function Icon({ name, size = 24, color = 'currentColor', style }:
       return <StrokeIcon size={s} color={c}><Rect x={3} y={5} width={18} height={14} rx={2.6} /><Path d="M9 10.6a2 2 0 1 0 0 2.8M16 10.6a2 2 0 1 0 0 2.8" /></StrokeIcon>;
     case 'handtap':
       return <StrokeIcon size={s} color={c}><Path d="M9 11V5.5a1.6 1.6 0 0 1 3.2 0V11M12.2 11V7.4a1.6 1.6 0 0 1 3.2 0V12M15.4 12v-1.4a1.6 1.6 0 0 1 3.2 0V15a5 5 0 0 1-5 5h-1.6a4.5 4.5 0 0 1-3.3-1.5l-3-3.3a1.6 1.6 0 0 1 2.4-2.1L9 12.6V11" /></StrokeIcon>;
-    case 'apple':
-      return (
-        <Svg width={s} height={s} viewBox="0 0 24 24">
-          <Path d="M16.2 12.7c0-2.4 2-3.5 2.1-3.6-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.15-2.9.9-3.6.9-.75 0-1.9-.85-3.1-.85-1.6 0-3.05.93-3.87 2.36-1.65 2.87-.42 7.12 1.18 9.45.78 1.14 1.71 2.42 2.93 2.37 1.18-.05 1.62-.76 3.04-.76 1.41 0 1.81.76 3.05.74 1.26-.02 2.06-1.16 2.83-2.31a9.4 9.4 0 0 0 1.28-2.64c-.03-.01-2.45-.94-2.48-3.73M14 5.2c.65-.8 1.09-1.9.97-3-.94.04-2.08.63-2.75 1.42-.6.7-1.13 1.82-.99 2.9 1.05.08 2.12-.53 2.77-1.32" fill={c} stroke="none" />
-        </Svg>
-      );
-    case 'google':
-      return (
-        <Svg width={s} height={s} viewBox="0 0 24 24">
-          <Path d="M21 12.2c0-.66-.06-1.3-.17-1.9H12v3.6h5.05a4.3 4.3 0 0 1-1.87 2.82v2.34h3.02C19.97 17.4 21 15 21 12.2" fill="#4285F4" stroke="none" />
-          <Path d="M12 21.5c2.52 0 4.63-.83 6.18-2.26l-3.02-2.34c-.84.56-1.9.9-3.16.9-2.43 0-4.5-1.64-5.23-3.85H3.66v2.42A9.5 9.5 0 0 0 12 21.5" fill="#34A853" stroke="none" />
-          <Path d="M6.77 13.95a5.7 5.7 0 0 1 0-3.65V7.88H3.66a9.5 9.5 0 0 0 0 8.49z" fill="#FBBC05" stroke="none" />
-          <Path d="M12 6.45c1.37 0 2.6.47 3.57 1.4l2.67-2.67A9.5 9.5 0 0 0 12 2.5a9.5 9.5 0 0 0-8.34 5.38l3.11 2.42C7.5 8.09 9.57 6.45 12 6.45" fill="#EA4335" stroke="none" />
-        </Svg>
-      );
     case 'carrot':
       return (
         <Svg width={s} height={s} viewBox="0 0 24 24" fill="none">
