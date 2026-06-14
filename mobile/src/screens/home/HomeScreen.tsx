@@ -129,9 +129,11 @@ export default function HomeScreen() {
   const familyRecipes = recipes.filter(r => r.isFamily);
 
   // "ANDERSON'S" on the cookbook cover; names already ending in s get just
-  // the apostrophe ("CHILES'"). No last name → "OUR FAMILY COOKBOOK".
-  const coverName = lastName
-    ? `${lastName.toUpperCase()}${lastName.toLowerCase().endsWith('s') ? '’' : '’S'}`
+  // the apostrophe ("CHILES'"). Prefer the surname, fall back to the first
+  // name ("KARIIM'S"), and only land on "OUR FAMILY COOKBOOK" when neither is set.
+  const coverBase = lastName || userName;
+  const coverName = coverBase
+    ? `${coverBase.toUpperCase()}${coverBase.toLowerCase().endsWith('s') ? '’' : '’S'}`
     : 'OUR';
 
   return (
