@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, TextInput, ScrollView, TouchableOpacity,
   StyleSheet, FlatList,
@@ -38,6 +38,20 @@ export default function SearchScreen() {
   useFocusEffect(useCallback(() => {
     getRecipes().then(setAllRecipes);
   }, []));
+
+  // Surface the most common tags as tap-to-search suggestions so the empty
+  // state teaches what's searchable instead of sitting blank.
+  const suggestions = useMemo(() => {
+    const freq = new Map<string, number>();
+    allRecipes.forEach(r => r.tags.forEach(t => {
+      const k = t.trim();
+      if (k) freq.set(k, (freq.get(k) ?? 0) + 1);
+    }));
+    return [...freq.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([t]) => t.charAt(0).toUpperCase() + t.slice(1));
+  }, [allRecipes]);
 
   useEffect(() => {
     let filtered = allRecipes;
@@ -90,7 +104,6 @@ export default function SearchScreen() {
             key={f}
             label={f}
             active={tagFilter === f}
-            soft={tagFilter === f}
             onPress={() => setTagFilter(prev => prev === f ? 'All' : f)}
             style={{ marginRight: 8 }}
           />
@@ -107,12 +120,32 @@ export default function SearchScreen() {
               ? `Search across ${allRecipes.length} saved recipes`
               : 'Save some recipes first using the + button'}
           </Text>
+          {suggestions.length > 0 && (
+            <View style={styles.suggestWrap}>
+              <Text style={styles.suggestLabel}>TRY SEARCHING</Text>
+              <View style={styles.suggestRow}>
+                {suggestions.map(s => (
+                  <Chip key={s} label={s} onPress={() => setQuery(s)} />
+                ))}
+              </View>
+            </View>
+          )}
         </View>
       ) : results.length === 0 ? (
         <View style={styles.emptyState}>
           <Icon name="plate" size={48} color={Colors.line2} />
           <Text style={styles.emptyTitle}>No matches</Text>
-          <Text style={styles.emptySub}>Try a different search or import a new recipe.</Text>
+          <Text style={styles.emptySub}>
+            {tagFilter !== 'All'
+              ? `Nothing tagged "${tagFilter}"${query.trim() ? ` matches "${query.trim()}"` : ''}.`
+              : 'Try a different search or import a new recipe.'}
+          </Text>
+          {tagFilter !== 'All' && (
+            <TouchableOpacity style={styles.clearFilterBtn} onPress={() => setTagFilter('All')}>
+              <Icon name="x" size={15} color={Colors.accentInk} />
+              <Text style={styles.clearFilterTxt}>Clear filter</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <FlatList
@@ -168,4 +201,13 @@ const styles = StyleSheet.create({
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 80, gap: 16 },
   emptyTitle: { fontFamily: Fonts.displayMedium, fontSize: 22, color: Colors.ink },
   emptySub: { fontFamily: Fonts.uiRegular, fontSize: 14, color: Colors.ink2, textAlign: 'center', paddingHorizontal: 40 },
+  suggestWrap: { alignItems: 'center', marginTop: 8, paddingHorizontal: 24 },
+  suggestLabel: { fontFamily: Fonts.uiBold, fontSize: 11, letterSpacing: 1.2, color: Colors.ink3, marginBottom: 12 },
+  suggestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  clearFilterBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 16, paddingVertical: 9,
+    backgroundColor: Colors.accentSoft, borderRadius: Radius.pill,
+  },
+  clearFilterTxt: { fontFamily: Fonts.uiBold, fontSize: 13.5, color: Colors.accentInk },
 });

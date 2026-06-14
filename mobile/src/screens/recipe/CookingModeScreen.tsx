@@ -46,6 +46,9 @@ export default function CookingModeScreen({ route, navigation }: Props) {
   const [trackWidth, setTrackWidth] = useState(0);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dirRef = useRef<1 | -1>(1);
+  // The 1s tick lives in a stable effect, so it reads "speak aloud" through a
+  // ref to announce timer events without re-subscribing the interval.
+  const speakRef = useRef(false);
 
   const fillWidth = useSharedValue(0);
   const fillStyle = useAnimatedStyle(() => ({ width: fillWidth.value }));
@@ -67,6 +70,7 @@ export default function CookingModeScreen({ route, navigation }: Props) {
     }
   }, [speakOn, stepIndex, recipe]);
   useEffect(() => () => { Speech.stop(); }, []);
+  useEffect(() => { speakRef.current = speakOn; }, [speakOn]);
 
   // Animate the progress fill whenever step or track size changes.
   useEffect(() => {
@@ -94,6 +98,8 @@ export default function CookingModeScreen({ route, navigation }: Props) {
         if (next === 0) {
           hapticSuccess();
           showToast(`${t.label} timer done!`, 'timer');
+          // Hands-free: call it out loud so you don't have to glance at the screen.
+          if (speakRef.current) Speech.speak(`${t.label} timer is done`, { rate: 0.95 });
         }
         return { ...t, remaining: next, running: next > 0 };
       }));
@@ -121,6 +127,14 @@ export default function CookingModeScreen({ route, navigation }: Props) {
       notificationId,
     }]);
     hapticStep();
+    if (speakRef.current) Speech.speak(`Timer started for ${spokenDuration(step.timerSeconds)}`, { rate: 0.95 });
+  }
+
+  async function dismissTimer(id: string) {
+    hapticStep();
+    const t = timers.find(x => x.id === id);
+    if (t?.notificationId) await cancelTimerNotification(t.notificationId);
+    setTimers(prev => prev.filter(x => x.id !== id));
   }
 
   async function toggleTimer(id: string) {
@@ -150,6 +164,15 @@ export default function CookingModeScreen({ route, navigation }: Props) {
     const sec = s % 60;
     if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
     return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  }
+
+  // Natural-language duration for the spoken timer confirmation.
+  function spokenDuration(s: number) {
+    if (s < 60) return `${s} seconds`;
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    const mins = `${m} minute${m === 1 ? '' : 's'}`;
+    return sec === 0 ? mins : `${mins} and ${sec} seconds`;
   }
 
   // Horizontal swipe to move between steps; failOffsetY hands vertically
@@ -240,18 +263,39 @@ export default function CookingModeScreen({ route, navigation }: Props) {
           {/* Active timers */}
           {timers.length > 0 && (
             <View style={styles.activeTimers}>
-              {timers.map(t => (
-                <View key={t.id} style={styles.timerChip}>
-                  <Text style={[styles.timerChipTxt, t.remaining === 0 && { color: Colors.accent }]}>
-                    {t.label}: {t.remaining === 0 ? 'Done!' : fmtTimer(t.remaining)}
-                  </Text>
-                  {t.remaining > 0 && (
-                    <TouchableOpacity onPress={() => toggleTimer(t.id)} hitSlop={10}>
-                      <Icon name={t.running ? 'pause' : 'play'} size={17} color="#fff" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ))}
+              {timers.map(t => {
+                const done = t.remaining === 0;
+                const frac = t.totalSeconds > 0 ? t.remaining / t.totalSeconds : 0;
+                return (
+                  <View key={t.id} style={[styles.timerChip, done && styles.timerChipDone]}>
+                    <View style={styles.timerChipRow}>
+                      <Icon name="timer" size={15} color={done ? Colors.accent : 'rgba(255,255,255,0.75)'} />
+                      <Text style={[styles.timerChipTxt, done && { color: Colors.accent }]}>
+                        {t.label} · {done ? 'Done!' : fmtTimer(t.remaining)}
+                      </Text>
+                      <View style={{ flex: 1 }} />
+                      {!done && (
+                        <TouchableOpacity onPress={() => toggleTimer(t.id)} hitSlop={8} style={styles.timerIconBtn}>
+                          <Icon name={t.running ? 'pause' : 'play'} size={16} color="#fff" />
+                        </TouchableOpacity>
+                      )}
+                      <TouchableOpacity
+                        onPress={() => dismissTimer(t.id)}
+                        hitSlop={8}
+                        style={styles.timerIconBtn}
+                        accessibilityLabel={`Dismiss ${t.label} timer`}
+                      >
+                        <Icon name="x" size={15} color="rgba(255,255,255,0.6)" />
+                      </TouchableOpacity>
+                    </View>
+                    {!done && (
+                      <View style={styles.timerTrack}>
+                        <View style={[styles.timerTrackFill, { width: `${frac * 100}%` as any }]} />
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </View>
           )}
         </ScrollView>
@@ -330,8 +374,13 @@ const styles = StyleSheet.create({
   timerBtn: { marginTop: 24, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: Colors.accent, paddingHorizontal: 18, paddingVertical: 13, borderRadius: 99 },
   timerBtnTxt: { fontFamily: Fonts.uiBold, color: '#fff', fontSize: 16 },
   activeTimers: { marginTop: 16, gap: 8 },
-  timerChip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12 },
+  timerChip: { backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 14, paddingVertical: 11, borderRadius: 12 },
+  timerChipDone: { backgroundColor: 'rgba(46,158,87,0.18)', borderWidth: 1, borderColor: Colors.accent },
+  timerChipRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   timerChipTxt: { fontFamily: Fonts.uiBold, color: '#fff', fontSize: 14 },
+  timerIconBtn: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.1)' },
+  timerTrack: { height: 3, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.15)', overflow: 'hidden', marginTop: 9 },
+  timerTrackFill: { height: '100%', borderRadius: 99, backgroundColor: Colors.accent },
   nav: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 22 },
   backBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   nextBtn: { flex: 1, height: 56, backgroundColor: '#fff', borderRadius: 99, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' },
