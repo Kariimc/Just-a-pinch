@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInRight, FadeInLeft, FadeOut } from 'react-native-reanimated';
+import Animated, {
+  FadeInRight, FadeInLeft, FadeOut,
+  useSharedValue, withTiming, useAnimatedStyle,
+} from 'react-native-reanimated';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Speech from 'expo-speech';
 import { RootStackParamList, Recipe, Step } from '../../types';
 import { Colors, Radius, Fonts } from '../../theme';
+import { Curves } from '../../theme/motion';
 import { getRecipe, saveRecipe } from '../../store/storage';
 import { getSettings, saveSettings } from '../../store/settingsStorage';
 import { hapticStep, hapticSuccess } from '../../lib/haptics';
@@ -38,17 +43,22 @@ export default function CookingModeScreen({ route, navigation }: Props) {
   const [checkedIngr, setCheckedIngr] = useState<Set<string>>(new Set());
   const [largerText, setLargerText] = useState(false);
   const [speakOn, setSpeakOn] = useState(false);
+  const [trackWidth, setTrackWidth] = useState(0);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const dirRef = useRef<1 | -1>(1);  // which side the next step slides in from
+  const dirRef = useRef<1 | -1>(1);
+
+  const fillWidth = useSharedValue(0);
+  const fillStyle = useAnimatedStyle(() => ({ width: fillWidth.value }));
+
+  // Derive step info before any early returns so hooks stay at the top.
+  const steps = recipe?.steps ?? [];
+  const stepCount = steps.length;
 
   useEffect(() => {
     getRecipe(recipeId).then(r => { if (r) setRecipe(r); });
     getSettings().then(s => { setLargerText(s.largerText); setSpeakOn(s.speakSteps); });
   }, [recipeId]);
 
-  // Read the current step aloud whenever it changes (and on entry) while the
-  // voice toggle is on; always cut any ongoing speech first so steps never
-  // overlap. Silence everything on exit.
   useEffect(() => {
     Speech.stop();
     const text = recipe?.steps[stepIndex]?.text;
@@ -58,10 +68,20 @@ export default function CookingModeScreen({ route, navigation }: Props) {
   }, [speakOn, stepIndex, recipe]);
   useEffect(() => () => { Speech.stop(); }, []);
 
+  // Animate the progress fill whenever step or track size changes.
+  useEffect(() => {
+    if (trackWidth > 0 && stepCount > 0) {
+      fillWidth.value = withTiming(
+        (trackWidth / stepCount) * (stepIndex + 1),
+        { duration: 280, easing: Curves.enter },
+      );
+    }
+  }, [stepIndex, trackWidth, stepCount]);
+
   async function toggleSpeak() {
     hapticStep();
     const next = !speakOn;
-    setSpeakOn(next);  // the effect above speaks/stops accordingly
+    setSpeakOn(next);
     const s = await getSettings();
     await saveSettings({ ...s, speakSteps: next });
   }
@@ -81,7 +101,6 @@ export default function CookingModeScreen({ route, navigation }: Props) {
     return () => { if (tickRef.current) clearInterval(tickRef.current); };
   }, []);
 
-  // Cancel any pending timer notifications when leaving cooking mode.
   useEffect(() => {
     return () => {
       timers.forEach(t => { if (t.notificationId) cancelTimerNotification(t.notificationId); });
@@ -108,7 +127,6 @@ export default function CookingModeScreen({ route, navigation }: Props) {
     const t = timers.find(x => x.id === id);
     if (!t) return;
     if (t.running) {
-      // pausing: drop the scheduled notification
       if (t.notificationId) await cancelTimerNotification(t.notificationId);
       setTimers(prev => prev.map(x => x.id === id ? { ...x, running: false, notificationId: undefined } : x));
     } else if (t.remaining > 0) {
@@ -134,6 +152,24 @@ export default function CookingModeScreen({ route, navigation }: Props) {
     return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
   }
 
+  // Horizontal swipe to move between steps; failOffsetY hands vertically
+  // dominant gestures back to the ScrollView so long steps still scroll.
+  const swipe = Gesture.Pan()
+    .runOnJS(true)
+    .activeOffsetX([-20, 20])
+    .failOffsetY([-20, 20])
+    .onEnd((e) => {
+      if (e.translationX < -60 && stepIndex < stepCount - 1) {
+        hapticStep();
+        dirRef.current = 1;
+        setStepIndex(i => i + 1);
+      } else if (e.translationX > 60 && stepIndex > 0) {
+        hapticStep();
+        dirRef.current = -1;
+        setStepIndex(i => i - 1);
+      }
+    });
+
   if (!recipe) {
     return (
       <View style={[styles.container, { paddingTop: insets.top + 8, paddingHorizontal: 26, justifyContent: 'center' }]}>
@@ -143,123 +179,132 @@ export default function CookingModeScreen({ route, navigation }: Props) {
     );
   }
 
-  const steps = recipe.steps;
   const current = steps[stepIndex];
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.ctrlBtn} onPress={() => navigation.goBack()}>
-          <Icon name="x" size={20} color="#fff" />
-        </TouchableOpacity>
-        <View style={styles.stepPill}>
-          <Text style={styles.stepPillTxt}>Step {stepIndex + 1} of {steps.length}</Text>
+    <GestureDetector gesture={swipe}>
+      <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.ctrlBtn} onPress={() => navigation.goBack()}>
+            <Icon name="x" size={20} color="#fff" />
+          </TouchableOpacity>
+          <View style={styles.stepPill}>
+            <Text style={styles.stepPillTxt}>Step {stepIndex + 1} of {steps.length}</Text>
+          </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={[styles.ctrlBtn, speakOn && styles.ctrlBtnOn]}
+              onPress={toggleSpeak}
+              accessibilityLabel={speakOn ? 'Stop reading steps aloud' : 'Read steps aloud'}
+            >
+              <Icon name="soundwave" size={20} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.ctrlBtn} onPress={() => setShowIngr(true)}>
+              <Icon name="list" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={[styles.ctrlBtn, speakOn && styles.ctrlBtnOn]}
-            onPress={toggleSpeak}
-            accessibilityLabel={speakOn ? 'Stop reading steps aloud' : 'Read steps aloud'}
+
+        {/* Segmented progress bar */}
+        <View
+          style={styles.progressTrack}
+          onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+        >
+          <Animated.View style={[styles.progressFill, fillStyle]} />
+          {/* Segment dividers */}
+          {steps.length > 1 && steps.map((_, i) => i < steps.length - 1 && (
+            <View
+              key={i}
+              style={[styles.progressDivider, { left: `${((i + 1) / steps.length) * 100}%` as any }]}
+            />
+          ))}
+        </View>
+
+        {/* Step content */}
+        <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
+          <Animated.View
+            key={stepIndex}
+            entering={(dirRef.current === 1 ? FadeInRight : FadeInLeft).duration(280)}
+            exiting={FadeOut.duration(120)}
           >
-            <Icon name="soundwave" size={20} color="#fff" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.ctrlBtn} onPress={() => setShowIngr(true)}>
-            <Icon name="list" size={20} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </View>
+            <Text style={[styles.stepText, largerText && styles.stepTextLarge]}>{current?.text}</Text>
+            {current?.timerSeconds ? (
+              <TouchableOpacity style={styles.timerBtn} onPress={() => startTimer(current)}>
+                <Icon name="timer" size={18} color="#fff" />
+                <Text style={styles.timerBtnTxt}>Start {fmtTimer(current.timerSeconds)} timer</Text>
+              </TouchableOpacity>
+            ) : null}
+          </Animated.View>
 
-      {/* Progress dots */}
-      <View style={styles.dots}>
-        {steps.map((_, i) => (
-          <View key={i} style={[styles.dot, { backgroundColor: i <= stepIndex ? '#fff' : 'rgba(255,255,255,0.22)' }]} />
-        ))}
-      </View>
-
-      {/* Step content */}
-      <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
-        <Animated.View
-          key={stepIndex}
-          entering={(dirRef.current === 1 ? FadeInRight : FadeInLeft).duration(280)}
-          exiting={FadeOut.duration(120)}
-        >
-          <Text style={[styles.stepText, largerText && styles.stepTextLarge]}>{current?.text}</Text>
-          {current?.timerSeconds ? (
-            <TouchableOpacity style={styles.timerBtn} onPress={() => startTimer(current)}>
-              <Icon name="timer" size={18} color="#fff" />
-              <Text style={styles.timerBtnTxt}>Start {fmtTimer(current.timerSeconds)} timer</Text>
-            </TouchableOpacity>
-          ) : null}
-        </Animated.View>
-
-        {/* Active timers */}
-        {timers.length > 0 && (
-          <View style={styles.activeTimers}>
-            {timers.map(t => (
-              <View key={t.id} style={styles.timerChip}>
-                <Text style={[styles.timerChipTxt, t.remaining === 0 && { color: Colors.accent }]}>
-                  {t.label}: {t.remaining === 0 ? 'Done!' : fmtTimer(t.remaining)}
-                </Text>
-                {t.remaining > 0 && (
-                  <TouchableOpacity onPress={() => toggleTimer(t.id)} hitSlop={10}>
-                    <Icon name={t.running ? 'pause' : 'play'} size={17} color="#fff" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Nav */}
-      <View style={[styles.nav, { paddingBottom: Math.max(insets.bottom, 20) + 12 }]}>
-        <TouchableOpacity
-          style={[styles.backBtn, stepIndex === 0 && { opacity: 0.4 }]}
-          onPress={() => { hapticStep(); dirRef.current = -1; setStepIndex(i => Math.max(0, i - 1)); }}
-          disabled={stepIndex === 0}
-        >
-          <Icon name="back" size={22} color="#fff" />
-        </TouchableOpacity>
-        {stepIndex < steps.length - 1 ? (
-          <TouchableOpacity style={styles.nextBtn} onPress={() => { hapticStep(); dirRef.current = 1; setStepIndex(i => i + 1); }}>
-            <Text style={styles.nextBtnTxt}>Next step</Text>
-            <Icon name="fwd" size={18} color="#14110c" />
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={[styles.nextBtn, { backgroundColor: Colors.accent }]} onPress={finishCooking}>
-            <Text style={[styles.nextBtnTxt, { color: '#fff' }]}>Done — I cooked it!</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Ingredient overlay */}
-      <Modal visible={showIngr} transparent animationType="slide" onRequestClose={() => setShowIngr(false)}>
-        <View style={styles.ingrOverlay}>
-          <View style={[styles.ingrSheet, { paddingBottom: Math.max(insets.bottom, 20) + 16 }]}>
-            <View style={styles.ingrHandle} />
-            <Text style={styles.ingrTitle}>Ingredients</Text>
-            <ScrollView>
-              {recipe.ingredients.map(ing => (
-                <TouchableOpacity
-                  key={ing.id}
-                  style={styles.ingrRow}
-                  onPress={() => setCheckedIngr(prev => { const n = new Set(prev); n.has(ing.id) ? n.delete(ing.id) : n.add(ing.id); return n; })}
-                >
-                  <AnimatedCheck checked={checkedIngr.has(ing.id)} borderColor="rgba(255,255,255,0.3)" />
-                  <Text style={[styles.ingrTxt, checkedIngr.has(ing.id) && styles.ingrDone]}>
-                    <Text style={{ fontFamily: Fonts.uiBold }}>{ing.quantity} {ing.unit}</Text> {ing.name}
+          {/* Active timers */}
+          {timers.length > 0 && (
+            <View style={styles.activeTimers}>
+              {timers.map(t => (
+                <View key={t.id} style={styles.timerChip}>
+                  <Text style={[styles.timerChipTxt, t.remaining === 0 && { color: Colors.accent }]}>
+                    {t.label}: {t.remaining === 0 ? 'Done!' : fmtTimer(t.remaining)}
                   </Text>
-                </TouchableOpacity>
+                  {t.remaining > 0 && (
+                    <TouchableOpacity onPress={() => toggleTimer(t.id)} hitSlop={10}>
+                      <Icon name={t.running ? 'pause' : 'play'} size={17} color="#fff" />
+                    </TouchableOpacity>
+                  )}
+                </View>
               ))}
-            </ScrollView>
-            <TouchableOpacity style={styles.gotItBtn} onPress={() => setShowIngr(false)}>
-              <Text style={styles.gotItTxt}>Got it</Text>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Nav */}
+        <View style={[styles.nav, { paddingBottom: Math.max(insets.bottom, 20) + 12 }]}>
+          <TouchableOpacity
+            style={[styles.backBtn, stepIndex === 0 && { opacity: 0.4 }]}
+            onPress={() => { hapticStep(); dirRef.current = -1; setStepIndex(i => Math.max(0, i - 1)); }}
+            disabled={stepIndex === 0}
+          >
+            <Icon name="back" size={22} color="#fff" />
+          </TouchableOpacity>
+          {stepIndex < steps.length - 1 ? (
+            <TouchableOpacity style={styles.nextBtn} onPress={() => { hapticStep(); dirRef.current = 1; setStepIndex(i => i + 1); }}>
+              <Text style={styles.nextBtnTxt}>Next step</Text>
+              <Icon name="fwd" size={18} color="#14110c" />
             </TouchableOpacity>
-          </View>
+          ) : (
+            <TouchableOpacity style={[styles.nextBtn, { backgroundColor: Colors.accent }]} onPress={finishCooking}>
+              <Text style={[styles.nextBtnTxt, { color: '#fff' }]}>Done — I cooked it!</Text>
+            </TouchableOpacity>
+          )}
         </View>
-      </Modal>
-    </View>
+
+        {/* Ingredient overlay */}
+        <Modal visible={showIngr} transparent animationType="slide" onRequestClose={() => setShowIngr(false)}>
+          <View style={styles.ingrOverlay}>
+            <View style={[styles.ingrSheet, { paddingBottom: Math.max(insets.bottom, 20) + 16 }]}>
+              <View style={styles.ingrHandle} />
+              <Text style={styles.ingrTitle}>Ingredients</Text>
+              <ScrollView>
+                {recipe.ingredients.map(ing => (
+                  <TouchableOpacity
+                    key={ing.id}
+                    style={styles.ingrRow}
+                    onPress={() => setCheckedIngr(prev => { const n = new Set(prev); n.has(ing.id) ? n.delete(ing.id) : n.add(ing.id); return n; })}
+                  >
+                    <AnimatedCheck checked={checkedIngr.has(ing.id)} borderColor="rgba(255,255,255,0.3)" />
+                    <Text style={[styles.ingrTxt, checkedIngr.has(ing.id) && styles.ingrDone]}>
+                      <Text style={{ fontFamily: Fonts.uiBold }}>{ing.quantity} {ing.unit}</Text> {ing.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <TouchableOpacity style={styles.gotItBtn} onPress={() => setShowIngr(false)}>
+                <Text style={styles.gotItTxt}>Got it</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      </View>
+    </GestureDetector>
   );
 }
 
@@ -271,8 +316,13 @@ const styles = StyleSheet.create({
   headerRight: { flexDirection: 'row', gap: 8 },
   stepPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99 },
   stepPillTxt: { fontFamily: Fonts.uiBold, fontSize: 13, color: '#fff' },
-  dots: { flexDirection: 'row', gap: 6, paddingHorizontal: 22, marginTop: 18 },
-  dot: { flex: 1, height: 4, borderRadius: 99 },
+  progressTrack: {
+    height: 4, marginHorizontal: 22, marginTop: 18,
+    borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.15)',
+    overflow: 'hidden', position: 'relative',
+  },
+  progressFill: { position: 'absolute', top: 0, left: 0, bottom: 0, backgroundColor: '#fff', borderRadius: 99 },
+  progressDivider: { position: 'absolute', top: 0, bottom: 0, width: 2, backgroundColor: '#13110C' },
   body: { flex: 1, paddingHorizontal: 26 },
   bodyContent: { flexGrow: 1, justifyContent: 'center', paddingVertical: 24 },
   stepText: { fontFamily: Fonts.displayMedium, fontSize: 34, color: '#fff', lineHeight: 43 },
