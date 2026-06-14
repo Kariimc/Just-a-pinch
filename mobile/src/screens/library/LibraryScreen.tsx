@@ -158,8 +158,14 @@ export default function LibraryScreen() {
           </View>
         ) : (
           <View style={styles.listPad}>
-            {sorted.map(r => (
-              <RecipeCard key={r.id} recipe={r} onPress={() => navigation.navigate('RecipeDetail', { recipeId: r.id })} variant="list" />
+            {sorted.map((r, i) => (
+              <Animated.View
+                key={r.id}
+                entering={FadeInDown.delay(Math.min(i, 8) * 40).springify().damping(26).stiffness(240)}
+                layout={LinearTransition.springify().damping(26).stiffness(240)}
+              >
+                <RecipeCard recipe={r} onPress={() => navigation.navigate('RecipeDetail', { recipeId: r.id })} variant="list" />
+              </Animated.View>
             ))}
           </View>
         )}

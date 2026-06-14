@@ -4,6 +4,7 @@ import {
   StyleSheet, FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useFocusEffect, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, Recipe } from '../types';
@@ -125,12 +126,16 @@ export default function SearchScreen() {
               {query.trim() ? ` for "${query.trim()}"` : ''}
             </Text>
           }
-          renderItem={({ item }) => (
-            <RecipeCard
-              recipe={item}
-              onPress={() => navigation.navigate('RecipeDetail', { recipeId: item.id })}
-              variant="list"
-            />
+          renderItem={({ item, index }) => (
+            <Animated.View
+              entering={FadeInDown.delay(Math.min(index, 8) * 35).duration(260).springify().damping(26).stiffness(240)}
+            >
+              <RecipeCard
+                recipe={item}
+                onPress={() => navigation.navigate('RecipeDetail', { recipeId: item.id })}
+                variant="list"
+              />
+            </Animated.View>
           )}
         />
       )}
