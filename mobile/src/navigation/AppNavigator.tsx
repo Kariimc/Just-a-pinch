@@ -127,14 +127,19 @@ function TabBar() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: [styles.tabbar, { height: 64 + insets.bottom, paddingBottom: Math.max(insets.bottom, 8) }],
+        tabBarStyle: [styles.tabbar, { height: 74 + insets.bottom, paddingBottom: Math.max(insets.bottom, 10) }],
         tabBarActiveTintColor: Colors.accentDeep,
         tabBarInactiveTintColor: Colors.ink3,
         tabBarButton: TabButton,
+        // includeFontPadding:false trims Android's extra glyph padding; the
+        // explicit lineHeight stops the descenders on "Recipes"/"Plan" from
+        // being clipped on web, where the label box was sitting too short.
         tabBarLabelStyle: {
           fontSize: 10.5,
+          lineHeight: 14,
           fontFamily: Fonts.uiSemiBold,
-          marginTop: 1,
+          marginTop: 2,
+          includeFontPadding: false,
         },
       }}
     >
@@ -245,11 +250,11 @@ const styles = StyleSheet.create({
   },
   tabBtn: { alignItems: 'center', justifyContent: 'center' },
   tabGlyphWrap: {
-    width: 52, height: 30,
+    width: 52, height: 28,
     alignItems: 'center', justifyContent: 'center',
   },
   tabPill: {
-    position: 'absolute', width: 48, height: 30,
+    position: 'absolute', width: 48, height: 28,
     borderRadius: Radius.pill, backgroundColor: Colors.accentSoft,
   },
   plusWrap: {
