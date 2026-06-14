@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Animated, {
   cancelAnimation, interpolate, useAnimatedStyle, useSharedValue,
@@ -50,26 +50,70 @@ function AddPlaceholder() {
 }
 
 // Tab icon with focus choreography: a soft pill blooms behind the glyph while
-// the icon rises 2px and pops once on the expressive spring.
+// the icon rises 2px and pops once on the expressive spring. On top of that,
+// each tab plays a one-shot reaction the moment it becomes active (a "click"),
+// themed to its concept but kept legible at 24px and built on the shared
+// motion tokens — never hand-rolled springs:
+//   home → the house lights up (warm glow)
+//   book → flips open on the Y axis
+//   calendar → flips like a turning page on the X axis
+//   cart → bounces as a food block drops in
 function TabGlyph({ name, color, focused }: { name: IconName; color: string; focused: boolean }) {
   const f = useSharedValue(focused ? 1 : 0);
+  const react = useSharedValue(0);
+  const prevFocused = useRef(focused);
 
   useEffect(() => {
     f.value = focused ? withSpring(1, Springs.pop) : withSpring(0, Springs.glide);
-  }, [focused, f]);
+    // Rising edge of focus = the tap that selected this tab → play the reaction.
+    if (focused && !prevFocused.current) {
+      react.value = 0;
+      react.value = withSequence(
+        withTiming(1, { duration: 220, easing: Curves.enter }),
+        withSpring(0, Springs.glide),
+      );
+    }
+    prevFocused.current = focused;
+  }, [focused, f, react]);
 
   const pill = useAnimatedStyle(() => ({
     opacity: Math.min(f.value, 1),
     transform: [{ scaleX: 0.6 + f.value * 0.4 }, { scaleY: 0.8 + f.value * 0.2 }],
   }));
 
-  const glyph = useAnimatedStyle(() => ({
-    transform: [{ translateY: f.value * -2 }, { scale: 1 + f.value * 0.08 }],
+  const glyph = useAnimatedStyle(() => {
+    const lift = f.value * -2;
+    const pop = 1 + f.value * 0.08;
+    if (name === 'book') {
+      return { transform: [{ perspective: 600 }, { translateY: lift }, { rotateY: `${react.value * -150}deg` }, { scale: pop }] };
+    }
+    if (name === 'calendar') {
+      return { transform: [{ perspective: 600 }, { translateY: lift }, { rotateX: `${react.value * -150}deg` }, { scale: pop }] };
+    }
+    if (name === 'cart') {
+      return { transform: [{ translateY: lift - react.value * 3 }, { scale: pop + react.value * 0.06 }] };
+    }
+    // home + default: a touch of extra pop on the reaction
+    return { transform: [{ translateY: lift }, { scale: pop + react.value * 0.05 }] };
+  });
+
+  // The house "lights on" glow — warms up while Home is active, flares on tap.
+  const glow = useAnimatedStyle(() => ({
+    opacity: name === 'home' ? Math.min(1, f.value * 0.4 + react.value * 0.45) : 0,
+    transform: [{ scale: 0.7 + f.value * 0.3 + react.value * 0.25 }],
+  }));
+
+  // The food block that drops into the cart on tap.
+  const drop = useAnimatedStyle(() => ({
+    opacity: name === 'cart' ? react.value : 0,
+    transform: [{ translateY: interpolate(react.value, [0, 1], [-9, 3]) }],
   }));
 
   return (
     <View style={styles.tabGlyphWrap}>
       <Animated.View style={[styles.tabPill, pill]} />
+      {name === 'home' && <Animated.View style={[styles.tabGlow, glow]} pointerEvents="none" />}
+      {name === 'cart' && <Animated.View style={[styles.tabDrop, drop]} pointerEvents="none" />}
       <Animated.View style={glyph}>
         <Icon name={name} size={24} color={color} />
       </Animated.View>
@@ -127,14 +171,19 @@ function TabBar() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: [styles.tabbar, { height: 64 + insets.bottom, paddingBottom: Math.max(insets.bottom, 8) }],
+        tabBarStyle: [styles.tabbar, { height: 74 + insets.bottom, paddingBottom: Math.max(insets.bottom, 10) }],
         tabBarActiveTintColor: Colors.accentDeep,
         tabBarInactiveTintColor: Colors.ink3,
         tabBarButton: TabButton,
+        // includeFontPadding:false trims Android's extra glyph padding; the
+        // explicit lineHeight stops the descenders on "Recipes"/"Plan" from
+        // being clipped on web, where the label box was sitting too short.
         tabBarLabelStyle: {
           fontSize: 10.5,
+          lineHeight: 14,
           fontFamily: Fonts.uiSemiBold,
-          marginTop: 1,
+          marginTop: 2,
+          includeFontPadding: false,
         },
       }}
     >
@@ -245,12 +294,22 @@ const styles = StyleSheet.create({
   },
   tabBtn: { alignItems: 'center', justifyContent: 'center' },
   tabGlyphWrap: {
-    width: 52, height: 30,
+    width: 52, height: 28,
     alignItems: 'center', justifyContent: 'center',
   },
   tabPill: {
-    position: 'absolute', width: 48, height: 30,
+    position: 'absolute', width: 48, height: 28,
     borderRadius: Radius.pill, backgroundColor: Colors.accentSoft,
+  },
+  // Warm "lights on" glow behind the Home glyph.
+  tabGlow: {
+    position: 'absolute', width: 30, height: 30, borderRadius: 15,
+    backgroundColor: '#F6C66B',
+  },
+  // A small food block that drops into the List/cart glyph on tap.
+  tabDrop: {
+    position: 'absolute', top: 1, width: 7, height: 7, borderRadius: 2,
+    backgroundColor: Colors.accentDeep,
   },
   plusWrap: {
     width: 50, height: 40, marginTop: -6,

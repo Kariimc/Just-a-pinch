@@ -16,6 +16,10 @@ const KEYS = {
   shopping: '@jap_shopping',
   pantry: '@jap_pantry',
   profile: '@jap_profile',
+  // Holds a profile edit that hasn't yet made it to the DB, so a stale DB read
+  // can't clobber it on the next getProfile (the "Settings saved but Home shows
+  // the old name" bug). Cleared once the edit successfully syncs.
+  profileDirty: '@jap_profile_dirty',
   onboarded: '@jap_onboarded',
 };
 
@@ -30,6 +34,10 @@ async function get<T>(key: string): Promise<T | null> {
 
 async function set<T>(key: string, value: T): Promise<void> {
   await AsyncStorage.setItem(key, JSON.stringify(value));
+}
+
+async function remove(key: string): Promise<void> {
+  try { await AsyncStorage.removeItem(key); } catch { /* ignore */ }
 }
 
 async function authed(): Promise<boolean> {
@@ -227,8 +235,29 @@ async function healProfile(profile: UserProfile | null): Promise<UserProfile | n
 }
 
 export async function getProfile(): Promise<UserProfile | null> {
+  // An edit that never reached the DB outranks whatever the DB returns —
+  // otherwise a failed write would let the stale row overwrite the user's
+  // change. Retry pushing it while we're here; only on success do we let the
+  // DB become the source of truth again.
+  const dirty = await get<UserProfile>(KEYS.profileDirty);
+
   if (await authed()) {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      // Only re-push a pending edit if it belongs to the signed-in account —
+      // a leftover edit from a previous user (sign-out keeps local data) must
+      // never be written onto someone else's profile.
+      if (dirty && user && dirty.id === user.id) {
+        try {
+          await dbSaveProfile(dirty);
+          await remove(KEYS.profileDirty);
+        } catch {
+          await set(KEYS.profile, dirty);
+          return dirty;
+        }
+      } else if (dirty) {
+        await remove(KEYS.profileDirty);
+      }
       const profile = await healProfile(await dbGetProfile());
       if (profile) {
         await set(KEYS.profile, profile);
@@ -236,16 +265,22 @@ export async function getProfile(): Promise<UserProfile | null> {
       }
     } catch { /* fall through */ }
   }
-  return get<UserProfile>(KEYS.profile);
+
+  return dirty ?? (await get<UserProfile>(KEYS.profile));
 }
 
 export async function saveProfile(profile: UserProfile): Promise<void> {
-  // Like saveRecipe: never gate the write on getSession() — it reports null
-  // during web boot, the DB write would be skipped, and the next getProfile()
-  // would clobber the local edit with the stale DB row. dbSaveProfile
-  // resolves the user itself and throws when truly signed out.
-  try { await dbSaveProfile(profile); } catch { /* offline / signed out */ }
+  // Local first so the UI never loses the edit. Then try the DB: on success
+  // the edit is durable; on failure we stash it as "dirty" so the next
+  // getProfile re-pushes it instead of reading back the stale row. (This is
+  // what fixes "Settings saved the new name but Home still shows the old one.")
   await set(KEYS.profile, profile);
+  try {
+    await dbSaveProfile(profile);
+    await remove(KEYS.profileDirty);
+  } catch {
+    await set(KEYS.profileDirty, profile);
+  }
 }
 
 // ── Featured Recipes ──────────────────────────────────────────────────────────

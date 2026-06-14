@@ -41,7 +41,21 @@ export default function MealPlanScreen() {
   const [pickerDay, setPickerDay] = useState(new Date());
 
   const today = new Date();
-  const days = weekDays(today);
+  const [weekStart, setWeekStart] = useState(today);
+  const days = weekDays(weekStart);
+
+  function shiftWeek(delta: number) {
+    setWeekStart(prev => {
+      const d = new Date(prev);
+      d.setDate(d.getDate() + delta * 7);
+      return d;
+    });
+    setSelectedDay(prev => {
+      const d = new Date(prev);
+      d.setDate(d.getDate() + delta * 7);
+      return d;
+    });
+  }
 
   async function load() {
     const [e, r, p] = await Promise.all([getMealPlan(), getRecipes(), getProfile()]);
@@ -189,6 +203,13 @@ export default function MealPlanScreen() {
   const todayKey = dateKey(today);
   const pickerDayKey = dateKey(pickerDay);
 
+  const weekStartKey = dateKey(weekStart);
+  const currentWeekStartKey = dateKey(today);
+  const isCurrentWeek = weekStartKey === currentWeekStartKey;
+  const weekLabel = isCurrentWeek
+    ? 'This week'
+    : days[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' – ' + days[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
   return (
     <View style={[styles.container, { paddingTop: insets.top + 6 }]}>
       <View style={styles.header}>
@@ -199,11 +220,19 @@ export default function MealPlanScreen() {
             </TouchableOpacity>
           )}
           <View>
-            <Text style={styles.subTxt}>This week</Text>
-            <Text style={styles.title}>{today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {days[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</Text>
+            <Text style={styles.subTxt}>{weekLabel}</Text>
+            <Text style={styles.title}>
+              {days[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {days[6].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </Text>
           </View>
         </View>
         <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => shiftWeek(-1)}>
+            <Icon name="back" size={18} color={Colors.ink} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => shiftWeek(1)}>
+            <Icon name="fwd" size={18} color={Colors.ink} />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.iconBtn} onPress={generateShoppingList}>
             <Icon name="cart" size={20} color={Colors.ink} />
           </TouchableOpacity>

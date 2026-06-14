@@ -12,6 +12,7 @@ import Chip from '../../components/Chip';
 import Icon from '../../components/Icon';
 import { GridCardSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
+import { showActionSheet } from '../../components/ActionSheet';
 
 const MEAL_FILTERS = ['All', 'Quick & Easy', 'Vegetarian', 'Breakfast', 'Brunch', 'Dinner', 'Snacks', 'Desserts', 'Baking', 'Comfort'];
 
@@ -61,9 +62,16 @@ export default function LibraryScreen() {
     return b.savedAt - a.savedAt;
   });
 
-  function cycleSort() {
-    const idx = SORTS.findIndex(s => s.key === sort);
-    setSort(SORTS[(idx + 1) % SORTS.length].key);
+  function openSortMenu() {
+    showActionSheet({
+      title: 'Sort recipes',
+      actions: SORTS.map(s => ({
+        // A leading check marks the current choice — the sheet has no built-in
+        // selected state, so it rides in the label.
+        label: `${sort === s.key ? '✓  ' : ''}${s.label}`,
+        onPress: () => setSort(s.key),
+      })),
+    });
   }
 
   const sortLabel = SORTS.find(s => s.key === sort)?.label ?? '';
@@ -102,7 +110,7 @@ export default function LibraryScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {MEAL_FILTERS.map(f => (
-              <Chip key={f} label={f} soft={filter === f} active={filter === f} onPress={() => setFilter(f)} />
+              <Chip key={f} label={f} active={filter === f} onPress={() => setFilter(f)} />
             ))}
             <View style={{ width: 8 }} />
           </View>
@@ -114,7 +122,8 @@ export default function LibraryScreen() {
             <Text style={{ fontFamily: Fonts.uiBold, color: Colors.ink }}>{sorted.length}</Text>
             <Text style={{ fontFamily: Fonts.uiRegular }}> recipe{sorted.length === 1 ? '' : 's'}</Text>
           </Text>
-          <TouchableOpacity onPress={cycleSort} style={styles.sortBtn}>
+          <TouchableOpacity onPress={openSortMenu} style={styles.sortBtn}>
+            <Text style={styles.sortLead}>Sort:</Text>
             <Text style={styles.sortTxt}>{sortLabel}</Text>
             <Icon name="down" size={13} color={Colors.ink2} />
           </TouchableOpacity>
@@ -158,8 +167,14 @@ export default function LibraryScreen() {
           </View>
         ) : (
           <View style={styles.listPad}>
-            {sorted.map(r => (
-              <RecipeCard key={r.id} recipe={r} onPress={() => navigation.navigate('RecipeDetail', { recipeId: r.id })} variant="list" />
+            {sorted.map((r, i) => (
+              <Animated.View
+                key={r.id}
+                entering={FadeInDown.delay(Math.min(i, 8) * 40).springify().damping(26).stiffness(240)}
+                layout={LinearTransition.springify().damping(26).stiffness(240)}
+              >
+                <RecipeCard recipe={r} onPress={() => navigation.navigate('RecipeDetail', { recipeId: r.id })} variant="list" />
+              </Animated.View>
             ))}
           </View>
         )}
@@ -191,6 +206,7 @@ const styles = StyleSheet.create({
   countRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   countTxt: { fontSize: 12.5, color: Colors.ink3 },
   sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4 },
+  sortLead: { fontFamily: Fonts.uiRegular, fontSize: 12.5, color: Colors.ink3 },
   sortTxt: { fontFamily: Fonts.uiBold, fontSize: 12.5, color: Colors.ink2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 13, paddingBottom: 100 },
   listPad: { paddingBottom: 100 },

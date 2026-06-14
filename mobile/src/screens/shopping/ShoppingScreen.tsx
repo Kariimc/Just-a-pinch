@@ -1,14 +1,16 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
   KeyboardAvoidingView, Platform, LayoutAnimation, UIManager, Linking,
 } from 'react-native';
+import Animated, { useSharedValue, withTiming, useAnimatedStyle } from 'react-native-reanimated';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Svg, { Path } from 'react-native-svg';
 import { Colors, Radius, Fonts } from '../../theme';
+import { Curves } from '../../theme/motion';
 import Icon from '../../components/Icon';
 import AnimatedCheck from '../../components/AnimatedCheck';
 import EmptyState from '../../components/EmptyState';
@@ -83,10 +85,25 @@ export default function ShoppingScreen() {
   const [items, setItems] = useState<ShoppingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [newItem, setNewItem] = useState('');
+  const trackWidthRef = useRef(0);
+  const fillWidth = useSharedValue(0);
+  const fillStyle = useAnimatedStyle(() => ({ width: fillWidth.value }));
 
   useFocusEffect(useCallback(() => {
     getShoppingItems().then(i => { setItems(i); setLoading(false); });
   }, []));
+
+  // Animate the progress bar whenever items change.
+  useEffect(() => {
+    if (trackWidthRef.current > 0) {
+      const t = items.length;
+      const c = items.filter(i => i.checked).length;
+      fillWidth.value = withTiming(
+        t > 0 ? (c / t) * trackWidthRef.current : 0,
+        { duration: 400, easing: Curves.enter },
+      );
+    }
+  }, [items]);
 
   async function toggle(id: string) {
     hapticLight();
@@ -189,12 +206,16 @@ export default function ShoppingScreen() {
   const checked = items.filter(i => i.checked).length;
 
   const byCategory = CATEGORIES.reduce((acc, cat) => {
-    const catItems = items.filter(i => i.category === cat);
+    const catItems = items
+      .filter(i => i.category === cat)
+      .sort((a, b) => Number(a.checked) - Number(b.checked)); // unchecked first
     if (catItems.length) acc[cat] = catItems;
     return acc;
   }, {} as Record<string, ShoppingItem[]>);
 
-  const uncategorised = items.filter(i => !CATEGORIES.includes(i.category));
+  const uncategorised = items
+    .filter(i => !CATEGORIES.includes(i.category))
+    .sort((a, b) => Number(a.checked) - Number(b.checked));
   if (uncategorised.length) byCategory['Other'] = [...(byCategory['Other'] ?? []), ...uncategorised];
 
   return (
@@ -209,8 +230,15 @@ export default function ShoppingScreen() {
 
         {total > 0 && (
           <View style={styles.progressRow}>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${(checked / total) * 100}%` }]} />
+            <View
+              style={styles.progressTrack}
+              onLayout={(e) => {
+                trackWidthRef.current = e.nativeEvent.layout.width;
+                const c = items.filter(i => i.checked).length;
+                fillWidth.value = total > 0 ? (c / total) * e.nativeEvent.layout.width : 0;
+              }}
+            >
+              <Animated.View style={[styles.progressFill, fillStyle]} />
             </View>
             <Text style={styles.progressTxt}>{checked} of {total}</Text>
           </View>

@@ -6,7 +6,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue, useAnimatedStyle, useAnimatedScrollHandler,
-  withSpring, withSequence, interpolate, Extrapolation,
+  withSpring, withSequence, interpolate, Extrapolation, FadeIn,
 } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -60,6 +60,17 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   });
   const bookmarkStyle = useAnimatedStyle(() => ({ transform: [{ scale: bookmarkScale.value }] }));
   const servingsStyle = useAnimatedStyle(() => ({ transform: [{ scale: servingsScale.value }] }));
+
+  // Once the hero has scrolled mostly out of frame, a solid title bar fades in
+  // behind the pinned controls so the recipe name stays anchored. Opacity-only
+  // (no transforms) so it stays smooth on web too.
+  const topBarStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [150, 215], [0, 1], Extrapolation.CLAMP),
+  }));
+  const topBarTitleStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [172, 222], [0, 1], Extrapolation.CLAMP),
+    transform: [{ translateY: interpolate(scrollY.value, [172, 222], [9, 0], Extrapolation.CLAMP) }],
+  }));
 
   function bumpServings(delta: number) {
     hapticLight();
@@ -282,6 +293,8 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
             ))}
           </View>
 
+          {/* Tab content — keyed so each switch replays a soft fade-in */}
+          <Animated.View key={tab} entering={FadeIn.duration(200)}>
           {/* Ingredients tab */}
           {tab === 'ingredients' && (
             <View>
@@ -352,6 +365,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
               </View>
             )
           )}
+          </Animated.View>
 
           {/* Notes */}
           {recipe.notes ? (
@@ -361,6 +375,16 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
           ) : null}
         </View>
       </Animated.ScrollView>
+
+      {/* Solid title bar — fades in as the hero scrolls away, behind the controls */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.topBar, { height: insets.top + 56, paddingTop: insets.top }, topBarStyle]}
+      >
+        <Animated.Text numberOfLines={1} style={[styles.topBarTitle, topBarTitleStyle]}>
+          {recipe.title}
+        </Animated.Text>
+      </Animated.View>
 
       {/* Floating header controls — pinned while the hero parallaxes beneath */}
       <View style={[styles.heroOverlay, { top: insets.top + 8 }]} pointerEvents="box-none">
@@ -425,6 +449,16 @@ const styles = StyleSheet.create({
   heroOverlay: {
     position: 'absolute', left: 16, right: 16,
     flexDirection: 'row', justifyContent: 'space-between',
+  },
+  topBar: {
+    position: 'absolute', top: 0, left: 0, right: 0,
+    backgroundColor: Colors.glassPaper,
+    borderBottomWidth: 1, borderBottomColor: Colors.line,
+    alignItems: 'center', justifyContent: 'flex-end',
+    paddingBottom: 11, paddingHorizontal: 68,
+  },
+  topBarTitle: {
+    fontFamily: Fonts.uiBold, fontSize: 15.5, color: Colors.ink,
   },
   iconBtn: {
     width: 44, height: 44, borderRadius: 22,

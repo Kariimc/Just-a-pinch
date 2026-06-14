@@ -11,6 +11,7 @@ import { importFromUrl, ocrImage, parseTextRecipe } from '../../services/api';
 import { saveRecipe } from '../../store/storage';
 import { uid } from '../../utils/id';
 import BottomSheet from '../../components/BottomSheet';
+import FoodWatermark from '../../components/FoodWatermark';
 import Icon, { IconName } from '../../components/Icon';
 import { hapticSuccess } from '../../lib/haptics';
 import { showToast } from '../../components/Toast';
@@ -263,7 +264,12 @@ export default function AddMenuScreen({ navigation }: Props) {
   // Main action sheet
   return (
     <View style={styles.container}>
-      <BottomSheet visible={sheetVisible} onClose={() => navigation.goBack()}>
+      <BottomSheet
+        visible={sheetVisible}
+        onClose={() => navigation.goBack()}
+        backdrop={<FoodWatermark mode="dark" />}
+        dismissHint="Tap anywhere to close"
+      >
         {ocrChooser ? (
           <>
             <View style={styles.chooserHeader}>

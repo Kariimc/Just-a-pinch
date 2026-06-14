@@ -129,9 +129,11 @@ export default function HomeScreen() {
   const familyRecipes = recipes.filter(r => r.isFamily);
 
   // "ANDERSON'S" on the cookbook cover; names already ending in s get just
-  // the apostrophe ("CHILES'"). No last name → "OUR FAMILY COOKBOOK".
-  const coverName = lastName
-    ? `${lastName.toUpperCase()}${lastName.toLowerCase().endsWith('s') ? '’' : '’S'}`
+  // the apostrophe ("CHILES'"). Prefer the surname, fall back to the first
+  // name ("KARIIM'S"), and only land on "OUR FAMILY COOKBOOK" when neither is set.
+  const coverBase = lastName || userName;
+  const coverName = coverBase
+    ? `${coverBase.toUpperCase()}${coverBase.toLowerCase().endsWith('s') ? '’' : '’S'}`
     : 'OUR';
 
   return (
@@ -362,17 +364,20 @@ export default function HomeScreen() {
       ) : recipes.length > 0 ? (
         <>
           <Text style={[styles.secTitle, { marginTop: 24 }]}>From the family cookbook</Text>
+          {/* Even before any recipe is marked "family", show the engraved cover
+              as the hero so the showpiece is always present — it doubles as the
+              call-to-action to start one. */}
           <TouchableOpacity
-            style={styles.familyEmpty}
-            activeOpacity={0.8}
+            style={[styles.familyCard, Shadow.cardSoft]}
+            activeOpacity={0.9}
             onPress={() => navigation.navigate('AddMenu')}
           >
-            <Icon name="people" size={22} color={Colors.accentDeep} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.familyEmptyTitle}>Start your family cookbook</Text>
-              <Text style={styles.familyEmptySub}>Scan a handwritten card to keep it forever.</Text>
+            <CookbookCover style={StyleSheet.absoluteFill} />
+            <View style={styles.familyOverlay}>
+              <Text style={styles.familyName}>{coverName}</Text>
+              <Text style={styles.familyTitle}>FAMILY COOKBOOK</Text>
+              <Text style={styles.familySub}>+ TAP TO START YOURS</Text>
             </View>
-            <Icon name="fwd" size={18} color={Colors.ink3} />
           </TouchableOpacity>
         </>
       ) : null}
@@ -469,11 +474,4 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.uiSemiBold, fontSize: 9.5, color: '#D9D3BC',
     letterSpacing: 2.4, marginTop: 9, textAlign: 'center',
   },
-  familyEmpty: {
-    flexDirection: 'row', alignItems: 'center', gap: 13, marginTop: 12,
-    padding: 16, backgroundColor: Colors.surface,
-    borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.line,
-  },
-  familyEmptyTitle: { fontFamily: Fonts.uiBold, fontSize: 14.5, color: Colors.ink },
-  familyEmptySub: { fontFamily: Fonts.uiRegular, fontSize: 12.5, color: Colors.ink3, marginTop: 1 },
 });
