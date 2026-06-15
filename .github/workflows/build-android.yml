@@ -2,10 +2,19 @@ name: Build Android (Production)
 
 on:
   workflow_dispatch:
+    inputs:
+      profile:
+        description: Build profile (preview = installable APK, production = Play Store AAB)
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - production
 
 jobs:
   build:
-    name: EAS Build — Android Production
+    name: EAS Build — Android
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,8 +29,8 @@ jobs:
         working-directory: mobile
         run: npm ci
 
-      - name: Build Android AAB
+      - name: Build Android
         working-directory: mobile
-        run: npx eas-cli build --platform android --profile production --non-interactive
+        run: npx eas-cli build --platform android --profile ${{ inputs.profile || 'preview' }} --non-interactive
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
