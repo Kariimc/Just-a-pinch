@@ -148,6 +148,7 @@ export default function SettingsScreen({ navigation }: Props) {
   async function handleSave() {
     setSaving(true);
     try {
+      if (editingName) await saveName();
       await saveSettings(settings);
       if (settings.notificationsEnabled) {
         await scheduleDailyReminder(settings.notificationHour, settings.notificationMinute);
