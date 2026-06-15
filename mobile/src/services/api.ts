@@ -64,6 +64,22 @@ export async function parseTextRecipe(text: string): Promise<Partial<ImportResul
   return invokeRecipeApi<Partial<ImportResult>>({ action: 'parseText', text }, 'Parse failed');
 }
 
+// Looks up a single stock food photo for a dish (Pexels, keyed off title/tags)
+// without any AI call — used to back-fill cover photos for recipes that were
+// created without one. Resolves to undefined (never throws) when nothing is
+// found or PEXELS_API_KEY isn't set, so callers can skip gracefully.
+export async function fetchFoodPhotoFor(title: string, tags?: string[]): Promise<string | undefined> {
+  try {
+    const { imageUrl } = await invokeRecipeApi<{ imageUrl?: string }>(
+      { action: 'foodPhoto', title, tags },
+      'Could not fetch a photo',
+    );
+    return imageUrl || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // Creates an Instacart shopping-list page from the items and returns its URL.
 // Opening it lands the user in the Instacart app/site with every item matched
 // to real products, one tap from the cart.

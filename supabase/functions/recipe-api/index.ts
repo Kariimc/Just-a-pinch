@@ -64,6 +64,7 @@ Deno.serve(async (req) => {
       case 'ocr': return await ocr(req, body.image);
       case 'generate': return await generate(req, body.prompt, body.constraints);
       case 'instacartLink': return await instacartLink(body.items, body.title);
+      case 'foodPhoto': return await foodPhoto(body.title, body.tags);
       default: return json({ error: `Unknown action: ${body.action}` }, 400);
     }
   } catch (err) {
@@ -199,6 +200,14 @@ async function fetchFoodPhoto(title?: unknown, tags?: unknown): Promise<string |
     }
   }
   return undefined;
+}
+
+// Stand-alone photo lookup (no AI, no metering) so the app can back-fill cover
+// photos for recipes saved without one. Always 200s with { imageUrl } — the
+// value is undefined when nothing matches or PEXELS_API_KEY is unset.
+async function foodPhoto(title?: unknown, tags?: unknown) {
+  const imageUrl = await fetchFoodPhoto(title, tags);
+  return json({ imageUrl });
 }
 
 // ── Instacart ─────────────────────────────────────────────────────────────────

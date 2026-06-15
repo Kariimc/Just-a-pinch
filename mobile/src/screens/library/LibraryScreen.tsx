@@ -6,13 +6,15 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, Recipe } from '../../types';
 import { Colors, Radius, Fonts } from '../../theme';
-import { getRecipes } from '../../store/storage';
+import { getRecipes, saveRecipe } from '../../store/storage';
 import RecipeCard from '../../components/RecipeCard';
 import Chip from '../../components/Chip';
 import Icon from '../../components/Icon';
 import { GridCardSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import { showActionSheet } from '../../components/ActionSheet';
+import { showToast } from '../../components/Toast';
+import { fetchFoodPhotoFor } from '../../services/api';
 
 const MEAL_FILTERS = ['All', 'Quick & Easy', 'Vegetarian', 'Breakfast', 'Brunch', 'Dinner', 'Snacks', 'Desserts', 'Baking', 'Comfort'];
 
@@ -43,6 +45,7 @@ export default function LibraryScreen() {
   const [tab, setTab] = useState<'all' | 'saved' | 'created'>('all');
   const [filter, setFilter] = useState('All');
   const [sort, setSort] = useState<SortKey>('recent');
+  const [backfilling, setBackfilling] = useState(false);
 
   useFocusEffect(useCallback(() => {
     getRecipes().then(r => { setRecipes(r); setLoading(false); });
@@ -76,6 +79,41 @@ export default function LibraryScreen() {
 
   const sortLabel = SORTS.find(s => s.key === sort)?.label ?? '';
 
+  // Back-fill cover photos for recipes saved without one (AI/manual/paste, or a
+  // page with no extractable image) by pulling a stock dish photo per title.
+  async function fillMissingPhotos() {
+    const missing = recipes.filter(r => !r.imageUri);
+    if (!missing.length) return;
+    setBackfilling(true);
+    showToast(`Finding photos for ${missing.length} recipe${missing.length === 1 ? '' : 's'}…`, 'sparkle');
+    let added = 0;
+    for (const r of missing) {
+      const url = await fetchFoodPhotoFor(r.title, r.tags);
+      if (url) { await saveRecipe({ ...r, imageUri: url }); added += 1; }
+    }
+    setRecipes(await getRecipes());
+    setBackfilling(false);
+    showToast(
+      added ? `Added ${added} photo${added === 1 ? '' : 's'}` : 'No new photos found',
+      added ? 'check' : 'info',
+    );
+  }
+
+  function openMoreMenu() {
+    const missingCount = recipes.filter(r => !r.imageUri).length;
+    showActionSheet({
+      title: 'My Recipes',
+      actions: [{
+        label: backfilling
+          ? 'Finding photos…'
+          : missingCount
+            ? `Fill in ${missingCount} missing photo${missingCount === 1 ? '' : 's'}`
+            : 'All recipes have photos',
+        onPress: missingCount && !backfilling ? fillMissingPhotos : undefined,
+      }],
+    });
+  }
+
   return (
     <View style={[styles.container, { paddingTop: insets.top + 6 }]}>
       {/* App bar */}
@@ -90,6 +128,9 @@ export default function LibraryScreen() {
             onPress={() => setMode(m => m === 'grid' ? 'list' : 'grid')}
           >
             <Icon name={mode === 'grid' ? 'list' : 'grid'} size={20} color={Colors.ink} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={openMoreMenu}>
+            <Icon name="more" size={20} color={Colors.ink} />
           </TouchableOpacity>
         </View>
       </View>
