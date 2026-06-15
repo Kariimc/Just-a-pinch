@@ -18,7 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import RecipeCard from '../../components/RecipeCard';
 import Chip from '../../components/Chip';
 import FoodPlaceholder from '../../components/FoodPlaceholder';
-import CookbookCover from '../../components/CookbookCover';
+import CookbookHero from '../../components/CookbookHero';
 import Icon from '../../components/Icon';
 import Tappable from '../../components/Tappable';
 import Sheen from '../../components/Sheen';
@@ -366,20 +366,11 @@ export default function HomeScreen() {
       {recipes.length > 0 && (
         <>
           <Text style={[styles.secTitle, { marginTop: 24 }]}>From the family cookbook</Text>
-          <TouchableOpacity
-            style={[styles.familyCard, Shadow.cardSoft]}
-            activeOpacity={0.9}
+          <CookbookHero
+            name={lastName || userName || ''}
+            recipeCount={recipes.length}
             onPress={() => (navigation as any).navigate('Recipes')}
-          >
-            <CookbookCover style={StyleSheet.absoluteFill} />
-            <View style={styles.familyOverlay}>
-              <Text style={styles.familyName}>{coverName}</Text>
-              <Text style={styles.familyTitle}>FAMILY COOKBOOK</Text>
-              <Text style={styles.familySub}>
-                {recipes.length} RECIPE{recipes.length === 1 ? '' : 'S'} · TAP TO OPEN
-              </Text>
-            </View>
-          </TouchableOpacity>
+          />
         </>
       )}
       </ScrollView>
