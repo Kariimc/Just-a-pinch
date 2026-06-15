@@ -79,7 +79,8 @@
           "photosPermission": "Just a Pinch needs photo access so you can import recipe screenshots and add cover photos.",
           "cameraPermission": "Just a Pinch uses the camera to scan recipe cards and take photos of your dishes."
         }
-      ]
+      ],
+      "react-native-purchases"
     ]
   }
 }
