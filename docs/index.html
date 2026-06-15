@@ -4,180 +4,455 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Just a Pinch — Recipe Organizer</title>
-<meta name="description" content="Save recipes from any source and cook them hands-free. Your family cookbook." />
+<meta name="description" content="Save recipes from any source and cook them hands-free. Your family cookbook, always with you." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --green: #2E9E57;
-    --green-deep: #1E7A41;
-    --green-soft: #E4F2E8;
-    --ink: #211C16;
-    --ink2: #4A4139;
-    --ink3: #9C9387;
-    --cream: #FAF6EF;
-    --line: #E8E0D4;
-  }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--cream);
-    color: var(--ink);
-    line-height: 1.6;
-  }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* Hero */
-  .hero {
-    background: linear-gradient(160deg, var(--green-deep) 0%, var(--green) 100%);
-    color: #fff;
-    padding: 72px 24px 64px;
-    text-align: center;
-  }
-  .logo {
-    width: 88px; height: 88px;
-    border-radius: 22px;
-    background: rgba(255,255,255,0.15);
-    display: flex; align-items: center; justify-content: center;
-    margin: 0 auto 24px;
-    font-size: 44px;
-  }
-  .hero h1 {
-    font-size: clamp(28px, 6vw, 42px);
-    font-weight: 700;
-    letter-spacing: -0.5px;
-    line-height: 1.15;
-    margin-bottom: 14px;
-  }
-  .hero p {
-    font-size: 17px;
-    opacity: 0.88;
-    max-width: 440px;
-    margin: 0 auto 32px;
-  }
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    background: #fff;
-    color: var(--green-deep);
-    font-weight: 600;
-    font-size: 15px;
-    padding: 13px 24px;
-    border-radius: 50px;
-    text-decoration: none;
-    transition: transform 0.15s, box-shadow 0.15s;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.18);
-  }
-  .badge:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(0,0,0,0.22); }
-  .badge svg { flex-shrink: 0; }
-  .coming { opacity: 0.72; cursor: default; }
-  .coming:hover { transform: none; box-shadow: 0 4px 20px rgba(0,0,0,0.18); }
+:root {
+  --green:       #2E9E57;
+  --green-deep:  #1E7A41;
+  --green-ink:   #14542C;
+  --green-soft:  #E4F2E8;
+  --paper:       #FAF6EF;
+  --surface:     #FFFFFF;
+  --ink:         #211C16;
+  --ink2:        #6A6157;
+  --ink3:        #9C9387;
+  --line:        #ECE4D7;
+  --line2:       #E0D6C6;
+}
 
-  /* Features */
-  .section {
-    max-width: 680px;
-    margin: 0 auto;
-    padding: 56px 24px;
-  }
-  .section h2 {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--green-deep);
-    margin-bottom: 28px;
-    letter-spacing: -0.2px;
-  }
-  .features {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 16px;
-  }
-  .feature {
-    background: #fff;
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    padding: 22px 20px;
-  }
-  .feature-icon {
-    font-size: 26px;
-    margin-bottom: 10px;
-  }
-  .feature h3 {
-    font-size: 15px;
-    font-weight: 600;
-    margin-bottom: 6px;
-    color: var(--ink);
-  }
-  .feature p {
-    font-size: 13.5px;
-    color: var(--ink2);
-    line-height: 1.55;
-  }
+body {
+  font-family: 'Hanken Grotesk', system-ui, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
 
-  /* Divider */
-  hr { border: none; border-top: 1px solid var(--line); }
+/* ── Hero ──────────────────────────────────────────────────────────────── */
+.hero {
+  background: var(--green-ink);
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 80px 28px 100px;
+  position: relative;
+  overflow: hidden;
+}
 
-  /* Footer */
-  footer {
-    text-align: center;
-    padding: 32px 24px 48px;
-    font-size: 13px;
-    color: var(--ink3);
-  }
-  footer a { color: var(--green); text-decoration: none; }
-  footer a:hover { text-decoration: underline; }
-  .footer-links { display: flex; gap: 20px; justify-content: center; margin-bottom: 12px; }
+/* Subtle noise-like ring decor */
+.hero::before, .hero::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.05);
+  pointer-events: none;
+}
+.hero::before { width: 640px; height: 640px; top: -200px; right: -200px; }
+.hero::after  { width: 440px; height: 440px; bottom: -140px; left: -180px; }
+
+/* Logo mark */
+.logomark {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 36px;
+}
+.logomark-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(46,158,87,0.25);
+}
+.logomark-ring:nth-child(1) { inset: -14px; }
+.logomark-ring:nth-child(2) { inset: -28px; border-color: rgba(46,158,87,0.10); }
+.logomark-face {
+  width: 96px;
+  height: 96px;
+  border-radius: 24px;
+  background: linear-gradient(145deg, #2E9E57, #1E7A41);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35), 0 0 0 1.5px rgba(255,255,255,0.1);
+  position: relative;
+  z-index: 1;
+}
+.logomark-face svg { width: 52px; height: 52px; }
+
+.hero-eyebrow {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--green);
+  margin-bottom: 16px;
+}
+
+.hero h1 {
+  font-family: 'Newsreader', Georgia, serif;
+  font-weight: 500;
+  font-size: clamp(48px, 9vw, 86px);
+  line-height: 1.0;
+  letter-spacing: -1.5px;
+  color: #FAF6EF;
+  margin-bottom: 20px;
+}
+.hero h1 em {
+  font-style: italic;
+  color: var(--green);
+}
+
+.hero-sub {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: clamp(16px, 2.5vw, 19px);
+  font-weight: 400;
+  color: rgba(250,246,239,0.65);
+  max-width: 480px;
+  margin: 0 auto 40px;
+  line-height: 1.55;
+}
+
+.coming-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.14);
+  color: rgba(250,246,239,0.75);
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 11px 22px;
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+}
+.coming-badge svg { opacity: 0.7; flex-shrink: 0; }
+
+/* ── Angle break ───────────────────────────────────────────────────────── */
+.angle-break {
+  height: 80px;
+  background: var(--green-ink);
+  clip-path: polygon(0 0, 100% 0, 100% 30%, 0 100%);
+  margin-bottom: -2px;
+}
+
+/* ── Intro ─────────────────────────────────────────────────────────────── */
+.intro {
+  background: var(--paper);
+  padding: 72px 28px 64px;
+  text-align: center;
+}
+.intro-rule {
+  width: 32px;
+  height: 2px;
+  background: var(--green);
+  margin: 0 auto 28px;
+  border-radius: 2px;
+}
+.intro p {
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: clamp(20px, 3vw, 26px);
+  font-weight: 400;
+  font-style: italic;
+  color: var(--ink2);
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.5;
+}
+.intro p strong {
+  color: var(--ink);
+  font-style: normal;
+  font-weight: 500;
+}
+
+/* ── Features ──────────────────────────────────────────────────────────── */
+.features {
+  background: var(--paper);
+  padding: 0 20px 80px;
+}
+.features-inner {
+  max-width: 900px;
+  margin: 0 auto;
+}
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+.feat-card {
+  background: var(--surface);
+  border-radius: 18px;
+  border: 1.5px solid var(--line);
+  overflow: hidden;
+  display: flex;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.feat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 18px 40px rgba(20,16,10,0.10);
+}
+.feat-bar {
+  width: 5px;
+  background: var(--green);
+  flex-shrink: 0;
+}
+.feat-body {
+  padding: 22px 20px 22px 22px;
+}
+.feat-icon {
+  font-size: 26px;
+  margin-bottom: 12px;
+  line-height: 1;
+}
+.feat-title {
+  font-family: 'Newsreader', Georgia, serif;
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 6px;
+  line-height: 1.25;
+}
+.feat-desc {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 13.5px;
+  color: var(--ink2);
+  line-height: 1.55;
+}
+
+/* ── Tagline band ──────────────────────────────────────────────────────── */
+.band {
+  background: var(--green-soft);
+  border-top: 1.5px solid #C8E8D2;
+  border-bottom: 1.5px solid #C8E8D2;
+  padding: 64px 28px;
+  text-align: center;
+}
+.band h2 {
+  font-family: 'Newsreader', Georgia, serif;
+  font-weight: 500;
+  font-size: clamp(28px, 5vw, 44px);
+  letter-spacing: -0.5px;
+  color: var(--green-ink);
+  line-height: 1.2;
+  max-width: 620px;
+  margin: 0 auto 20px;
+}
+.band h2 em { font-style: italic; color: var(--green-deep); }
+.band p {
+  font-size: 15px;
+  color: var(--green-deep);
+  font-weight: 500;
+  font-family: 'Hanken Grotesk', sans-serif;
+}
+
+/* ── What's included ───────────────────────────────────────────────────── */
+.included {
+  background: var(--paper);
+  padding: 80px 28px;
+  max-width: 680px;
+  margin: 0 auto;
+}
+.section-eyebrow {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2.2px;
+  text-transform: uppercase;
+  color: var(--green);
+  margin-bottom: 14px;
+}
+.included h2 {
+  font-family: 'Newsreader', Georgia, serif;
+  font-weight: 500;
+  font-size: clamp(26px, 4vw, 36px);
+  color: var(--ink);
+  letter-spacing: -0.4px;
+  margin-bottom: 36px;
+  line-height: 1.2;
+}
+.check-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 28px;
+}
+@media (max-width: 520px) { .check-list { grid-template-columns: 1fr; } }
+.check-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 14.5px;
+  color: var(--ink2);
+}
+.check-list li::before {
+  content: '';
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: var(--green-soft);
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='10' viewBox='0 0 12 10' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 5l3.5 3.5L11 1' stroke='%231E7A41' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+/* ── Footer ────────────────────────────────────────────────────────────── */
+footer {
+  background: var(--ink);
+  padding: 40px 28px 52px;
+  text-align: center;
+}
+.footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+.footer-links a {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 13px;
+  color: var(--ink3);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.footer-links a:hover { color: var(--green); }
+.footer-copy {
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 12px;
+  color: #4A4139;
+}
 </style>
 </head>
 <body>
 
+<!-- ── Hero ── -->
 <section class="hero">
-  <div class="logo">🥘</div>
-  <h1>Just a Pinch</h1>
-  <p>Save recipes from any source and cook them hands-free. Your family cookbook, always with you.</p>
-  <span class="badge coming">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+  <div class="logomark">
+    <div class="logomark-ring"></div>
+    <div class="logomark-ring"></div>
+    <div class="logomark-face">
+      <!-- Spoon + leaf mark -->
+      <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="26" cy="14" r="8" stroke="rgba(255,255,255,0.9)" stroke-width="2"/>
+        <line x1="26" y1="22" x2="26" y2="42" stroke="rgba(255,255,255,0.9)" stroke-width="2" stroke-linecap="round"/>
+        <path d="M33 10 C37 6 42 8 40 14 C38 18 34 18 33 16" stroke="rgba(255,255,255,0.55)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+      </svg>
+    </div>
+  </div>
+
+  <p class="hero-eyebrow">Recipe Organizer</p>
+  <h1>Just <em>a</em> Pinch</h1>
+  <p class="hero-sub">Save recipes from any source — a link, a photo, a text — and cook them hands-free. Your family cookbook, always with you.</p>
+
+  <span class="coming-badge">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
       <path d="M3.18 23.76a2 2 0 0 0 2.04-.19l12.2-6.96-2.93-2.93L3.18 23.76zM22.3 10.56l-3.02-1.72-3.3 3.3 3.3 3.3 3.04-1.73a2.02 2.02 0 0 0 0-3.15zM3.18.24L14.5 10.32l-2.93 2.93L3.18.43A2.01 2.01 0 0 0 3.18.24zM1.94 1.02A2 2 0 0 0 1 2.78v18.44c0 .73.4 1.37.94 1.76L13.32 12 1.94 1.02z"/>
     </svg>
     Coming to Google Play
   </span>
 </section>
 
-<section class="section">
-  <h2>Everything your recipes need</h2>
-  <div class="features">
-    <div class="feature">
-      <div class="feature-icon">🔗</div>
-      <h3>Import from any link</h3>
-      <p>Paste a URL from any recipe website and get the full recipe instantly — no copy-pasting.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">📷</div>
-      <h3>Scan a photo or card</h3>
-      <p>Point your camera at a cookbook page or handwritten recipe card. The app reads it for you.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">✨</div>
-      <h3>AI recipe generation</h3>
-      <p>Describe what you want to make and get a complete recipe, ready to cook.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">🍳</div>
-      <h3>Hands-free cooking mode</h3>
-      <p>One step at a time, large text, with optional voice narration. Keep your hands clean.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">📅</div>
-      <h3>Weekly meal planner</h3>
-      <p>Drag recipes onto your week. Your shopping list builds itself automatically.</p>
-    </div>
-    <div class="feature">
-      <div class="feature-icon">🛒</div>
-      <h3>Smart shopping list</h3>
-      <p>Send your list straight to Instacart, or copy it to share with anyone.</p>
+<div class="angle-break"></div>
+
+<!-- ── Intro ── -->
+<div class="intro">
+  <div class="intro-rule"></div>
+  <p>The recipes you love — from websites, cookbooks, and family cards — <strong>organized in one place</strong> and ready to cook from, hands-free.</p>
+</div>
+
+<!-- ── Features ── -->
+<section class="features">
+  <div class="features-inner">
+    <div class="features-grid">
+      <div class="feat-card">
+        <div class="feat-bar"></div>
+        <div class="feat-body">
+          <div class="feat-icon">🔗</div>
+          <div class="feat-title">Import from any link</div>
+          <p class="feat-desc">Paste a URL from any recipe website — Just a Pinch pulls the full recipe in seconds.</p>
+        </div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-bar"></div>
+        <div class="feat-body">
+          <div class="feat-icon">📷</div>
+          <div class="feat-title">Scan a photo or card</div>
+          <p class="feat-desc">Point your camera at a cookbook page or handwritten recipe card and the app reads it for you.</p>
+        </div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-bar"></div>
+        <div class="feat-body">
+          <div class="feat-icon">✨</div>
+          <div class="feat-title">AI recipe generation</div>
+          <p class="feat-desc">Describe what you want to make and get a complete recipe, ready to cook.</p>
+        </div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-bar"></div>
+        <div class="feat-body">
+          <div class="feat-icon">🍳</div>
+          <div class="feat-title">Hands-free cooking mode</div>
+          <p class="feat-desc">One step at a time, large text, with optional voice narration so you never touch your screen.</p>
+        </div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-bar"></div>
+        <div class="feat-body">
+          <div class="feat-icon">📅</div>
+          <div class="feat-title">Weekly meal planner</div>
+          <p class="feat-desc">Drag recipes onto your week. Your shopping list builds itself automatically.</p>
+        </div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-bar"></div>
+        <div class="feat-body">
+          <div class="feat-icon">🛒</div>
+          <div class="feat-title">Smart shopping list</div>
+          <p class="feat-desc">Send your list to Instacart or copy it to share with anyone — even add items mid-flow.</p>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
-<hr />
+<!-- ── Tagline band ── -->
+<div class="band">
+  <h2>The recipes you keep are<br /><em>the ones worth keeping.</em></h2>
+  <p>Your family cookbook — organized the way a real cookbook should be: yours.</p>
+</div>
 
+<!-- ── What's included ── -->
+<div class="included">
+  <p class="section-eyebrow">What's included</p>
+  <h2>Everything your recipes need, nothing they don't.</h2>
+  <ul class="check-list">
+    <li>Unlimited recipe saving</li>
+    <li>Import from any recipe website</li>
+    <li>Photo & handwritten card OCR</li>
+    <li>AI recipe generation</li>
+    <li>Hands-free cooking mode</li>
+    <li>Voice step narration</li>
+    <li>Weekly meal planner</li>
+    <li>Smart shopping list</li>
+    <li>Instacart integration</li>
+    <li>Achievement badges</li>
+    <li>Works offline</li>
+    <li>Syncs across devices</li>
+  </ul>
+</div>
+
+<!-- ── Footer ── -->
 <footer>
   <div class="footer-links">
     <a href="privacy.html">Privacy Policy</a>
@@ -185,7 +460,7 @@
     <a href="delete-account.html">Delete Account</a>
     <a href="mailto:kariimchiles@gmail.com">Contact</a>
   </div>
-  <p>© 2026 Just a Pinch. All rights reserved.</p>
+  <p class="footer-copy">© 2026 Just a Pinch. All rights reserved.</p>
 </footer>
 
 </body>
