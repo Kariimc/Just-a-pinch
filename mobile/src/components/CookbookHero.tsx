@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     height: 210,
   },
   bgImage: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     opacity: 0.15,
   },
   accentBar: {
