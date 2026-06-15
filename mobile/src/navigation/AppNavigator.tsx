@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Animated, {
   cancelAnimation, interpolate, useAnimatedStyle, useSharedValue,
@@ -49,32 +49,41 @@ function AddPlaceholder() {
   return <View />;
 }
 
+// Lets each tab replay its glyph reaction on press — including re-pressing the
+// already-active tab, so the animations are easy to trigger and see. Keyed by
+// the glyph's icon name; the tab's tabPress listener calls fireTabReaction.
+const tabReactors: Partial<Record<IconName, () => void>> = {};
+function fireTabReaction(name: IconName) { tabReactors[name]?.(); }
+
 // Tab icon with focus choreography: a soft pill blooms behind the glyph while
-// the icon rises 2px and pops once on the expressive spring. On top of that,
-// each tab plays a one-shot reaction the moment it becomes active (a "click"),
-// themed to its concept but kept legible at 24px and built on the shared
-// motion tokens — never hand-rolled springs:
-//   home → the house lights up (warm glow)
-//   book → flips open on the Y axis
-//   calendar → flips like a turning page on the X axis
+// the icon rises and pops on the expressive spring. On top of that, each tab
+// plays a one-shot reaction on every press, themed to its concept and built on
+// the shared motion tokens (web-safe 2D transforms — no 3D rotations that fail
+// to render on react-native-web):
+//   home → the house lights up (warm glow + pop)
+//   book → the cover flips (horizontal squash & spring back)
+//   calendar → a page turns (vertical squash & spring back)
 //   cart → bounces as a food block drops in
 function TabGlyph({ name, color, focused }: { name: IconName; color: string; focused: boolean }) {
   const f = useSharedValue(focused ? 1 : 0);
   const react = useSharedValue(0);
-  const prevFocused = useRef(focused);
 
   useEffect(() => {
     f.value = focused ? withSpring(1, Springs.pop) : withSpring(0, Springs.glide);
-    // Rising edge of focus = the tap that selected this tab → play the reaction.
-    if (focused && !prevFocused.current) {
+  }, [focused, f]);
+
+  // Register this glyph's reaction so a tab press can fire it.
+  useEffect(() => {
+    const fire = () => {
       react.value = 0;
       react.value = withSequence(
-        withTiming(1, { duration: 220, easing: Curves.enter }),
+        withTiming(1, { duration: 240, easing: Curves.enter }),
         withSpring(0, Springs.glide),
       );
-    }
-    prevFocused.current = focused;
-  }, [focused, f, react]);
+    };
+    tabReactors[name] = fire;
+    return () => { if (tabReactors[name] === fire) delete tabReactors[name]; };
+  }, [name, react]);
 
   const pill = useAnimatedStyle(() => ({
     opacity: Math.min(f.value, 1),
@@ -85,28 +94,33 @@ function TabGlyph({ name, color, focused }: { name: IconName; color: string; foc
     const lift = f.value * -2;
     const pop = 1 + f.value * 0.08;
     if (name === 'book') {
-      return { transform: [{ perspective: 600 }, { translateY: lift }, { rotateY: `${react.value * -150}deg` }, { scale: pop }] };
+      // Cover flip: squash horizontally then spring back open.
+      return { transform: [{ translateY: lift }, { scaleX: pop * (1 - react.value * 0.7) }, { scaleY: pop }] };
     }
     if (name === 'calendar') {
-      return { transform: [{ perspective: 600 }, { translateY: lift }, { rotateX: `${react.value * -150}deg` }, { scale: pop }] };
+      // Page turn: squash vertically then spring back.
+      return { transform: [{ translateY: lift }, { scaleX: pop }, { scaleY: pop * (1 - react.value * 0.65) }] };
     }
     if (name === 'cart') {
-      return { transform: [{ translateY: lift - react.value * 3 }, { scale: pop + react.value * 0.06 }] };
+      return { transform: [{ translateY: lift - react.value * 4 }, { scale: pop + react.value * 0.16 }] };
     }
-    // home + default: a touch of extra pop on the reaction
-    return { transform: [{ translateY: lift }, { scale: pop + react.value * 0.05 }] };
+    // home: a clear pop on tap
+    return { transform: [{ translateY: lift - react.value * 2 }, { scale: pop + react.value * 0.14 }] };
   });
 
   // The house "lights on" glow — warms up while Home is active, flares on tap.
   const glow = useAnimatedStyle(() => ({
-    opacity: name === 'home' ? Math.min(1, f.value * 0.4 + react.value * 0.45) : 0,
-    transform: [{ scale: 0.7 + f.value * 0.3 + react.value * 0.25 }],
+    opacity: name === 'home' ? Math.min(1, f.value * 0.45 + react.value * 0.5) : 0,
+    transform: [{ scale: 0.7 + f.value * 0.35 + react.value * 0.4 }],
   }));
 
   // The food block that drops into the cart on tap.
   const drop = useAnimatedStyle(() => ({
     opacity: name === 'cart' ? react.value : 0,
-    transform: [{ translateY: interpolate(react.value, [0, 1], [-9, 3]) }],
+    transform: [
+      { translateY: interpolate(react.value, [0, 1], [-12, 4]) },
+      { scale: 0.8 + react.value * 0.6 },
+    ],
   }));
 
   return (
@@ -194,6 +208,7 @@ function TabBar() {
           title: 'Home',
           tabBarIcon: ({ color, focused }) => <TabGlyph name="home" color={color} focused={focused} />,
         }}
+        listeners={{ tabPress: () => fireTabReaction('home') }}
       />
       <Tab.Screen
         name="Recipes"
@@ -202,6 +217,7 @@ function TabBar() {
           title: 'Recipes',
           tabBarIcon: ({ color, focused }) => <TabGlyph name="book" color={color} focused={focused} />,
         }}
+        listeners={{ tabPress: () => fireTabReaction('book') }}
       />
       <Tab.Screen
         name="Add"
@@ -224,6 +240,7 @@ function TabBar() {
           title: 'Plan',
           tabBarIcon: ({ color, focused }) => <TabGlyph name="calendar" color={color} focused={focused} />,
         }}
+        listeners={{ tabPress: () => fireTabReaction('calendar') }}
       />
       <Tab.Screen
         name="Shopping"
@@ -232,6 +249,7 @@ function TabBar() {
           title: 'List',
           tabBarIcon: ({ color, focused }) => <TabGlyph name="cart" color={color} focused={focused} />,
         }}
+        listeners={{ tabPress: () => fireTabReaction('cart') }}
       />
     </Tab.Navigator>
   );
@@ -303,12 +321,12 @@ const styles = StyleSheet.create({
   },
   // Warm "lights on" glow behind the Home glyph.
   tabGlow: {
-    position: 'absolute', width: 30, height: 30, borderRadius: 15,
+    position: 'absolute', width: 34, height: 34, borderRadius: 17,
     backgroundColor: '#F6C66B',
   },
   // A small food block that drops into the List/cart glyph on tap.
   tabDrop: {
-    position: 'absolute', top: 1, width: 7, height: 7, borderRadius: 2,
+    position: 'absolute', top: 0, width: 9, height: 9, borderRadius: 2.5,
     backgroundColor: Colors.accentDeep,
   },
   plusWrap: {

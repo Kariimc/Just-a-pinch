@@ -95,11 +95,36 @@ function HomeBackdrop() {
   );
 }
 
+// Module-level so the random "What's for dinner" pick differs from the last one
+// shown this session (avoids the same recipes back-to-back).
+let lastDinnerIds: string[] = [];
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// A random 5 from the whole cookbook. With more than 5 recipes it avoids
+// repeating the previous pick; with 5 or fewer it just shuffles what's there.
+function pickDinner(all: Recipe[]): Recipe[] {
+  if (all.length <= 5) return shuffle(all);
+  const fresh = all.filter(r => !lastDinnerIds.includes(r.id));
+  const pool = fresh.length >= 5 ? fresh : all;
+  const picked = shuffle(pool).slice(0, 5);
+  lastDinnerIds = picked.map(r => r.id);
+  return picked;
+}
+
 export default function HomeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [dinnerPicks, setDinnerPicks] = useState<Recipe[]>([]);
   const [featured, setFeatured] = useState<Recipe[]>([]);
   const [userName, setUserName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -109,6 +134,7 @@ export default function HomeScreen() {
   async function load() {
     const [r, p, f] = await Promise.all([getRecipes(), getProfile(), getFeaturedRecipes()]);
     setRecipes(r);
+    setDinnerPicks(pickDinner(r));
     // Never greet with a blank: profile name → signup name → email → Chef.
     const metaName = (user?.user_metadata?.name as string | undefined)?.trim();
     const resolved = p?.name?.trim() || metaName || user?.email?.split('@')[0] || 'Chef';
@@ -124,9 +150,6 @@ export default function HomeScreen() {
   const greeting = hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,';
 
   const recent = recipes.slice(0, 6);
-  const dinner = recipes.filter(r => r.tags.includes('dinner')).slice(0, 4);
-  const displayed = dinner.length ? dinner : recipes.slice(0, 4);
-  const familyRecipes = recipes.filter(r => r.isFamily);
 
   // "ANDERSON'S" on the cookbook cover; names already ending in s get just
   // the apostrophe ("CHILES'"). Prefer the surname, fall back to the first
@@ -217,7 +240,7 @@ export default function HomeScreen() {
             contentContainerStyle={styles.cardRow}
           >
             <View style={{ flexDirection: 'row', gap: 13 }}>
-              {displayed.map(r => (
+              {dinnerPicks.map(r => (
                 <View key={r.id} style={{ width: 215 }}>
                   <RecipeCard
                     recipe={r}
@@ -342,45 +365,27 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* Family shelf */}
-      {familyRecipes.length > 0 ? (
+      {/* Family cookbook — the whole collection. Every saved recipe lives here;
+          tapping opens the full library. */}
+      {recipes.length > 0 && (
         <>
           <Text style={[styles.secTitle, { marginTop: 24 }]}>From the family cookbook</Text>
           <TouchableOpacity
             style={[styles.familyCard, Shadow.cardSoft]}
             activeOpacity={0.9}
-            onPress={() => navigation.navigate('RecipeDetail', { recipeId: familyRecipes[0].id })}
+            onPress={() => (navigation as any).navigate('Recipes')}
           >
             <CookbookCover style={StyleSheet.absoluteFill} />
             <View style={styles.familyOverlay}>
               <Text style={styles.familyName}>{coverName}</Text>
               <Text style={styles.familyTitle}>FAMILY COOKBOOK</Text>
               <Text style={styles.familySub}>
-                {familyRecipes.length} RECIPE{familyRecipes.length === 1 ? '' : 'S'} · HANDED DOWN
+                {recipes.length} RECIPE{recipes.length === 1 ? '' : 'S'} · TAP TO OPEN
               </Text>
             </View>
           </TouchableOpacity>
         </>
-      ) : recipes.length > 0 ? (
-        <>
-          <Text style={[styles.secTitle, { marginTop: 24 }]}>From the family cookbook</Text>
-          {/* Even before any recipe is marked "family", show the engraved cover
-              as the hero so the showpiece is always present — it doubles as the
-              call-to-action to start one. */}
-          <TouchableOpacity
-            style={[styles.familyCard, Shadow.cardSoft]}
-            activeOpacity={0.9}
-            onPress={() => navigation.navigate('AddMenu')}
-          >
-            <CookbookCover style={StyleSheet.absoluteFill} />
-            <View style={styles.familyOverlay}>
-              <Text style={styles.familyName}>{coverName}</Text>
-              <Text style={styles.familyTitle}>FAMILY COOKBOOK</Text>
-              <Text style={styles.familySub}>+ TAP TO START YOURS</Text>
-            </View>
-          </TouchableOpacity>
-        </>
-      ) : null}
+      )}
       </ScrollView>
     </View>
   );
