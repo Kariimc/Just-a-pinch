@@ -209,12 +209,15 @@ export default function CookingModeScreen({ route, navigation }: Props) {
       <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
         {/* Header */}
         <View style={styles.header}>
+          {/* Step pill: absolutely centred so it never pushes the edge buttons off-screen */}
+          <View style={styles.stepPillWrap} pointerEvents="none">
+            <View style={styles.stepPill}>
+              <Text style={styles.stepPillTxt} numberOfLines={1}>Step {stepIndex + 1} of {steps.length}</Text>
+            </View>
+          </View>
           <TouchableOpacity style={styles.ctrlBtn} onPress={() => navigation.goBack()}>
             <Icon name="x" size={20} color="#fff" />
           </TouchableOpacity>
-          <View style={styles.stepPill}>
-            <Text style={styles.stepPillTxt}>Step {stepIndex + 1} of {steps.length}</Text>
-          </View>
           <View style={styles.headerRight}>
             <TouchableOpacity
               style={[styles.ctrlBtn, speakOn && styles.ctrlBtnOn]}
@@ -358,7 +361,8 @@ const styles = StyleSheet.create({
   ctrlBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' },
   ctrlBtnOn: { backgroundColor: Colors.accent },
   headerRight: { flexDirection: 'row', gap: 8 },
-  stepPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99 },
+  stepPillWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  stepPill: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, maxWidth: '55%' },
   stepPillTxt: { fontFamily: Fonts.uiBold, fontSize: 13, color: '#fff' },
   progressTrack: {
     height: 4, marginHorizontal: 22, marginTop: 18,
