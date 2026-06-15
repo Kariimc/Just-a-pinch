@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import Animated, {
   useSharedValue, withSequence, withSpring, withTiming,
 } from 'react-native-reanimated';
@@ -35,6 +35,12 @@ export default function CookbookHero({ name, recipeCount, onPress }: Props) {
   return (
     <Animated.View style={[styles.card, Shadow.cardSoft, { transform: [{ scale: cardScale }] }]}>
       <TouchableOpacity activeOpacity={1} onPress={handlePress} style={styles.inner}>
+
+        <Image
+          source={require('../../assets/cookbook-bg.jpg')}
+          style={styles.bgImage}
+          resizeMode="cover"
+        />
 
         <View style={styles.accentBar} />
 
@@ -75,6 +81,10 @@ const styles = StyleSheet.create({
   inner: {
     flexDirection: 'row',
     height: 210,
+  },
+  bgImage: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.15,
   },
   accentBar: {
     width: 6,
