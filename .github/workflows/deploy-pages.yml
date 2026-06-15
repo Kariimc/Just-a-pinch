@@ -43,6 +43,9 @@ jobs:
       - name: SPA fallback so deep links load the app instead of a 404
         run: cp dist/index.html dist/404.html
 
+      - name: Merge docs/ into dist (legal pages, landing page)
+        run: cp -r docs/. dist/
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
