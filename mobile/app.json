@@ -36,7 +36,7 @@
       "favicon": "./assets/favicon.png"
     },
     "experiments": {
-      "baseUrl": "/Just-a-pinch"
+      "baseUrl": "/Just-a-pinch/app"
     },
     "extra": {
       "eas": {

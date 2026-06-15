@@ -38,13 +38,13 @@ jobs:
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: npx expo export --platform web --output-dir ../dist
+        run: npx expo export --platform web --output-dir ../dist/app
 
-      - name: SPA fallback so deep links load the app instead of a 404
-        run: cp dist/index.html dist/404.html
+      - name: Copy docs (landing page + legal) to dist root
+        run: cp -r docs/. dist/
 
-      - name: Merge docs/ into dist (legal pages, landing page)
-        run: cp -rn docs/. dist/
+      - name: SPA fallback — deep links into the app load app/index.html
+        run: cp dist/app/index.html dist/404.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

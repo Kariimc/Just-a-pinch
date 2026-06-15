@@ -120,6 +120,33 @@ body {
   line-height: 1.55;
 }
 
+.hero-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.btn-app {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--green);
+  color: #fff;
+  font-family: 'Hanken Grotesk', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 14px 28px;
+  border-radius: 999px;
+  text-decoration: none;
+  letter-spacing: 0.1px;
+  transition: background 0.18s, transform 0.15s;
+  box-shadow: 0 4px 20px rgba(46,158,87,0.35);
+}
+.btn-app:hover { background: #3ab566; transform: translateY(-2px); }
+.btn-app:active { transform: translateY(0); }
+.btn-app svg { flex-shrink: 0; }
+
 .coming-badge {
   display: inline-flex;
   align-items: center;
@@ -354,12 +381,23 @@ footer {
   <h1>Just <em>a</em> Pinch</h1>
   <p class="hero-sub">Save recipes from any source — a link, a photo, a text — and cook them hands-free. Your family cookbook, always with you.</p>
 
-  <span class="coming-badge">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M3.18 23.76a2 2 0 0 0 2.04-.19l12.2-6.96-2.93-2.93L3.18 23.76zM22.3 10.56l-3.02-1.72-3.3 3.3 3.3 3.3 3.04-1.73a2.02 2.02 0 0 0 0-3.15zM3.18.24L14.5 10.32l-2.93 2.93L3.18.43A2.01 2.01 0 0 0 3.18.24zM1.94 1.02A2 2 0 0 0 1 2.78v18.44c0 .73.4 1.37.94 1.76L13.32 12 1.94 1.02z"/>
-    </svg>
-    Coming to Google Play
-  </span>
+  <div class="hero-actions">
+    <a href="/Just-a-pinch/app/" class="btn-app">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="3"/>
+        <path d="M3 9h18"/>
+        <circle cx="7.5" cy="6" r=".5" fill="currentColor"/>
+        <circle cx="10.5" cy="6" r=".5" fill="currentColor"/>
+      </svg>
+      Open Web App
+    </a>
+    <span class="coming-badge">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M3.18 23.76a2 2 0 0 0 2.04-.19l12.2-6.96-2.93-2.93L3.18 23.76zM22.3 10.56l-3.02-1.72-3.3 3.3 3.3 3.3 3.04-1.73a2.02 2.02 0 0 0 0-3.15zM3.18.24L14.5 10.32l-2.93 2.93L3.18.43A2.01 2.01 0 0 0 3.18.24zM1.94 1.02A2 2 0 0 0 1 2.78v18.44c0 .73.4 1.37.94 1.76L13.32 12 1.94 1.02z"/>
+      </svg>
+      Coming to Google Play
+    </span>
+  </div>
 </section>
 
 <div class="angle-break"></div>
