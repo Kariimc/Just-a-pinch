@@ -177,4 +177,4 @@ AI banner sheen + sparkle pulse, ambient home backdrop.
 3. Store assets beyond icons (screenshots, listing copy) not started.
 4. Real IAP (StoreKit/Play Billing or RevenueCat) behind the paywall before
    charging; the current trial is a local flag only.
-5. Delete the leftover `recipe-scraper` edge function once confirmed unused.
+5. ~~Delete the leftover `recipe-scraper` edge function~~ — already gone (confirmed 2026-06-15; only `claude-proxy` v11 and `recipe-api` v13 remain).

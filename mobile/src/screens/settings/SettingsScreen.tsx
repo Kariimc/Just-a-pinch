@@ -570,7 +570,7 @@ export default function SettingsScreen({ navigation }: Props) {
           <View style={styles.divider} />
           <TouchableOpacity
             style={styles.row}
-            onPress={() => Linking.openURL('https://github.com/kariimc/just-a-pinch')}
+            onPress={() => Linking.openURL('mailto:kariimchiles@gmail.com?subject=Just%20a%20Pinch%20Feedback')}
           >
             <View style={styles.rowLeft}>
               <Text style={styles.rowTitle}>Help &amp; feedback</Text>
