@@ -151,13 +151,9 @@ export default function HomeScreen() {
 
   const recent = recipes.slice(0, 6);
 
-  // "ANDERSON'S" on the cookbook cover; names already ending in s get just
-  // the apostrophe ("CHILES'"). Prefer the surname, fall back to the first
-  // name ("KARIIM'S"), and only land on "OUR FAMILY COOKBOOK" when neither is set.
-  const coverBase = lastName || userName;
-  const coverName = coverBase
-    ? `${coverBase.toUpperCase()}${coverBase.toLowerCase().endsWith('s') ? '’' : '’S'}`
-    : 'OUR';
+  // The cookbook carries the family surname in plain caps — "CHILES", not a
+  // possessive "CHILES'". Falls back to the first name, then "OUR".
+  const coverName = (lastName || userName || 'OUR').toUpperCase();
 
   return (
     <View style={styles.container}>

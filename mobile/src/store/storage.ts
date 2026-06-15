@@ -244,19 +244,24 @@ export async function getProfile(): Promise<UserProfile | null> {
   if (await authed()) {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      // Only re-push a pending edit if it belongs to the signed-in account —
-      // a leftover edit from a previous user (sign-out keeps local data) must
-      // never be written onto someone else's profile.
-      if (dirty && user && dirty.id === user.id) {
-        try {
-          await dbSaveProfile(dirty);
+      if (dirty) {
+        if (user && dirty.id !== user.id) {
+          // Provably belongs to a different account (sign-out keeps local
+          // data) — drop it so it can't be written onto the new user.
           await remove(KEYS.profileDirty);
-        } catch {
-          await set(KEYS.profile, dirty);
-          return dirty;
+        } else {
+          // Ours, or we can't resolve the user yet (getUser() returns null
+          // transiently on web during token refresh). Either way, try to sync
+          // and KEEP the edit if that fails — never discard it, or the next
+          // read would clobber the local name with the stale DB row.
+          try {
+            await dbSaveProfile(dirty);
+            await remove(KEYS.profileDirty);
+          } catch {
+            await set(KEYS.profile, dirty);
+            return dirty;
+          }
         }
-      } else if (dirty) {
-        await remove(KEYS.profileDirty);
       }
       const profile = await healProfile(await dbGetProfile());
       if (profile) {
