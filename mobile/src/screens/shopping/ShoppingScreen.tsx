@@ -5,8 +5,6 @@ import {
 } from 'react-native';
 import Animated, { useSharedValue, withTiming, useAnimatedStyle } from 'react-native-reanimated';
 import * as Clipboard from 'expo-clipboard';
-import * as MediaLibrary from 'expo-media-library';
-import { captureRef } from 'react-native-view-shot';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -206,6 +204,12 @@ export default function ShoppingScreen() {
 
   async function openInstacartWithImage() {
     if (Platform.OS === 'web') { await copyList(true); return; }
+
+    // Native-only modules, required lazily: expo-media-library's Next module
+    // calls requireNativeModule at import time and throws on web, so a static
+    // top-level import would white-screen the entire web bundle.
+    const MediaLibrary = require('expo-media-library') as typeof import('expo-media-library');
+    const { captureRef } = require('react-native-view-shot') as typeof import('react-native-view-shot');
 
     const { list, didAddPending } = resolvedList();
     const unchecked = list.filter(i => !i.checked);
