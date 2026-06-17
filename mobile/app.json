@@ -79,6 +79,14 @@
           "photosPermission": "Just a Pinch needs photo access so you can import recipe screenshots and add cover photos.",
           "cameraPermission": "Just a Pinch uses the camera to scan recipe cards and take photos of your dishes."
         }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Just a Pinch saves your shopping list as an image so you can upload it to Instacart.",
+          "savePhotosPermission": "Just a Pinch saves your shopping list as an image so you can upload it to Instacart.",
+          "isAccessMediaLocationEnabled": false
+        }
       ]
     ]
   }

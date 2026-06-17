@@ -5,6 +5,8 @@ import {
 } from 'react-native';
 import Animated, { useSharedValue, withTiming, useAnimatedStyle } from 'react-native-reanimated';
 import * as Clipboard from 'expo-clipboard';
+import * as MediaLibrary from 'expo-media-library';
+import { captureRef } from 'react-native-view-shot';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -60,8 +62,6 @@ function openExternal(url: string) {
   }
 }
 
-// Big Instacart hand-off plus an explicit copy affordance — the silent copy
-// alone wasn't discoverable, so "Copy list" makes it a visible action too.
 function InstacartButtons({ onOpen, onCopy }: { onOpen: () => void; onCopy: () => void }) {
   return (
     <>
@@ -69,7 +69,9 @@ function InstacartButtons({ onOpen, onCopy }: { onOpen: () => void; onCopy: () =
         <View style={styles.instacartCircle}>
           <InstacartMark size={24} />
         </View>
-        <Text style={styles.instacartText}>Get it on Instacart</Text>
+        <Text style={styles.instacartText}>
+          {Platform.OS === 'web' ? 'Get it on Instacart' : 'Send list to Instacart'}
+        </Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.copyBtn} onPress={onCopy} activeOpacity={0.7}>
         <Icon name="note" size={16} color={Colors.ink2} />
@@ -88,6 +90,7 @@ export default function ShoppingScreen() {
   const trackWidthRef = useRef(0);
   const fillWidth = useSharedValue(0);
   const fillStyle = useAnimatedStyle(() => ({ width: fillWidth.value }));
+  const listCaptureRef = useRef<View>(null);
 
   useFocusEffect(useCallback(() => {
     getShoppingItems().then(i => { setItems(i); setLoading(false); });
@@ -150,38 +153,41 @@ export default function ShoppingScreen() {
     setItems(updated);
   }
 
-  // Copy the unchecked items as plain text, then optionally hand off to
-  // Instacart (app when installed, website otherwise). Text still sitting in
-  // the add-field counts too — people type an item and tap the button without
-  // pressing + first. The clipboard write happens before any await so the
-  // browser still honors the tap's permission window.
-  async function copyList(openAfter: boolean) {
-    let list = items;
+  function resolvedList() {
     const pending = newItem.trim();
-    if (pending) {
-      list = [...items, {
+    if (!pending) return { list: items, didAddPending: false };
+    return {
+      list: [...items, {
         id: uid(), name: pending, quantity: '1', unit: '',
         category: categorizeIngredient(pending), checked: false, isManual: true,
-      }];
-    }
+      }],
+      didAddPending: true,
+    };
+  }
+
+  function commitPending(list: ShoppingItem[]) {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setItems(list);
+    setNewItem('');
+    saveShoppingItems(list);
+  }
+
+  async function copyList(openAfter: boolean) {
+    const { list, didAddPending } = resolvedList();
     const unchecked = list.filter(i => !i.checked);
     if (!unchecked.length) {
-      showToast('Type an item below or add a recipe’s ingredients first', 'info');
+      showToast('Type an item below or add a recipe\'s ingredients first', 'info');
       return;
     }
     const text = unchecked
       .map(i => [i.quantity, i.unit, i.name].filter(Boolean).join(' ').trim())
       .join('\n');
 
+    // Clipboard write before any await so the browser honors the tap's permission window.
     let copied = true;
     try { await Clipboard.setStringAsync(text); } catch { copied = false; }
 
-    if (pending) {
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      setItems(list);
-      setNewItem('');
-      saveShoppingItems(list);
-    }
+    if (didAddPending) commitPending(list);
     hapticSuccess();
     showToast(
       copied
@@ -194,11 +200,35 @@ export default function ShoppingScreen() {
     if (Platform.OS === 'web') {
       openExternal('https://www.instacart.com/store/');
     } else {
-      try {
-        await Linking.openURL('instacart://');
-      } catch {
-        openExternal('https://www.instacart.com/store/');
-      }
+      try { await Linking.openURL('instacart://'); } catch { openExternal('https://www.instacart.com/store/'); }
+    }
+  }
+
+  async function openInstacartWithImage() {
+    if (Platform.OS === 'web') { await copyList(true); return; }
+
+    const { list, didAddPending } = resolvedList();
+    const unchecked = list.filter(i => !i.checked);
+    if (!unchecked.length) {
+      showToast('No items on your list yet', 'info');
+      return;
+    }
+    if (didAddPending) commitPending(list);
+
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== 'granted') {
+      showToast('Allow photo access to save your list image', 'info');
+      return;
+    }
+
+    try {
+      const uri = await captureRef(listCaptureRef, { format: 'jpg', quality: 0.92 });
+      await MediaLibrary.saveToLibraryAsync(uri);
+      hapticSuccess();
+      showToast('List saved to your photos — open Instacart\'s camera to import', 'check');
+      try { await Linking.openURL('instacart://'); } catch { openExternal('https://www.instacart.com/store/'); }
+    } catch {
+      showToast('Could not save image — try copying the list instead', 'info');
     }
   }
 
@@ -284,7 +314,7 @@ export default function ShoppingScreen() {
                   ))}
                 </View>
               ))}
-              <InstacartButtons onOpen={() => copyList(true)} onCopy={() => copyList(false)} />
+              <InstacartButtons onOpen={openInstacartWithImage} onCopy={() => copyList(false)} />
             </>
           )}
         </ScrollView>
@@ -301,6 +331,20 @@ export default function ShoppingScreen() {
           <TouchableOpacity style={styles.micBtn} onPress={addManual}>
             <Icon name="plus" size={22} color="#fff" />
           </TouchableOpacity>
+        </View>
+
+        {/* Off-screen view captured as image for Instacart import */}
+        <View ref={listCaptureRef} style={styles.captureView} collapsable={false}>
+          <Text style={styles.captureHeading}>Shopping List</Text>
+          {items.filter(i => !i.checked).map(item => (
+            <View key={item.id} style={styles.captureRow}>
+              <Text style={styles.captureCheck}>□</Text>
+              <Text style={styles.captureItemTxt}>
+                {[item.quantity, item.unit, item.name].filter(Boolean).join(' ')}
+              </Text>
+            </View>
+          ))}
+          <Text style={styles.captureFooter}>Just a Pinch</Text>
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -361,4 +405,39 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.line2,
   },
   copyTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 14, color: Colors.ink2 },
+
+  captureView: {
+    position: 'absolute',
+    left: 9999,
+    top: 0,
+    width: 360,
+    backgroundColor: '#FFFDF8',
+    padding: 28,
+    paddingBottom: 36,
+  },
+  captureHeading: {
+    fontFamily: Fonts.displayMedium,
+    fontSize: 22,
+    color: '#14542C',
+    marginBottom: 18,
+    letterSpacing: -0.3,
+  },
+  captureRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8E0D4',
+  },
+  captureCheck: { fontSize: 16, color: '#2E9E57', lineHeight: 22 },
+  captureItemTxt: { fontFamily: Fonts.uiRegular, fontSize: 16, color: '#211C16', flex: 1, lineHeight: 22 },
+  captureFooter: {
+    fontFamily: Fonts.uiBold,
+    fontSize: 11,
+    color: '#9C9387',
+    marginTop: 20,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
 });

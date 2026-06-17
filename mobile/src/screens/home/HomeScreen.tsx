@@ -275,26 +275,20 @@ export default function HomeScreen() {
 
       {/* Community */}
       <Animated.View entering={enter(3)}>
-      <Tappable
-        scaleTo={0.97}
-        haptic
-        style={styles.communityCard}
-        onPress={() => navigation.navigate('Community')}
-      >
-        <View style={styles.communityIconWrap}>
+      <View style={[styles.communityCard, styles.communityCardDisabled]}>
+        <View style={[styles.communityIconWrap, { opacity: 0.5 }]}>
           <Icon name="people" size={22} color="#fff" />
         </View>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={styles.communityTitle}>Community Recipes</Text>
+            <Text style={[styles.communityTitle, { opacity: 0.5 }]}>Community Recipes</Text>
             <View style={styles.comingSoonChip}>
-              <Text style={styles.comingSoonTxt}>Soon</Text>
+              <Text style={styles.comingSoonTxt}>Coming Soon</Text>
             </View>
           </View>
-          <Text style={styles.communitySub}>Share, discover, and rate — launching soon</Text>
+          <Text style={[styles.communitySub, { opacity: 0.5 }]}>Share, discover, and rate — launching soon</Text>
         </View>
-        <Icon name="fwd" size={20} color={Colors.accentDeep} />
-      </Tappable>
+      </View>
       </Animated.View>
 
       {/* Today's Picks */}
@@ -434,6 +428,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface2,
     borderRadius: Radius.lg,
   },
+  communityCardDisabled: { opacity: 0.8 },
   communityIconWrap: {
     width: 48, height: 48, borderRadius: Radius.sm,
     backgroundColor: Colors.accentDeep,

@@ -27,14 +27,17 @@ const SLIDES = [
   },
 ];
 
+const MAX_SLIDE_WIDTH = 480;
+
 export default function WelcomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
+  const slideWidth = Platform.OS === 'web' ? Math.min(windowWidth, MAX_SLIDE_WIDTH) : windowWidth;
   const [index, setIndex] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
 
   function onScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    const i = Math.round(e.nativeEvent.contentOffset.x / width);
+    const i = Math.round(e.nativeEvent.contentOffset.x / slideWidth);
     setIndex(Math.max(0, Math.min(SLIDES.length - 1, i)));
   }
 
@@ -44,55 +47,59 @@ export default function WelcomeScreen({ navigation }: Props) {
       return;
     }
     const next = index + 1;
-    scrollRef.current?.scrollTo({ x: next * width, animated: true });
+    scrollRef.current?.scrollTo({ x: next * slideWidth, animated: true });
     setIndex(next);
   }
 
+  const isWide = Platform.OS === 'web' && windowWidth > MAX_SLIDE_WIDTH;
+
   return (
-    <View style={styles.container}>
-      {/* Skip button */}
-      <TouchableOpacity style={[styles.skip, { top: insets.top + 8 }]} onPress={() => navigation.navigate('SignUp')}>
-        <Text style={styles.skipTxt}>Skip</Text>
-      </TouchableOpacity>
+    <View style={[styles.container, isWide && styles.containerWide]}>
+      <View style={[styles.panel, isWide && { maxWidth: MAX_SLIDE_WIDTH, alignSelf: 'center' as const }]}>
+        {/* Skip button */}
+        <TouchableOpacity style={[styles.skip, { top: insets.top + 8 }]} onPress={() => navigation.navigate('SignUp')}>
+          <Text style={styles.skipTxt}>Skip</Text>
+        </TouchableOpacity>
 
-      {/* Swipeable slides */}
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={onScroll}
-        scrollEventThrottle={Platform.OS === 'web' ? 16 : 64}
-        style={{ flex: 1 }}
-      >
-        {SLIDES.map(slide => (
-          <View key={slide.title} style={[styles.body, { width }]}>
-            <OnboardingArt variant={slide.variant} width={Math.min(width - 80, 300)} />
-            <Text style={styles.title}>{slide.title}</Text>
-            <Text style={styles.sub}>{slide.body}</Text>
+        {/* Swipeable slides */}
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={onScroll}
+          scrollEventThrottle={Platform.OS === 'web' ? 16 : 64}
+          style={{ flex: 1 }}
+        >
+          {SLIDES.map(slide => (
+            <View key={slide.title} style={[styles.body, { width: slideWidth }]}>
+              <OnboardingArt variant={slide.variant} width={Math.min(slideWidth - 80, 300)} />
+              <Text style={styles.title}>{slide.title}</Text>
+              <Text style={styles.sub}>{slide.body}</Text>
+            </View>
+          ))}
+        </ScrollView>
+
+        {/* Progress dots */}
+        <View style={styles.dots}>
+          {SLIDES.map((_, i) => (
+            <View key={i} style={[styles.dot, i === index && styles.dotActive]} />
+          ))}
+        </View>
+
+        {/* CTA footer */}
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) + 16 }]}>
+          {index < SLIDES.length - 1 ? (
+            <Button label="Next" onPress={goNext} />
+          ) : (
+            <Button label="Get Started" onPress={() => navigation.navigate('SignUp')} />
+          )}
+          <View style={styles.loginRow}>
+            <Text style={styles.loginTxt}>I already have an account · </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('LogIn')}>
+              <Text style={styles.loginLink}>Log In</Text>
+            </TouchableOpacity>
           </View>
-        ))}
-      </ScrollView>
-
-      {/* Progress dots */}
-      <View style={styles.dots}>
-        {SLIDES.map((_, i) => (
-          <View key={i} style={[styles.dot, i === index && styles.dotActive]} />
-        ))}
-      </View>
-
-      {/* CTA footer */}
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) + 16 }]}>
-        {index < SLIDES.length - 1 ? (
-          <Button label="Next" onPress={goNext} />
-        ) : (
-          <Button label="Get Started" onPress={() => navigation.navigate('SignUp')} />
-        )}
-        <View style={styles.loginRow}>
-          <Text style={styles.loginTxt}>I already have an account · </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('LogIn')}>
-            <Text style={styles.loginLink}>Log In</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -101,6 +108,8 @@ export default function WelcomeScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.paper },
+  containerWide: { justifyContent: 'center' },
+  panel: { flex: 1 },
   skip: { position: 'absolute', right: 18, zIndex: 1 },
   skipTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 14, color: Colors.ink2, height: 34, lineHeight: 34, paddingHorizontal: 12 },
   body: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 30 },
