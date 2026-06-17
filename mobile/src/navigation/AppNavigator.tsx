@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Animated, {
-  cancelAnimation, interpolate, useAnimatedStyle, useSharedValue,
+  cancelAnimation, interpolate, interpolateColor,
+  SharedValue, useAnimatedProps, useAnimatedStyle, useSharedValue,
   withDelay, withRepeat, withSequence, withSpring, withTiming,
 } from 'react-native-reanimated';
+import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { navigationRef } from './navigationRef';
@@ -15,6 +17,92 @@ import { Springs, Curves } from '../theme/motion';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import Icon, { IconName } from '../components/Icon';
 import Tappable from '../components/Tappable';
+
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+const AnimatedRect = Animated.createAnimatedComponent(Rect);
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+type GlyphInner = { color: string; f: SharedValue<number>; react: SharedValue<number> };
+
+// Home: a window lights up with warm amber on press; glows dimly when focused.
+function HomeGlyph({ color, f, react }: GlyphInner) {
+  const windowProps = useAnimatedProps(() => {
+    const lit = Math.min(1, f.value * 0.55 + react.value * 0.9);
+    return { fill: interpolateColor(lit, [0, 1], ['rgba(246,198,107,0)', 'rgba(246,198,107,1)']) };
+  });
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M3 10.5 12 3l9 7.5" />
+      <Path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" />
+      <AnimatedRect x={9.5} y={11} width={5} height={3.5} rx={0.7} stroke="none" animatedProps={windowProps} />
+    </Svg>
+  );
+}
+
+// Recipes: the book opens flat — text lines fade in to show the pages on focus/press.
+function BookGlyph({ color, f, react }: GlyphInner) {
+  const linesStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, f.value * 0.9 + react.value * 1.5),
+  }));
+  return (
+    <View>
+      <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+        <Path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6.5A1.5 1.5 0 0 0 5 20.5z" />
+        <Path d="M5 17.5A1.5 1.5 0 0 1 6.5 16H20" />
+      </Svg>
+      <Animated.View style={[StyleSheet.absoluteFill, linesStyle]} pointerEvents="none">
+        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.3} strokeLinecap="round">
+          <Path d="M8 8.5h8M8 11.5h8M8 14.5h5.5" />
+        </Svg>
+      </Animated.View>
+    </View>
+  );
+}
+
+// Plan: a checkmark draws itself on a calendar date cell on press; stays visible while focused.
+function CalendarGlyph({ color, f, react }: GlyphInner) {
+  const checkProps = useAnimatedProps(() => ({
+    strokeDashoffset: interpolate(Math.max(react.value, f.value * 0.8), [0, 1], [13, 0]),
+    opacity: Math.max(react.value, f.value * 0.7),
+  }));
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <Rect x={3.5} y={4.5} width={17} height={16} rx={2.5} />
+      <Path d="M3.5 9h17M8 3v4M16 3v4" />
+      <AnimatedPath d="M8.5 16 11 19 16.5 13" strokeDasharray={13} animatedProps={checkProps} />
+    </Svg>
+  );
+}
+
+// List: food circles drop into the cart on press and stay inside while focused.
+function CartGlyph({ color, f, react }: GlyphInner) {
+  const dot1Props = useAnimatedProps(() => {
+    const t = Math.max(react.value, f.value * 0.85);
+    return {
+      cy: interpolate(t, [0, 1], [5, 11]),
+      opacity: interpolate(t, [0, 0.1, 1], [0, 1, 1]),
+      r: 1.9,
+    };
+  });
+  const dot2Props = useAnimatedProps(() => {
+    const fromReact = Math.max(0, interpolate(react.value, [0.35, 1], [0, 1]));
+    const t = Math.max(fromReact, f.value * 0.7);
+    return {
+      cy: interpolate(t, [0, 1], [5, 12.5]),
+      opacity: interpolate(t, [0, 0.1, 1], [0, 1, 1]),
+      r: 1.5,
+    };
+  });
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx={9.5} cy={20} r={1.4} />
+      <Circle cx={18} cy={20} r={1.4} />
+      <Path d="M2.5 3.5h2.2l2 11.2a1.5 1.5 0 0 0 1.5 1.2h8.4a1.5 1.5 0 0 0 1.47-1.16L21 7.5H6" />
+      <AnimatedCircle cx={11.5} fill={color} stroke="none" animatedProps={dot1Props} />
+      <AnimatedCircle cx={15.5} fill={color} stroke="none" animatedProps={dot2Props} />
+    </Svg>
+  );
+}
 
 // Auth
 import SplashScreen from '../screens/auth/SplashScreen';
@@ -55,15 +143,12 @@ function AddPlaceholder() {
 const tabReactors: Partial<Record<IconName, () => void>> = {};
 function fireTabReaction(name: IconName) { tabReactors[name]?.(); }
 
-// Tab icon with focus choreography: a soft pill blooms behind the glyph while
-// the icon rises and pops on the expressive spring. On top of that, each tab
-// plays a one-shot reaction on every press, themed to its concept and built on
-// the shared motion tokens (web-safe 2D transforms — no 3D rotations that fail
-// to render on react-native-web):
-//   home → the house lights up (warm glow + pop)
-//   book → the cover flips (horizontal squash & spring back)
-//   calendar → a page turns (vertical squash & spring back)
-//   cart → bounces as a food block drops in
+// Tab icon with focus choreography: pill blooms behind the glyph on focus,
+// icon lifts and pops. Each tab also plays a themed one-shot reaction on press:
+//   home     → window lights up amber
+//   recipes  → page text lines fade in (book opens flat)
+//   plan     → checkmark draws on a calendar date cell
+//   list     → food circles drop into the cart
 function TabGlyph({ name, color, focused }: { name: IconName; color: string; focused: boolean }) {
   const f = useSharedValue(focused ? 1 : 0);
   const react = useSharedValue(0);
@@ -72,7 +157,6 @@ function TabGlyph({ name, color, focused }: { name: IconName; color: string; foc
     f.value = focused ? withSpring(1, Springs.pop) : withSpring(0, Springs.glide);
   }, [focused, f]);
 
-  // Register this glyph's reaction so a tab press can fire it.
   useEffect(() => {
     const fire = () => {
       react.value = 0;
@@ -90,46 +174,21 @@ function TabGlyph({ name, color, focused }: { name: IconName; color: string; foc
     transform: [{ scaleX: 0.6 + f.value * 0.4 }, { scaleY: 0.8 + f.value * 0.2 }],
   }));
 
-  const glyph = useAnimatedStyle(() => {
-    const lift = f.value * -2;
-    const pop = 1 + f.value * 0.08;
-    if (name === 'book') {
-      // Cover flip: squash horizontally then spring back open.
-      return { transform: [{ translateY: lift }, { scaleX: pop * (1 - react.value * 0.7) }, { scaleY: pop }] };
-    }
-    if (name === 'calendar') {
-      // Page turn: squash vertically then spring back.
-      return { transform: [{ translateY: lift }, { scaleX: pop }, { scaleY: pop * (1 - react.value * 0.65) }] };
-    }
-    if (name === 'cart') {
-      return { transform: [{ translateY: lift - react.value * 4 }, { scale: pop + react.value * 0.16 }] };
-    }
-    // home: a clear pop on tap
-    return { transform: [{ translateY: lift - react.value * 2 }, { scale: pop + react.value * 0.14 }] };
-  });
-
-  // The house "lights on" glow — warms up while Home is active, flares on tap.
-  const glow = useAnimatedStyle(() => ({
-    opacity: name === 'home' ? Math.min(1, f.value * 0.45 + react.value * 0.5) : 0,
-    transform: [{ scale: 0.7 + f.value * 0.35 + react.value * 0.4 }],
-  }));
-
-  // The food block that drops into the cart on tap.
-  const drop = useAnimatedStyle(() => ({
-    opacity: name === 'cart' ? react.value : 0,
+  const glyph = useAnimatedStyle(() => ({
     transform: [
-      { translateY: interpolate(react.value, [0, 1], [-12, 4]) },
-      { scale: 0.8 + react.value * 0.6 },
+      { translateY: -(f.value * 2 + react.value * 1.5) },
+      { scale: 1 + f.value * 0.08 + react.value * 0.06 },
     ],
   }));
 
   return (
     <View style={styles.tabGlyphWrap}>
       <Animated.View style={[styles.tabPill, pill]} />
-      {name === 'home' && <Animated.View style={[styles.tabGlow, glow]} pointerEvents="none" />}
-      {name === 'cart' && <Animated.View style={[styles.tabDrop, drop]} pointerEvents="none" />}
       <Animated.View style={glyph}>
-        <Icon name={name} size={24} color={color} />
+        {name === 'home' && <HomeGlyph color={color} f={f} react={react} />}
+        {name === 'book' && <BookGlyph color={color} f={f} react={react} />}
+        {name === 'calendar' && <CalendarGlyph color={color} f={f} react={react} />}
+        {name === 'cart' && <CartGlyph color={color} f={f} react={react} />}
       </Animated.View>
     </View>
   );
@@ -318,16 +377,6 @@ const styles = StyleSheet.create({
   tabPill: {
     position: 'absolute', width: 48, height: 28,
     borderRadius: Radius.pill, backgroundColor: Colors.accentSoft,
-  },
-  // Warm "lights on" glow behind the Home glyph.
-  tabGlow: {
-    position: 'absolute', width: 34, height: 34, borderRadius: 17,
-    backgroundColor: '#F6C66B',
-  },
-  // A small food block that drops into the List/cart glyph on tap.
-  tabDrop: {
-    position: 'absolute', top: 0, width: 9, height: 9, borderRadius: 2.5,
-    backgroundColor: Colors.accentDeep,
   },
   plusWrap: {
     width: 50, height: 40, marginTop: -6,

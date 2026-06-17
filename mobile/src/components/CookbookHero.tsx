@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   name: {
-    fontFamily: Fonts.displayMedium,
+    fontFamily: Fonts.displaySemiBold,
     fontSize: 36,
     color: Colors.ink,
     letterSpacing: -0.5,
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
   },
   logoPanel: {
     width: 110,
-    backgroundColor: Colors.accentSoft,
+    backgroundColor: Colors.accentDeep,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
     height: 98,
     borderRadius: 49,
     borderWidth: 1,
-    borderColor: 'rgba(46,158,87,0.22)',
+    borderColor: 'rgba(255,255,255,0.18)',
   },
   ring2: {
     position: 'absolute',
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     height: 118,
     borderRadius: 59,
     borderWidth: 1,
-    borderColor: 'rgba(46,158,87,0.10)',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   logo: {
     width: 72,
