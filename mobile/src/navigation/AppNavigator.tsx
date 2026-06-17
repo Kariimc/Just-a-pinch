@@ -1,11 +1,11 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Animated, {
-  cancelAnimation, interpolate, interpolateColor,
-  SharedValue, useAnimatedProps, useAnimatedStyle, useSharedValue,
+  cancelAnimation, interpolate,
+  SharedValue, useAnimatedStyle, useSharedValue,
   withDelay, withRepeat, withSequence, withSpring, withTiming,
 } from 'react-native-reanimated';
-import Svg, { Path, Circle, Rect } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { navigationRef } from './navigationRef';
@@ -18,38 +18,31 @@ import { AuthProvider, useAuth } from '../context/AuthContext';
 import Icon, { IconName } from '../components/Icon';
 import Tappable from '../components/Tappable';
 
-const AnimatedPath = Animated.createAnimatedComponent(Path);
-const AnimatedRect = Animated.createAnimatedComponent(Rect);
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
 type GlyphInner = { color: string; f: SharedValue<number>; react: SharedValue<number> };
 
-// Home: a window lights up with warm amber on press; glows dimly when focused.
+// Home: an amber window lights up inside the house on press; glows when focused.
+// Uses a plain Animated.View overlay at SVG-coordinate position so no useAnimatedProps needed.
 function HomeGlyph({ color, f, react }: GlyphInner) {
-  const windowProps = useAnimatedProps(() => {
-    const lit = Math.min(1, f.value * 0.55 + react.value * 0.9);
-    return { fill: interpolateColor(lit, [0, 1], ['rgba(246,198,107,0)', 'rgba(246,198,107,1)']) };
-  });
+  const lightStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, f.value * 0.55 + react.value * 0.9),
+  }));
   return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-      <Path d="M3 10.5 12 3l9 7.5" />
-      <Path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5" />
-      <AnimatedRect x={9.5} y={11} width={5} height={3.5} rx={0.7} stroke="none" animatedProps={windowProps} />
-    </Svg>
+    <View style={styles.iconWrap}>
+      <Icon name="home" size={24} color={color} />
+      {/* Amber window rect at SVG coords x=9.5,y=11,w=5,h=3.5 — 1:1 with the 24×24 viewBox */}
+      <Animated.View style={[styles.windowLight, lightStyle]} pointerEvents="none" />
+    </View>
   );
 }
 
-// Recipes: the book opens flat — text lines fade in to show the pages on focus/press.
+// Recipes: page text lines fade in over the closed book, showing it open on focus/press.
 function BookGlyph({ color, f, react }: GlyphInner) {
   const linesStyle = useAnimatedStyle(() => ({
     opacity: Math.min(1, f.value * 0.9 + react.value * 1.5),
   }));
   return (
-    <View>
-      <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-        <Path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H6.5A1.5 1.5 0 0 0 5 20.5z" />
-        <Path d="M5 17.5A1.5 1.5 0 0 1 6.5 16H20" />
-      </Svg>
+    <View style={styles.iconWrap}>
+      <Icon name="book" size={24} color={color} />
       <Animated.View style={[StyleSheet.absoluteFill, linesStyle]} pointerEvents="none">
         <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.3} strokeLinecap="round">
           <Path d="M8 8.5h8M8 11.5h8M8 14.5h5.5" />
@@ -59,48 +52,47 @@ function BookGlyph({ color, f, react }: GlyphInner) {
   );
 }
 
-// Plan: a checkmark draws itself on a calendar date cell on press; stays visible while focused.
+// Plan: a checkmark fades in on a calendar date cell; stays visible while focused.
 function CalendarGlyph({ color, f, react }: GlyphInner) {
-  const checkProps = useAnimatedProps(() => ({
-    strokeDashoffset: interpolate(Math.max(react.value, f.value * 0.8), [0, 1], [13, 0]),
+  const checkStyle = useAnimatedStyle(() => ({
     opacity: Math.max(react.value, f.value * 0.7),
   }));
   return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-      <Rect x={3.5} y={4.5} width={17} height={16} rx={2.5} />
-      <Path d="M3.5 9h17M8 3v4M16 3v4" />
-      <AnimatedPath d="M8.5 16 11 19 16.5 13" strokeDasharray={13} animatedProps={checkProps} />
-    </Svg>
+    <View style={styles.iconWrap}>
+      <Icon name="calendar" size={24} color={color} />
+      <Animated.View style={[StyleSheet.absoluteFill, checkStyle]} pointerEvents="none">
+        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M8.5 16 11 19 16.5 13" />
+        </Svg>
+      </Animated.View>
+    </View>
   );
 }
 
-// List: food circles drop into the cart on press and stay inside while focused.
+// List: two food dots drop from above into the cart on press, stay inside while focused.
 function CartGlyph({ color, f, react }: GlyphInner) {
-  const dot1Props = useAnimatedProps(() => {
-    const t = Math.max(react.value, f.value * 0.85);
+  const dot1Style = useAnimatedStyle(() => {
+    const t = Math.max(react.value, f.value);
     return {
-      cy: interpolate(t, [0, 1], [5, 11]),
       opacity: interpolate(t, [0, 0.1, 1], [0, 1, 1]),
-      r: 1.9,
+      transform: [{ translateY: interpolate(t, [0, 1], [-8, 0]) }],
     };
   });
-  const dot2Props = useAnimatedProps(() => {
+  const dot2Style = useAnimatedStyle(() => {
     const fromReact = Math.max(0, interpolate(react.value, [0.35, 1], [0, 1]));
-    const t = Math.max(fromReact, f.value * 0.7);
+    const t = Math.max(fromReact, f.value * 0.9);
     return {
-      cy: interpolate(t, [0, 1], [5, 12.5]),
       opacity: interpolate(t, [0, 0.1, 1], [0, 1, 1]),
-      r: 1.5,
+      transform: [{ translateY: interpolate(t, [0, 1], [-8, 0]) }],
     };
   });
   return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-      <Circle cx={9.5} cy={20} r={1.4} />
-      <Circle cx={18} cy={20} r={1.4} />
-      <Path d="M2.5 3.5h2.2l2 11.2a1.5 1.5 0 0 0 1.5 1.2h8.4a1.5 1.5 0 0 0 1.47-1.16L21 7.5H6" />
-      <AnimatedCircle cx={11.5} fill={color} stroke="none" animatedProps={dot1Props} />
-      <AnimatedCircle cx={15.5} fill={color} stroke="none" animatedProps={dot2Props} />
-    </Svg>
+    <View style={styles.iconWrap}>
+      <Icon name="cart" size={24} color={color} />
+      {/* Dots positioned at their landing spot (inside basket); translateY lifts them into starting pos */}
+      <Animated.View style={[styles.cartDot1, { backgroundColor: color }, dot1Style]} pointerEvents="none" />
+      <Animated.View style={[styles.cartDot2, { backgroundColor: color }, dot2Style]} pointerEvents="none" />
+    </View>
   );
 }
 
@@ -198,7 +190,7 @@ function TabGlyph({ name, color, focused }: { name: IconName; color: string; foc
 function TabButton(props: BottomTabBarButtonProps) {
   const { style, children, ...rest } = props;
   return (
-    <Tappable {...(rest as object)} style={[style as object, styles.tabBtn]} scaleTo={0.9}>
+    <Tappable {...(rest as object)} style={[style as object, styles.tabBtn]}>
       {children}
     </Tappable>
   );
@@ -377,6 +369,23 @@ const styles = StyleSheet.create({
   tabPill: {
     position: 'absolute', width: 48, height: 28,
     borderRadius: Radius.pill, backgroundColor: Colors.accentSoft,
+  },
+  // 24×24 wrapper so absolute-positioned overlays align 1:1 with SVG viewBox units.
+  iconWrap: { width: 24, height: 24 },
+  // Amber window pane at SVG position x=9.5 y=11 w=5 h=3.5
+  windowLight: {
+    position: 'absolute', left: 9.5, top: 11,
+    width: 5, height: 3.5, borderRadius: 1,
+    backgroundColor: '#F6C66B',
+  },
+  // Food dots that drop into the cart basket; translateY animation moves them in from above
+  cartDot1: {
+    position: 'absolute', left: 10, top: 11,
+    width: 3.5, height: 3.5, borderRadius: 2,
+  },
+  cartDot2: {
+    position: 'absolute', left: 14.5, top: 12.5,
+    width: 2.5, height: 2.5, borderRadius: 1.5,
   },
   plusWrap: {
     width: 50, height: 40, marginTop: -6,
