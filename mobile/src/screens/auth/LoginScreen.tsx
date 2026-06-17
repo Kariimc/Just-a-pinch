@@ -71,7 +71,7 @@ export default function LoginScreen({ navigation }: Props) {
         onChangeText={setEmail}
         keyboardType="email-address"
         autoCapitalize="none"
-        placeholder="you@email.com"
+        placeholder="your@email.com"
         placeholderTextColor={Colors.ink3}
       />
 

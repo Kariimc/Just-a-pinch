@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Animated, {
-  cancelAnimation, interpolate, useAnimatedStyle, useSharedValue,
+  cancelAnimation, interpolate,
+  SharedValue, useAnimatedStyle, useSharedValue,
   withDelay, withRepeat, withSequence, withSpring, withTiming,
 } from 'react-native-reanimated';
+import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { navigationRef } from './navigationRef';
@@ -15,6 +17,84 @@ import { Springs, Curves } from '../theme/motion';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import Icon, { IconName } from '../components/Icon';
 import Tappable from '../components/Tappable';
+
+type GlyphInner = { color: string; f: SharedValue<number>; react: SharedValue<number> };
+
+// Home: an amber window lights up inside the house on press; glows when focused.
+// Uses a plain Animated.View overlay at SVG-coordinate position so no useAnimatedProps needed.
+function HomeGlyph({ color, f, react }: GlyphInner) {
+  const lightStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, f.value * 0.55 + react.value * 0.9),
+  }));
+  return (
+    <View style={styles.iconWrap}>
+      <Icon name="home" size={24} color={color} />
+      {/* Amber window rect at SVG coords x=9.5,y=11,w=5,h=3.5 — 1:1 with the 24×24 viewBox */}
+      <Animated.View style={[styles.windowLight, lightStyle]} pointerEvents="none" />
+    </View>
+  );
+}
+
+// Recipes: page text lines fade in over the closed book, showing it open on focus/press.
+function BookGlyph({ color, f, react }: GlyphInner) {
+  const linesStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(1, f.value * 0.9 + react.value * 1.5),
+  }));
+  return (
+    <View style={styles.iconWrap}>
+      <Icon name="book" size={24} color={color} />
+      <Animated.View style={[StyleSheet.absoluteFill, linesStyle]} pointerEvents="none">
+        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.3} strokeLinecap="round">
+          <Path d="M8 8.5h8M8 11.5h8M8 14.5h5.5" />
+        </Svg>
+      </Animated.View>
+    </View>
+  );
+}
+
+// Plan: a checkmark fades in on a calendar date cell; stays visible while focused.
+function CalendarGlyph({ color, f, react }: GlyphInner) {
+  const checkStyle = useAnimatedStyle(() => ({
+    opacity: Math.max(react.value, f.value * 0.7),
+  }));
+  return (
+    <View style={styles.iconWrap}>
+      <Icon name="calendar" size={24} color={color} />
+      <Animated.View style={[StyleSheet.absoluteFill, checkStyle]} pointerEvents="none">
+        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <Path d="M8.5 16 11 19 16.5 13" />
+        </Svg>
+      </Animated.View>
+    </View>
+  );
+}
+
+// List: two food dots drop from above into the cart on press, stay inside while focused.
+function CartGlyph({ color, f, react }: GlyphInner) {
+  const dot1Style = useAnimatedStyle(() => {
+    const t = Math.max(react.value, f.value);
+    return {
+      opacity: interpolate(t, [0, 0.1, 1], [0, 1, 1]),
+      transform: [{ translateY: interpolate(t, [0, 1], [-8, 0]) }],
+    };
+  });
+  const dot2Style = useAnimatedStyle(() => {
+    const fromReact = Math.max(0, interpolate(react.value, [0.35, 1], [0, 1]));
+    const t = Math.max(fromReact, f.value * 0.9);
+    return {
+      opacity: interpolate(t, [0, 0.1, 1], [0, 1, 1]),
+      transform: [{ translateY: interpolate(t, [0, 1], [-8, 0]) }],
+    };
+  });
+  return (
+    <View style={styles.iconWrap}>
+      <Icon name="cart" size={24} color={color} />
+      {/* Dots positioned at their landing spot (inside basket); translateY lifts them into starting pos */}
+      <Animated.View style={[styles.cartDot1, { backgroundColor: color }, dot1Style]} pointerEvents="none" />
+      <Animated.View style={[styles.cartDot2, { backgroundColor: color }, dot2Style]} pointerEvents="none" />
+    </View>
+  );
+}
 
 // Auth
 import SplashScreen from '../screens/auth/SplashScreen';
@@ -55,15 +135,12 @@ function AddPlaceholder() {
 const tabReactors: Partial<Record<IconName, () => void>> = {};
 function fireTabReaction(name: IconName) { tabReactors[name]?.(); }
 
-// Tab icon with focus choreography: a soft pill blooms behind the glyph while
-// the icon rises and pops on the expressive spring. On top of that, each tab
-// plays a one-shot reaction on every press, themed to its concept and built on
-// the shared motion tokens (web-safe 2D transforms — no 3D rotations that fail
-// to render on react-native-web):
-//   home → the house lights up (warm glow + pop)
-//   book → the cover flips (horizontal squash & spring back)
-//   calendar → a page turns (vertical squash & spring back)
-//   cart → bounces as a food block drops in
+// Tab icon with focus choreography: pill blooms behind the glyph on focus,
+// icon lifts and pops. Each tab also plays a themed one-shot reaction on press:
+//   home     → window lights up amber
+//   recipes  → page text lines fade in (book opens flat)
+//   plan     → checkmark draws on a calendar date cell
+//   list     → food circles drop into the cart
 function TabGlyph({ name, color, focused }: { name: IconName; color: string; focused: boolean }) {
   const f = useSharedValue(focused ? 1 : 0);
   const react = useSharedValue(0);
@@ -72,7 +149,6 @@ function TabGlyph({ name, color, focused }: { name: IconName; color: string; foc
     f.value = focused ? withSpring(1, Springs.pop) : withSpring(0, Springs.glide);
   }, [focused, f]);
 
-  // Register this glyph's reaction so a tab press can fire it.
   useEffect(() => {
     const fire = () => {
       react.value = 0;
@@ -90,46 +166,21 @@ function TabGlyph({ name, color, focused }: { name: IconName; color: string; foc
     transform: [{ scaleX: 0.6 + f.value * 0.4 }, { scaleY: 0.8 + f.value * 0.2 }],
   }));
 
-  const glyph = useAnimatedStyle(() => {
-    const lift = f.value * -2;
-    const pop = 1 + f.value * 0.08;
-    if (name === 'book') {
-      // Cover flip: squash horizontally then spring back open.
-      return { transform: [{ translateY: lift }, { scaleX: pop * (1 - react.value * 0.7) }, { scaleY: pop }] };
-    }
-    if (name === 'calendar') {
-      // Page turn: squash vertically then spring back.
-      return { transform: [{ translateY: lift }, { scaleX: pop }, { scaleY: pop * (1 - react.value * 0.65) }] };
-    }
-    if (name === 'cart') {
-      return { transform: [{ translateY: lift - react.value * 4 }, { scale: pop + react.value * 0.16 }] };
-    }
-    // home: a clear pop on tap
-    return { transform: [{ translateY: lift - react.value * 2 }, { scale: pop + react.value * 0.14 }] };
-  });
-
-  // The house "lights on" glow — warms up while Home is active, flares on tap.
-  const glow = useAnimatedStyle(() => ({
-    opacity: name === 'home' ? Math.min(1, f.value * 0.45 + react.value * 0.5) : 0,
-    transform: [{ scale: 0.7 + f.value * 0.35 + react.value * 0.4 }],
-  }));
-
-  // The food block that drops into the cart on tap.
-  const drop = useAnimatedStyle(() => ({
-    opacity: name === 'cart' ? react.value : 0,
+  const glyph = useAnimatedStyle(() => ({
     transform: [
-      { translateY: interpolate(react.value, [0, 1], [-12, 4]) },
-      { scale: 0.8 + react.value * 0.6 },
+      { translateY: -(f.value * 2 + react.value * 1.5) },
+      { scale: 1 + f.value * 0.08 + react.value * 0.06 },
     ],
   }));
 
   return (
     <View style={styles.tabGlyphWrap}>
       <Animated.View style={[styles.tabPill, pill]} />
-      {name === 'home' && <Animated.View style={[styles.tabGlow, glow]} pointerEvents="none" />}
-      {name === 'cart' && <Animated.View style={[styles.tabDrop, drop]} pointerEvents="none" />}
       <Animated.View style={glyph}>
-        <Icon name={name} size={24} color={color} />
+        {name === 'home' && <HomeGlyph color={color} f={f} react={react} />}
+        {name === 'book' && <BookGlyph color={color} f={f} react={react} />}
+        {name === 'calendar' && <CalendarGlyph color={color} f={f} react={react} />}
+        {name === 'cart' && <CartGlyph color={color} f={f} react={react} />}
       </Animated.View>
     </View>
   );
@@ -139,7 +190,7 @@ function TabGlyph({ name, color, focused }: { name: IconName; color: string; foc
 function TabButton(props: BottomTabBarButtonProps) {
   const { style, children, ...rest } = props;
   return (
-    <Tappable {...(rest as object)} style={[style as object, styles.tabBtn]} scaleTo={0.9}>
+    <Tappable {...(rest as object)} style={[style as object, styles.tabBtn]}>
       {children}
     </Tappable>
   );
@@ -319,15 +370,22 @@ const styles = StyleSheet.create({
     position: 'absolute', width: 48, height: 28,
     borderRadius: Radius.pill, backgroundColor: Colors.accentSoft,
   },
-  // Warm "lights on" glow behind the Home glyph.
-  tabGlow: {
-    position: 'absolute', width: 34, height: 34, borderRadius: 17,
+  // 24×24 wrapper so absolute-positioned overlays align 1:1 with SVG viewBox units.
+  iconWrap: { width: 24, height: 24 },
+  // Amber window pane at SVG position x=9.5 y=11 w=5 h=3.5
+  windowLight: {
+    position: 'absolute', left: 9.5, top: 11,
+    width: 5, height: 3.5, borderRadius: 1,
     backgroundColor: '#F6C66B',
   },
-  // A small food block that drops into the List/cart glyph on tap.
-  tabDrop: {
-    position: 'absolute', top: 0, width: 9, height: 9, borderRadius: 2.5,
-    backgroundColor: Colors.accentDeep,
+  // Food dots that drop into the cart basket; translateY animation moves them in from above
+  cartDot1: {
+    position: 'absolute', left: 10, top: 11,
+    width: 3.5, height: 3.5, borderRadius: 2,
+  },
+  cartDot2: {
+    position: 'absolute', left: 14.5, top: 12.5,
+    width: 2.5, height: 2.5, borderRadius: 1.5,
   },
   plusWrap: {
     width: 50, height: 40, marginTop: -6,
