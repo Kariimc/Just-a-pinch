@@ -22,11 +22,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const ANTHROPIC_KEY = Deno.env.get('ANTHROPIC_API_KEY') ?? '';
 const MODEL = 'claude-haiku-4-5-20251001';
 
-// Free AI captures per user per month. This is the early-access abuse/cost
-// guard — set generously so the "on the house" trial isn't throttled. Once real
-// IAP gates premium, lower this to the marketed 3 and let profiles.ai_unlimited
-// grant unlimited to paying users.
-const FREE_MONTHLY_AI_LIMIT = 25;
+// Free AI captures per user per month. Premium users (profiles.ai_unlimited)
+// are counted but never blocked — the RevenueCat webhook flips that flag.
+const FREE_MONTHLY_AI_LIMIT = 3;
 
 const INSTACART_KEY = Deno.env.get('INSTACART_API_KEY') ?? '';
 const INSTACART_HOST = Deno.env.get('INSTACART_ENV') === 'development'
