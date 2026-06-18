@@ -88,7 +88,6 @@ export default function ShoppingScreen() {
   const trackWidthRef = useRef(0);
   const fillWidth = useSharedValue(0);
   const fillStyle = useAnimatedStyle(() => ({ width: fillWidth.value }));
-  const listCaptureRef = useRef<View>(null);
 
   useFocusEffect(useCallback(() => {
     getShoppingItems().then(i => { setItems(i); setLoading(false); });
@@ -189,7 +188,9 @@ export default function ShoppingScreen() {
     hapticSuccess();
     showToast(
       copied
-        ? `${unchecked.length} item${unchecked.length === 1 ? '' : 's'} copied — paste anywhere`
+        ? openAfter
+          ? `List copied — paste it in Instacart's AI assistant`
+          : `${unchecked.length} item${unchecked.length === 1 ? '' : 's'} copied`
         : 'Could not copy automatically — try again',
       copied ? 'check' : 'info',
     );
@@ -202,39 +203,7 @@ export default function ShoppingScreen() {
     }
   }
 
-  async function openInstacartWithImage() {
-    if (Platform.OS === 'web') { await copyList(true); return; }
-
-    // Native-only modules, required lazily: expo-media-library's Next module
-    // calls requireNativeModule at import time and throws on web, so a static
-    // top-level import would white-screen the entire web bundle.
-    const MediaLibrary = require('expo-media-library') as typeof import('expo-media-library');
-    const { captureRef } = require('react-native-view-shot') as typeof import('react-native-view-shot');
-
-    const { list, didAddPending } = resolvedList();
-    const unchecked = list.filter(i => !i.checked);
-    if (!unchecked.length) {
-      showToast('No items on your list yet', 'info');
-      return;
-    }
-    if (didAddPending) commitPending(list);
-
-    const { status } = await MediaLibrary.requestPermissionsAsync();
-    if (status !== 'granted') {
-      showToast('Allow photo access to save your list image', 'info');
-      return;
-    }
-
-    try {
-      const uri = await captureRef(listCaptureRef, { format: 'jpg', quality: 0.92 });
-      await MediaLibrary.saveToLibraryAsync(uri);
-      hapticSuccess();
-      showToast('List saved to your photos — open Instacart\'s camera to import', 'check');
-      try { await Linking.openURL('instacart://'); } catch { openExternal('https://www.instacart.com/store/'); }
-    } catch {
-      showToast('Could not save image — try copying the list instead', 'info');
-    }
-  }
+  function openInstacart() { copyList(true); }
 
   const total = items.length;
   const checked = items.filter(i => i.checked).length;
@@ -318,7 +287,7 @@ export default function ShoppingScreen() {
                   ))}
                 </View>
               ))}
-              <InstacartButtons onOpen={openInstacartWithImage} onCopy={() => copyList(false)} />
+              <InstacartButtons onOpen={openInstacart} onCopy={() => copyList(false)} />
             </>
           )}
         </ScrollView>
@@ -337,19 +306,6 @@ export default function ShoppingScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Off-screen view captured as image for Instacart import */}
-        <View ref={listCaptureRef} style={styles.captureView} collapsable={false}>
-          <Text style={styles.captureHeading}>Shopping List</Text>
-          {items.filter(i => !i.checked).map(item => (
-            <View key={item.id} style={styles.captureRow}>
-              <Text style={styles.captureCheck}>□</Text>
-              <Text style={styles.captureItemTxt}>
-                {[item.quantity, item.unit, item.name].filter(Boolean).join(' ')}
-              </Text>
-            </View>
-          ))}
-          <Text style={styles.captureFooter}>Just a Pinch</Text>
-        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -410,38 +366,4 @@ const styles = StyleSheet.create({
   },
   copyTxt: { fontFamily: Fonts.uiSemiBold, fontSize: 14, color: Colors.ink2 },
 
-  captureView: {
-    position: 'absolute',
-    left: 9999,
-    top: 0,
-    width: 360,
-    backgroundColor: '#FFFDF8',
-    padding: 28,
-    paddingBottom: 36,
-  },
-  captureHeading: {
-    fontFamily: Fonts.displayMedium,
-    fontSize: 22,
-    color: '#14542C',
-    marginBottom: 18,
-    letterSpacing: -0.3,
-  },
-  captureRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-    paddingVertical: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8E0D4',
-  },
-  captureCheck: { fontSize: 16, color: '#2E9E57', lineHeight: 22 },
-  captureItemTxt: { fontFamily: Fonts.uiRegular, fontSize: 16, color: '#211C16', flex: 1, lineHeight: 22 },
-  captureFooter: {
-    fontFamily: Fonts.uiBold,
-    fontSize: 11,
-    color: '#9C9387',
-    marginTop: 20,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
 });
