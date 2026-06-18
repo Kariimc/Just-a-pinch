@@ -4,7 +4,7 @@
     "slug": "just-a-pinch",
     "owner": "kariimc",
     "scheme": "justapinch",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.justapinch.app",
-      "versionCode": 1,
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#1E7A41",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -78,14 +78,6 @@
         {
           "photosPermission": "Just a Pinch needs photo access so you can import recipe screenshots and add cover photos.",
           "cameraPermission": "Just a Pinch uses the camera to scan recipe cards and take photos of your dishes."
-        }
-      ],
-      [
-        "expo-media-library",
-        {
-          "photosPermission": "Just a Pinch saves your shopping list as an image so you can upload it to Instacart.",
-          "savePhotosPermission": "Just a Pinch saves your shopping list as an image so you can upload it to Instacart.",
-          "isAccessMediaLocationEnabled": false
         }
       ]
     ]
