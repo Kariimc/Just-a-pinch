@@ -210,20 +210,27 @@ export async function getBadgeProgress(): Promise<BadgeProgress[]> {
     };
   });
 
-  // Announce fresh unlocks exactly once — pops the slide-in panel.
+  // Collect fresh unlocks — persist before notifying so a restart never
+  // re-shows a panel the user already saw (or missed due to a crash).
+  const toAnnounce: BadgeProgress[] = [];
   for (const b of all) {
     const entry = earnedMap[b.id];
     if (entry?.notified === false && !announced.has(b.id)) {
       announced.add(b.id);
       entry.notified = true;
       dirty = true;
-      notifyBadgeUnlock(b);
+      toAnnounce.push(b);
     }
   }
 
   if (dirty) {
     try { await writeJson(EARNED_KEY, earnedMap); } catch { /* ignore */ }
   }
+
+  for (const b of toAnnounce) {
+    notifyBadgeUnlock(b);
+  }
+
   return all;
 }
 
