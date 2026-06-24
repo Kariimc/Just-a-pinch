@@ -21,6 +21,7 @@ import {
   PurchasesNotConfigured, PremiumOffer, BillingPeriod,
   purchasesAvailable, getPremiumOffers, purchase, restorePurchases,
 } from '../../lib/purchases';
+import { webPaymentsAvailable, startWebCheckout } from '../../lib/webPayments';
 import { openPrivacy, openTerms } from '../../lib/legal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Paywall'>;
@@ -94,10 +95,27 @@ export default function PaywallScreen({ navigation, route }: Props) {
     return updated;
   }
 
-  // Primary CTA. Runs the real store purchase when IAP is configured; otherwise
-  // falls back to the early-access "on the house" trial flag.
+  // Primary CTA. Web → Stripe Checkout redirect; native → RevenueCat store sheet;
+  // unconfigured → early-access "on the house" trial flag.
   async function handleSubscribe() {
     if (busy || !settings) return;
+
+    // Web path: redirect to Stripe Checkout. The page navigates away; when
+    // Stripe redirects back with ?payment_status=success the AuthContext picks
+    // it up and marks the plan as premium.
+    if (webPaymentsAvailable()) {
+      setBusy(true);
+      try {
+        await startWebCheckout(billing);
+        // startWebCheckout navigates away — execution stops here on success.
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Could not start checkout';
+        showToast(msg, 'info');
+        setBusy(false);
+      }
+      return;
+    }
+
     if (!purchasesAvailable()) { await startTrial(); return; }
     const offer = offerFor(billing);
     if (!offer) { await startTrial(); return; }
@@ -333,9 +351,11 @@ export default function PaywallScreen({ navigation, route }: Props) {
         <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 14) + 6 }]}>
           <Button
             label={
-              purchasesAvailable() && offers
+              webPaymentsAvailable()
                 ? `Subscribe · ${priceFor(billing)}${billing === 'annual' ? '/yr' : '/mo'}`
-                : 'Start free trial'
+                : purchasesAvailable() && offers
+                  ? `Subscribe · ${priceFor(billing)}${billing === 'annual' ? '/yr' : '/mo'}`
+                  : 'Start free trial'
             }
             onPress={handleSubscribe}
             loading={busy}
