@@ -197,7 +197,10 @@ export async function getBadgeProgress(): Promise<BadgeProgress[]> {
     // Once earned, always earned — deleting recipes never revokes a badge.
     const earned = !!earnedMap[def.id] || current >= def.target;
     if (earned && !earnedMap[def.id]) {
-      earnedMap[def.id] = { earnedAt: now, celebrated: false, notified: false };
+      // If a concurrent getBadgeProgress() call already announced this badge
+      // (it's in the session-level `announced` set), mark it notified:true
+      // immediately so this call's write doesn't overwrite it with false.
+      earnedMap[def.id] = { earnedAt: now, celebrated: false, notified: announced.has(def.id) };
       dirty = true;
     }
     const entry = earnedMap[def.id];
