@@ -365,6 +365,12 @@ export default function PaywallScreen({ navigation, route }: Props) {
               <Text style={styles.freeLinkTxt}>Continue with the free plan</Text>
             </TouchableOpacity>
           )}
+          {/* Web: secondary trial link so testers can try the app without paying */}
+          {webPaymentsAvailable() && (
+            <TouchableOpacity onPress={startTrial} hitSlop={8} style={styles.freeLink}>
+              <Text style={styles.freeLinkTxt}>Start free trial instead</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             onPress={handleRestore}
             hitSlop={8}
