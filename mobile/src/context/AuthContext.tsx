@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { handleAuthLink } from '../lib/authRedirect';
@@ -7,6 +8,7 @@ import { showToast } from '../components/Toast';
 import { resetToMain } from '../navigation/navigationRef';
 import { setSentryUser } from '../lib/sentry';
 import { configurePurchases } from '../lib/purchases';
+import { getSettings, saveSettings } from '../store/settingsStorage';
 
 interface AuthContextType {
   user: User | null;
@@ -50,6 +52,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  // Web: when Stripe redirects back with ?payment_status=success, mark the
+  // local plan as premium and show a confirmation toast. The stripe-webhook
+  // edge function has already (or will shortly) flip profiles.ai_unlimited.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment_status') !== 'success') return;
+    window.history.replaceState({}, '', window.location.pathname);
+    getSettings().then(async s => {
+      await saveSettings({ ...s, subscriptionPlan: 'premium' });
+      showToast('Welcome to Premium!', 'sparkle');
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Exchange auth codes from email links (confirmation + password reset),
