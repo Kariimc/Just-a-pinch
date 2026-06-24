@@ -19,6 +19,9 @@ export interface AppSettings {
   // Applied at startup (App.tsx flips the theme before screens load);
   // changing it needs a reload — web reloads itself, native asks the user.
   darkMode: boolean;
+  // URI of a user-chosen cover photo shown at 25% opacity behind the
+  // cookbook hero on the home screen. Undefined = show the default image.
+  coverImageUri?: string;
 }
 
 const DEFAULTS: AppSettings = {

@@ -5,14 +5,17 @@ import Animated, {
 } from 'react-native-reanimated';
 import { Colors, Fonts, Radius, Shadow } from '../theme';
 import { Springs } from '../theme/motion';
+import Icon from './Icon';
 
 interface Props {
   name: string;
   recipeCount: number;
+  coverImageUri?: string;
   onPress?: () => void;
+  onChangeCover?: () => void;
 }
 
-export default function CookbookHero({ name, recipeCount, onPress }: Props) {
+export default function CookbookHero({ name, recipeCount, coverImageUri, onPress, onChangeCover }: Props) {
   const logoScale = useSharedValue(1);
   const cardScale = useSharedValue(1);
 
@@ -36,11 +39,11 @@ export default function CookbookHero({ name, recipeCount, onPress }: Props) {
     <Animated.View style={[styles.card, Shadow.cardSoft, { transform: [{ scale: cardScale }] }]}>
       <TouchableOpacity activeOpacity={1} onPress={handlePress} style={styles.inner}>
 
-        <Image
-          source={require('../../assets/cookbook-bg.jpg')}
-          style={styles.bgImage}
-          resizeMode="cover"
-        />
+        {coverImageUri ? (
+          <Image source={{ uri: coverImageUri }} style={styles.bgImageCustom} resizeMode="cover" />
+        ) : (
+          <Image source={require('../../assets/cookbook-bg.jpg')} style={styles.bgImage} resizeMode="cover" />
+        )}
 
         <View style={styles.accentBar} />
 
@@ -66,6 +69,13 @@ export default function CookbookHero({ name, recipeCount, onPress }: Props) {
         </View>
 
       </TouchableOpacity>
+
+      {/* Camera button sits outside the main tap so it doesn't trigger navigation */}
+      {onChangeCover && (
+        <TouchableOpacity style={styles.cameraBtn} onPress={onChangeCover} hitSlop={10}>
+          <Icon name="camera" size={13} color="#fff" />
+        </TouchableOpacity>
+      )}
     </Animated.View>
   );
 }
@@ -85,6 +95,21 @@ const styles = StyleSheet.create({
   bgImage: {
     ...StyleSheet.absoluteFill,
     opacity: 0.15,
+  },
+  bgImageCustom: {
+    ...StyleSheet.absoluteFill,
+    opacity: 0.25,
+  },
+  cameraBtn: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,0,0,0.38)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   accentBar: {
     width: 6,

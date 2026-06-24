@@ -14,6 +14,8 @@ import { RootStackParamList, Recipe } from '../../types';
 import { Colors, Radius, Fonts, Shadow } from '../../theme';
 import { Ambient, Curves } from '../../theme/motion';
 import { getRecipes, getProfile, getFeaturedRecipes } from '../../store/storage';
+import { getSettings, saveSettings } from '../../store/settingsStorage';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import RecipeCard from '../../components/RecipeCard';
 import Chip from '../../components/Chip';
@@ -130,10 +132,12 @@ export default function HomeScreen() {
   const [lastName, setLastName] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [coverImageUri, setCoverImageUri] = useState<string | undefined>();
 
   async function load() {
-    const [r, p, f] = await Promise.all([getRecipes(), getProfile(), getFeaturedRecipes()]);
+    const [r, p, f, s] = await Promise.all([getRecipes(), getProfile(), getFeaturedRecipes(), getSettings()]);
     setRecipes(r);
+    setCoverImageUri(s.coverImageUri);
     setDinnerPicks(pickDinner(r));
     // Never greet with a blank: profile name → signup name → email → Chef.
     const metaName = (user?.user_metadata?.name as string | undefined)?.trim();
@@ -145,6 +149,22 @@ export default function HomeScreen() {
   }
 
   useFocusEffect(useCallback(() => { load(); }, [user?.id]));
+
+  async function handleChangeCover() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 7],
+      quality: 0.85,
+    });
+    if (result.canceled) return;
+    const uri = result.assets[0].uri;
+    setCoverImageUri(uri);
+    const s = await getSettings();
+    await saveSettings({ ...s, coverImageUri: uri });
+  }
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,';
@@ -363,7 +383,9 @@ export default function HomeScreen() {
           <CookbookHero
             name={lastName || userName || ''}
             recipeCount={recipes.length}
+            coverImageUri={coverImageUri}
             onPress={() => (navigation as any).navigate('Recipes')}
+            onChangeCover={handleChangeCover}
           />
         </>
       )}
