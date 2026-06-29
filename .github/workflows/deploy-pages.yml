@@ -40,9 +40,8 @@ jobs:
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: npx expo export --platform web --output-dir ../dist/app
 
-      - name: Brand the pre-mount paint (kill the white flash before the splash)
-        run: |
-          node -e "const fs=require('fs');const f='dist/app/index.html';let s=fs.readFileSync(f,'utf8');if(!s.includes('jap-prepaint')){s=s.replace('</head>','  <style id=\"jap-prepaint\">html,body{background-color:#2E9E57}#root{background-color:#2E9E57}</style>\n</head>');fs.writeFileSync(f,s);}"
+      - name: Optimize web export (green pre-paint + parallel chunk preload)
+        run: node mobile/scripts/optimize-web-export.js dist/app
 
       - name: Copy docs (landing page + legal) to dist root
         run: cp -r docs/. dist/
