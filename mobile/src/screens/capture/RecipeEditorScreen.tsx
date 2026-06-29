@@ -131,35 +131,41 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
     if (!title.trim()) { showToast('Please add a recipe title'); return; }
     setSaving(true);
 
-    const recipeId = editId ?? uid();
-    let finalImageUri = imageUri;
+    try {
+      const recipeId = editId ?? uid();
+      let finalImageUri = imageUri;
 
-    if (imageUri && imageUri.startsWith('file://')) {
-      finalImageUri = await uploadRecipeImage(imageUri, recipeId);
+      if (imageUri && imageUri.startsWith('file://')) {
+        finalImageUri = await uploadRecipeImage(imageUri, recipeId);
+      }
+
+      // Spread the existing recipe first so editing never wipes fields the
+      // editor doesn't expose (notes, nutrition, rating, source, collections…).
+      const recipe: Recipe = {
+        ...(existing ?? { collections: [], savedAt: Date.now(), createdAt: Date.now() }),
+        id: recipeId,
+        title: title.trim(),
+        description: description.trim() || undefined,
+        imageUri: finalImageUri,
+        imageColor: finalImageUri ? undefined : imageColor,
+        servings,
+        prepMinutes: prepMin,
+        cookMinutes: cookMin,
+        ingredients: ingredients.filter(i => i.name.trim()),
+        steps: steps.filter(s => s.text.trim()),
+        tags,
+        isFamily,
+      } as Recipe;
+      await saveRecipe(recipe);
+      hapticSuccess();
+      showToast(editId ? 'Recipe updated' : 'Recipe saved');
+      navigation.replace('RecipeDetail', { recipeId: recipe.id });
+    } catch {
+      // A network/storage failure must never strand the user on the spinner.
+      showToast('Could not save recipe — please try again');
+    } finally {
+      setSaving(false);
     }
-
-    // Spread the existing recipe first so editing never wipes fields the
-    // editor doesn't expose (notes, nutrition, rating, source, collections…).
-    const recipe: Recipe = {
-      ...(existing ?? { collections: [], savedAt: Date.now(), createdAt: Date.now() }),
-      id: recipeId,
-      title: title.trim(),
-      description: description.trim() || undefined,
-      imageUri: finalImageUri,
-      imageColor: finalImageUri ? undefined : imageColor,
-      servings,
-      prepMinutes: prepMin,
-      cookMinutes: cookMin,
-      ingredients: ingredients.filter(i => i.name.trim()),
-      steps: steps.filter(s => s.text.trim()),
-      tags,
-      isFamily,
-    } as Recipe;
-    await saveRecipe(recipe);
-    hapticSuccess();
-    showToast(editId ? 'Recipe updated' : 'Recipe saved');
-    setSaving(false);
-    navigation.replace('RecipeDetail', { recipeId: recipe.id });
   }
 
   return (
