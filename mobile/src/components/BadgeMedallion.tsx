@@ -419,11 +419,11 @@ export default function BadgeMedallion({
   if (art) {
     return (
       <View
-        style={{
-          width: size,
-          height: size,
-          boxShadow: `0 ${size * 0.06}px ${size * 0.30}px 0 ${palette.glow}`,
-        } as any}
+        // No drop shadow here: the art PNG is a non-rectangular silhouette on a
+        // transparent canvas, so a box-shadow on this square View renders as a
+        // hard square halo around the badge (the "square outline" bug). The art
+        // already carries its own rendered shading.
+        style={{ width: size, height: size }}
       >
         <Image source={art} style={{ width: size, height: size }} resizeMode="contain" />
 

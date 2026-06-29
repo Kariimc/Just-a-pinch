@@ -227,7 +227,7 @@ export function BadgeUnlockHost() {
           <View style={[styles.edgeStrip, { backgroundColor: metals.rimMid }]} />
 
           <View style={styles.medallionBox}>
-            <BadgeMedallion metal={current.metal} icon={current.icon} size={MEDALLION} earned fx="full" />
+            <BadgeMedallion metal={current.metal} icon={current.icon} id={current.id} size={MEDALLION} earned fx="full" />
             <GlitterBurst key={instance} />
           </View>
 

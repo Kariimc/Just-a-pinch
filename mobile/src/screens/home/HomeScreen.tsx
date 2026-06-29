@@ -8,12 +8,14 @@ import Animated, {
   FadeInDown, cancelAnimation, interpolate, useAnimatedStyle, useSharedValue,
   withDelay, withRepeat, withSequence, withTiming,
 } from 'react-native-reanimated';
+import Svg, { Defs, LinearGradient, RadialGradient, Stop, Circle } from 'react-native-svg';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, Recipe } from '../../types';
 import { Colors, Radius, Fonts, Shadow } from '../../theme';
 import { Ambient, Curves } from '../../theme/motion';
 import { getRecipes, getProfile, getFeaturedRecipes } from '../../store/storage';
+import { getBadgeProgress } from '../../store/badges';
 import { getSettings, saveSettings } from '../../store/settingsStorage';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
@@ -146,6 +148,10 @@ export default function HomeScreen() {
     setLastName(p?.lastName?.trim() ?? '');
     setFeatured(f);
     setLoading(false);
+    // Silently seed the earned-badge map from synced recipes so a later
+    // in-app action only ever celebrates a genuinely new badge (never the
+    // ones the account already had on login). Read path → never announces.
+    void getBadgeProgress();
   }
 
   useFocusEffect(useCallback(() => { load(); }, [user?.id]));
@@ -191,18 +197,40 @@ export default function HomeScreen() {
             ? <Skeleton width={140} height={28} style={{ marginTop: 4 }} />
             : <Text style={styles.nameGreet}>{userName}</Text>}
         </View>
-        <Tappable
-          scaleTo={0.92}
-          haptic
+        {/* Plain TouchableOpacity (not the reanimated Tappable): the wrapped
+            Pressable was swallowing the click on web, so the profile screen
+            was unreachable from the home header. */}
+        <TouchableOpacity
+          activeOpacity={0.85}
           style={styles.avatar}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Open your profile and settings"
           onPress={() => navigation.navigate('Settings')}
         >
+          {/* Glossy brand-green orb — same gradient + glass highlight as the
+              nav + button, so the profile button reads as part of one set. */}
+          <Svg width={44} height={44} style={StyleSheet.absoluteFill}>
+            <Defs>
+              <LinearGradient id="avatarOrb" x1="0" y1="0" x2="0.35" y2="1">
+                <Stop offset="0" stopColor="#43C275" />
+                <Stop offset="0.5" stopColor="#2E9E57" />
+                <Stop offset="1" stopColor="#1C763E" />
+              </LinearGradient>
+              <RadialGradient id="avatarHi" cx="32%" cy="24%" r="62%">
+                <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.55" />
+                <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+              </RadialGradient>
+            </Defs>
+            <Circle cx={22} cy={22} r={22} fill="url(#avatarOrb)" />
+            <Circle cx={22} cy={22} r={22} fill="url(#avatarHi)" />
+          </Svg>
           {userName ? (
             <Text style={styles.avatarTxt}>{userName[0].toUpperCase()}</Text>
           ) : (
             <Icon name="user" size={20} color={Colors.white} />
           )}
-        </Tappable>
+        </TouchableOpacity>
       </View>
 
       {/* Search field */}
@@ -417,8 +445,14 @@ const styles = StyleSheet.create({
   avatar: {
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden',
+    shadowColor: Colors.accent, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4, shadowRadius: 8, elevation: 5,
   },
-  avatarTxt: { fontFamily: Fonts.uiBold, color: '#fff', fontSize: 16 },
+  avatarTxt: {
+    fontFamily: Fonts.uiBold, color: '#fff', fontSize: 16,
+    textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
+  },
   searchField: {
     flexDirection: 'row', alignItems: 'center', gap: 10, height: 50,
     paddingHorizontal: 16, backgroundColor: Colors.surface2,

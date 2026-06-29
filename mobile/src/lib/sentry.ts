@@ -10,11 +10,19 @@ import Constants from 'expo-constants';
 const DSN = ((Constants.expoConfig?.extra?.sentryDsn as string | undefined) ?? '').trim();
 
 let client: typeof import('@sentry/react-native') | null = null;
+// A user id set before the SDK finished loading — applied once it's ready.
+let pendingUserId: string | null = null;
+let pendingUserSet = false;
 
-export function initSentry(): void {
-  if (!DSN) return; // No DSN → stay a no-op (early access / open-source forks).
+// Loaded LAZILY via dynamic import() so the heavy Sentry SDK lands in its own
+// async chunk instead of the initial bundle — it no longer blocks first paint /
+// time-to-interactive. Call after the app has rendered (see App.tsx). Errors
+// thrown before it resolves are still caught by the ErrorBoundary; we just
+// can't forward those very first ones, an acceptable trade for a faster start.
+export async function initSentry(): Promise<void> {
+  if (!DSN || client) return; // No DSN, or already initialised → nothing to do.
   try {
-    const S = require('@sentry/react-native') as typeof import('@sentry/react-native');
+    const S = (await import('@sentry/react-native')) as typeof import('@sentry/react-native');
     S.init({
       dsn: DSN,
       // Recipe titles, prompts, and ingredient text can be personal — never
@@ -27,6 +35,11 @@ export function initSentry(): void {
       enabled: !__DEV__,
     });
     client = S;
+    // Flush a user id that was set while the SDK was still loading.
+    if (pendingUserSet) {
+      try { S.setUser(pendingUserId ? { id: pendingUserId } : null); } catch { /* swallow */ }
+      pendingUserSet = false;
+    }
   } catch {
     // Package missing or init threw — reporting just stays off.
     client = null;
@@ -44,7 +57,12 @@ export function captureError(error: unknown, context?: Record<string, unknown>):
 // Tie events to the signed-in user (id only — no email/PII). Pass null to clear
 // on sign-out.
 export function setSentryUser(id: string | null): void {
-  if (!client) return;
+  if (!client) {
+    // SDK not loaded yet — remember it and apply on init.
+    pendingUserId = id;
+    pendingUserSet = true;
+    return;
+  }
   try {
     client.setUser(id ? { id } : null);
   } catch { /* swallow */ }

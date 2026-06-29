@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import Animated, {
-  useSharedValue, withSequence, withSpring, withTiming,
+  useSharedValue, useAnimatedStyle, withSequence, withSpring,
 } from 'react-native-reanimated';
 import { Colors, Fonts, Radius, Shadow } from '../theme';
 import { Springs } from '../theme/motion';
 import Icon from './Icon';
+import CookbookCover from './CookbookCover';
 
 interface Props {
   name: string;
@@ -15,57 +16,61 @@ interface Props {
   onChangeCover?: () => void;
 }
 
+const CREAM = '#F1E9D5';        // embossed title ink on the green cloth
+const CREAM_DIM = '#D8E4D2';
+
+// Possessive form of the family name for the cover:
+//   "Chiles" → "CHILES'"   (ends in s — trailing apostrophe only)
+//   "Smith"  → "SMITH'S"
+// Empty name falls back to "OUR" (no possessive).
+function possessive(raw: string): string {
+  const name = raw.trim().toUpperCase();
+  if (!name) return 'OUR';
+  return /S$/.test(name) ? `${name}'` : `${name}'S`;
+}
+
 export default function CookbookHero({ name, recipeCount, coverImageUri, onPress, onChangeCover }: Props) {
-  const logoScale = useSharedValue(1);
   const cardScale = useSharedValue(1);
+
+  const cardStyle = useAnimatedStyle(() => ({ transform: [{ scale: cardScale.value }] }));
 
   function handlePress() {
     cardScale.value = withSequence(
       withSpring(0.97, Springs.press),
       withSpring(1, Springs.glide),
     );
-    logoScale.value = withSequence(
-      withTiming(1.12, { duration: 180 }),
-      withSpring(0.97, { damping: 14, stiffness: 340, mass: 0.9 }),
-      withSpring(1, Springs.glide),
-    );
     onPress?.();
   }
 
-  const displayName = (name || 'Our').toUpperCase();
+  const title = possessive(name);
   const countLabel = `${recipeCount} recipe${recipeCount === 1 ? '' : 's'} saved`;
 
   return (
-    <Animated.View style={[styles.card, Shadow.cardSoft, { transform: [{ scale: cardScale }] }]}>
-      <TouchableOpacity activeOpacity={1} onPress={handlePress} style={styles.inner}>
+    <Animated.View style={[styles.card, Shadow.cardSoft, cardStyle]}>
+      <TouchableOpacity activeOpacity={0.92} onPress={handlePress} style={styles.inner}>
 
+        {/* Background: the engraved cookbook cover (vector — crisp at any width,
+            themes with the app, bundles offline). A custom photo, if the user
+            picked one, replaces it under a dark scrim so the title stays legible. */}
         {coverImageUri ? (
-          <Image source={{ uri: coverImageUri }} style={styles.bgImageCustom} resizeMode="cover" />
+          <>
+            <Image source={{ uri: coverImageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+            <View style={styles.photoScrim} />
+          </>
         ) : (
-          <Image source={require('../../assets/cookbook-bg.jpg')} style={styles.bgImage} resizeMode="cover" />
+          <CookbookCover style={StyleSheet.absoluteFill} />
         )}
 
-        <View style={styles.accentBar} />
-
+        {/* Centred embossed title block */}
         <View style={styles.body}>
-          <Text style={styles.eyebrow}>Family Collection</Text>
-          <Text style={styles.name} numberOfLines={1}>{displayName}</Text>
+          <Text style={styles.eyebrow}>The</Text>
+          <Text style={styles.name} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{title}</Text>
           <Text style={styles.subtitle}>Family Cookbook</Text>
           <View style={styles.rule} />
           <View style={styles.metaRow}>
             <View style={styles.dot} />
             <Text style={styles.meta}>{countLabel}</Text>
           </View>
-        </View>
-
-        <View style={styles.logoPanel}>
-          <View style={styles.ring1} />
-          <View style={styles.ring2} />
-          <Animated.Image
-            source={require('../../assets/logo1.png')}
-            style={[styles.logo, { transform: [{ scale: logoScale }] }]}
-            resizeMode="contain"
-          />
         </View>
 
       </TouchableOpacity>
@@ -86,19 +91,16 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1.5,
     borderColor: Colors.line,
-    backgroundColor: Colors.paper,
+    backgroundColor: Colors.accentDeep,
   },
   inner: {
-    flexDirection: 'row',
     height: 210,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  bgImage: {
-    ...StyleSheet.absoluteFill,
-    opacity: 0.15,
-  },
-  bgImageCustom: {
-    ...StyleSheet.absoluteFill,
-    opacity: 0.25,
+  photoScrim: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(18,62,34,0.52)',
   },
   cameraBtn: {
     position: 'absolute',
@@ -111,43 +113,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  accentBar: {
-    width: 6,
-    backgroundColor: Colors.accent,
-  },
   body: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingVertical: 20,
-    paddingLeft: 24,
-    paddingRight: 18,
+    alignItems: 'center',
+    paddingHorizontal: 24,
   },
   eyebrow: {
-    fontFamily: Fonts.uiBold,
-    fontSize: 10,
-    letterSpacing: 2.2,
-    textTransform: 'uppercase',
-    color: Colors.accentDeep,
-    marginBottom: 8,
+    fontFamily: Fonts.displayRegularItalic,
+    fontSize: 15,
+    color: CREAM_DIM,
+    marginBottom: 2,
+    // soft emboss so cream reads cleanly over the engraved botanicals
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   name: {
     fontFamily: Fonts.displaySemiBold,
-    fontSize: 36,
-    color: Colors.ink,
-    letterSpacing: -0.5,
-    lineHeight: 36,
+    fontSize: 42,
+    color: CREAM,
+    letterSpacing: 0.5,
+    lineHeight: 46,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.45)',
+    textShadowOffset: { width: 0, height: 1.5 },
+    textShadowRadius: 4,
   },
   subtitle: {
-    fontFamily: Fonts.displayRegularItalic,
-    fontSize: 15,
-    color: Colors.ink2,
-    marginTop: 3,
+    fontFamily: Fonts.uiSemiBold,
+    fontSize: 11,
+    letterSpacing: 3.6,
+    textTransform: 'uppercase',
+    color: CREAM_DIM,
+    marginTop: 4,
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   rule: {
-    width: 36,
+    width: 44,
     height: 1.5,
-    backgroundColor: Colors.line,
-    marginVertical: 12,
+    backgroundColor: 'rgba(241,233,213,0.5)',
+    marginVertical: 11,
   },
   metaRow: {
     flexDirection: 'row',
@@ -158,38 +164,15 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: Colors.accent,
+    backgroundColor: CREAM,
   },
   meta: {
     fontFamily: Fonts.uiSemiBold,
     fontSize: 12,
-    color: Colors.ink3,
-  },
-  logoPanel: {
-    width: 110,
-    backgroundColor: Colors.accentDeep,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  ring1: {
-    position: 'absolute',
-    width: 98,
-    height: 98,
-    borderRadius: 49,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-  },
-  ring2: {
-    position: 'absolute',
-    width: 118,
-    height: 118,
-    borderRadius: 59,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  logo: {
-    width: 72,
-    height: 72,
+    color: CREAM_DIM,
+    letterSpacing: 0.3,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 });

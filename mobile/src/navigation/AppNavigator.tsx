@@ -35,19 +35,24 @@ function HomeGlyph({ color, f, react }: GlyphInner) {
   );
 }
 
-// Recipes: page text lines fade in over the closed book, showing it open on focus/press.
+// Recipes: three recipe lines are *written* across the page left-to-right, one
+// after another, like a hand jotting down a recipe — on focus and on press/hover.
 function BookGlyph({ color, f, react }: GlyphInner) {
-  const linesStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, f.value * 0.9 + react.value * 1.5),
-  }));
+  // Reveal progress: each line's width grows from its left edge, staggered.
+  const useReveal = (start: number, full: number) => useAnimatedStyle(() => {
+    const p = Math.max(react.value, f.value * 0.85);
+    const t = Math.min(1, Math.max(0, (p - start) / 0.4));
+    return { width: t * full, opacity: t > 0 ? 1 : 0 };
+  });
+  const l1 = useReveal(0, 8);
+  const l2 = useReveal(0.28, 8);
+  const l3 = useReveal(0.56, 5.5);
   return (
     <View style={styles.iconWrap}>
       <Icon name="book" size={24} color={color} />
-      <Animated.View style={[StyleSheet.absoluteFill, linesStyle]} pointerEvents="none">
-        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.3} strokeLinecap="round">
-          <Path d="M8 8.5h8M8 11.5h8M8 14.5h5.5" />
-        </Svg>
-      </Animated.View>
+      <Animated.View style={[styles.recipeLine, { top: 8, backgroundColor: color }, l1]} pointerEvents="none" />
+      <Animated.View style={[styles.recipeLine, { top: 11.2, backgroundColor: color }, l2]} pointerEvents="none" />
+      <Animated.View style={[styles.recipeLine, { top: 14.4, backgroundColor: color }, l3]} pointerEvents="none" />
     </View>
   );
 }
@@ -187,14 +192,24 @@ function TabGlyph({ name, color, focused }: { name: IconName; color: string; foc
 }
 
 // Spring-press wrapper for every tab button (replaces the default opacity dim).
-function TabButton(props: BottomTabBarButtonProps) {
-  const { style, children, ...rest } = props;
-  return (
-    <Tappable {...(rest as object)} style={[style as object, styles.tabBtn]}>
-      {children}
-    </Tappable>
-  );
+// On web it also replays the tab's signature glyph animation on hover, so the
+// house lights / cart drop / book lines / calendar check preview before a click.
+// `reactName` is the glyph to fire on hover (omit for no hover reaction).
+function makeTabButton(reactName?: IconName) {
+  return function TabButton(props: BottomTabBarButtonProps) {
+    const { style, children, ...rest } = props;
+    return (
+      <Tappable
+        {...(rest as object)}
+        onHoverIn={reactName ? () => fireTabReaction(reactName) : undefined}
+        style={[style as object, styles.tabBtn]}
+      >
+        {children}
+      </Tappable>
+    );
+  };
 }
+const TabButton = makeTabButton();
 
 // The + is the app's primary action, so it gets the richest treatment: a
 // gradient brand-green orb with a glass highlight and a slow breathing scale,
@@ -321,6 +336,7 @@ function TabBar() {
         component={HomeScreen}
         options={{
           title: 'Home',
+          tabBarButton: makeTabButton('home'),
           tabBarIcon: ({ color, focused }) => <TabGlyph name="home" color={color} focused={focused} />,
         }}
         listeners={{ tabPress: () => fireTabReaction('home') }}
@@ -330,6 +346,7 @@ function TabBar() {
         component={LibraryScreen}
         options={{
           title: 'Recipes',
+          tabBarButton: makeTabButton('book'),
           tabBarIcon: ({ color, focused }) => <TabGlyph name="book" color={color} focused={focused} />,
         }}
         listeners={{ tabPress: () => fireTabReaction('book') }}
@@ -338,6 +355,7 @@ function TabBar() {
         name="Add"
         component={AddPlaceholder}
         options={{
+          tabBarButton: makeTabButton('plus'),
           tabBarIcon: () => <PlusButton />,
           tabBarLabel: () => null,
         }}
@@ -354,6 +372,7 @@ function TabBar() {
         component={MealPlanScreen}
         options={{
           title: 'Plan',
+          tabBarButton: makeTabButton('calendar'),
           tabBarIcon: ({ color, focused }) => <TabGlyph name="calendar" color={color} focused={focused} />,
         }}
         listeners={{ tabPress: () => fireTabReaction('calendar') }}
@@ -363,6 +382,7 @@ function TabBar() {
         component={ShoppingScreen}
         options={{
           title: 'List',
+          tabBarButton: makeTabButton('cart'),
           tabBarIcon: ({ color, focused }) => <TabGlyph name="cart" color={color} focused={focused} />,
         }}
         listeners={{ tabPress: () => fireTabReaction('cart') }}
@@ -438,6 +458,8 @@ const styles = StyleSheet.create({
   },
   // 24×24 wrapper so absolute-positioned overlays align 1:1 with SVG viewBox units.
   iconWrap: { width: 24, height: 24 },
+  // Recipe lines "written" across the book page (left-anchored width animation)
+  recipeLine: { position: 'absolute', left: 8, height: 1.4, borderRadius: 1 },
   // Amber window pane at SVG position x=9.5 y=11 w=5 h=3.5
   windowLight: {
     position: 'absolute', left: 9.5, top: 11,

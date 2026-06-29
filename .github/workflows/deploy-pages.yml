@@ -40,6 +40,9 @@ jobs:
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: npx expo export --platform web --output-dir ../dist/app
 
+      - name: Optimize web export (green pre-paint + parallel chunk preload)
+        run: node mobile/scripts/optimize-web-export.js dist/app
+
       - name: Copy docs (landing page + legal) to dist root
         run: cp -r docs/. dist/
 
