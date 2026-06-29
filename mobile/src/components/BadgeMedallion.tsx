@@ -384,10 +384,6 @@ const BADGE_ART: Record<BadgeMetal, number> = {
   emerald: require('../../assets/badges/badge-emerald.png'),
 };
 
-// The silver shield render has a cut-through centre; fill it with an opaque
-// metal boss so the screen doesn't show through the hole. Fractions of the box.
-const SILVER_BOSS = { cx: 0.52, cy: 0.52, d: 0.40 };
-
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export default function BadgeMedallion({
@@ -401,7 +397,6 @@ export default function BadgeMedallion({
 
   // ── Earned: the photoreal render IS the badge (no overlaid icon) + sparkle ──
   if (art) {
-    const bossSize = metal === 'silver' ? size * SILVER_BOSS.d : 0;
     return (
       <View
         style={{
@@ -411,24 +406,6 @@ export default function BadgeMedallion({
         } as any}
       >
         <Image source={art} style={{ width: size, height: size }} resizeMode="contain" />
-
-        {/* Opaque metal boss to fill the silver shield's cut-through centre */}
-        {!!bossSize && (
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              left: SILVER_BOSS.cx * size - bossSize / 2,
-              top: SILVER_BOSS.cy * size - bossSize / 2,
-              width: bossSize, height: bossSize, borderRadius: bossSize / 2,
-              backgroundColor: palette.faceMid,
-              borderWidth: Math.max(1, size * 0.012), borderColor: palette.rimLight,
-              overflow: 'hidden',
-            }}
-          >
-            <View style={{ flex: 1, backgroundColor: palette.faceLight, opacity: 0.45 }} />
-          </View>
-        )}
 
         {/* Sparkle field — full FX budget only (hero + detail surfaces) */}
         {fx === 'full' && TWINKLES.map((t, i) => (
