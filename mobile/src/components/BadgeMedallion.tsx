@@ -40,14 +40,6 @@ const STAR_OUTER = '60,10 68.4,39.7 95.4,24.6 80.3,51.6 110,60 80.3,68.4 95.4,95
 // Inner star (75% scale): outer r=37.5, inner r=16.5
 const STAR_FACE = '60,22.5 66.3,44.8 86.6,33.5 75.2,53.7 97.5,60 75.2,66.3 86.6,86.6 66.3,75.2 60,97.5 53.7,75.2 33.5,86.6 44.8,66.3 22.5,60 44.8,53.7 33.5,33.5 53.7,44.8';
 
-// Icon translate from container center: fraction of size (+ = down, – = up)
-const ICON_TRANSLATE: Record<BadgeMetal, number> = {
-  bronze: 0.067,   // coin face cy=68, 8px below viewBox center
-  silver: 0,       // shield visual centre ≈ viewBox centre
-  gold: -0.14,     // inside cup: cup centre ~y=42, 18px above viewBox centre
-  emerald: 0,      // star centred at 60,60
-};
-
 // Sheen clip border-radius per shape (approximates the silhouette)
 const SHEEN_CLIP: Record<BadgeMetal, (s: number) => number> = {
   bronze: s => s * 0.5,
@@ -392,24 +384,14 @@ const BADGE_ART: Record<BadgeMetal, number> = {
   emerald: require('../../assets/badges/badge-emerald.png'),
 };
 
-// Where the emblem icon sits on each render (fraction of the badge box), its
-// size, and a colour that contrasts that render's centre. `boss` draws an
-// opaque metal disc first, to fill a cut-through centre (the silver shield).
-// Tuned by eye against the 512px renders — safe to nudge.
-const ART_EMBLEM: Record<
-  BadgeMetal,
-  { cx: number; cy: number; icon: number; color: string; boss?: number }
-> = {
-  bronze:  { cx: 0.52, cy: 0.55, icon: 0.18, color: BadgeMetals.bronze.ink },
-  silver:  { cx: 0.52, cy: 0.52, icon: 0.18, color: BadgeMetals.silver.ink, boss: 0.40 },
-  gold:    { cx: 0.50, cy: 0.40, icon: 0.13, color: BadgeMetals.gold.ink },
-  emerald: { cx: 0.49, cy: 0.48, icon: 0.16, color: BadgeMetals.emerald.faceLight },
-};
+// The silver shield render has a cut-through centre; fill it with an opaque
+// metal boss so the screen doesn't show through the hole. Fractions of the box.
+const SILVER_BOSS = { cx: 0.52, cy: 0.52, d: 0.40 };
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export default function BadgeMedallion({
-  metal, icon, size = 96, earned = false, fx = 'sheen', sheenDelayMs = 0,
+  metal, size = 96, earned = false, fx = 'sheen', sheenDelayMs = 0,
 }: Props) {
   const palette = BadgeMetals[earned ? metal : 'stone'];
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
@@ -417,11 +399,9 @@ export default function BadgeMedallion({
 
   const art = earned ? BADGE_ART[metal] : null;
 
-  // ── Earned: photoreal render + contrast emblem icon + sparkle ──────────────
+  // ── Earned: the photoreal render IS the badge (no overlaid icon) + sparkle ──
   if (art) {
-    const em = ART_EMBLEM[metal];
-    const iconBox = size * em.icon;
-    const bossSize = em.boss ? size * em.boss : 0;
+    const bossSize = metal === 'silver' ? size * SILVER_BOSS.d : 0;
     return (
       <View
         style={{
@@ -432,14 +412,14 @@ export default function BadgeMedallion({
       >
         <Image source={art} style={{ width: size, height: size }} resizeMode="contain" />
 
-        {/* Opaque metal boss to fill a cut-through centre (silver shield) */}
+        {/* Opaque metal boss to fill the silver shield's cut-through centre */}
         {!!bossSize && (
           <View
             pointerEvents="none"
             style={{
               position: 'absolute',
-              left: em.cx * size - bossSize / 2,
-              top: em.cy * size - bossSize / 2,
+              left: SILVER_BOSS.cx * size - bossSize / 2,
+              top: SILVER_BOSS.cy * size - bossSize / 2,
               width: bossSize, height: bossSize, borderRadius: bossSize / 2,
               backgroundColor: palette.faceMid,
               borderWidth: Math.max(1, size * 0.012), borderColor: palette.rimLight,
@@ -449,20 +429,6 @@ export default function BadgeMedallion({
             <View style={{ flex: 1, backgroundColor: palette.faceLight, opacity: 0.45 }} />
           </View>
         )}
-
-        {/* Emblem icon, contrast-tinted and positioned per render */}
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            left: em.cx * size - iconBox / 2,
-            top: em.cy * size - iconBox / 2,
-            width: iconBox, height: iconBox,
-            alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <Icon name={icon} size={iconBox} color={em.color} />
-        </View>
 
         {/* Sparkle field — full FX budget only (hero + detail surfaces) */}
         {fx === 'full' && TWINKLES.map((t, i) => (
@@ -477,7 +443,6 @@ export default function BadgeMedallion({
   }
 
   // ── Locked (or art missing): engraved stone/metal SVG fallback ─────────────
-  const iconTranslateY = ICON_TRANSLATE[metal] * size;
   const sheenClipRadius = SHEEN_CLIP[metal](size);
 
   const SvgFace = { bronze: BronzeSvg, silver: SilverSvg, gold: GoldSvg, emerald: EmeraldSvg }[metal];
@@ -491,13 +456,6 @@ export default function BadgeMedallion({
       } as any}
     >
       <SvgFace uid={uid} palette={palette} size={size} pips={pips} />
-
-      {/* Icon overlay, vertically offset to align with badge face centre */}
-      <View style={[StyleSheet.absoluteFill, styles.iconWrap]}>
-        <View style={{ opacity: earned ? 1 : 0.5, transform: [{ translateY: iconTranslateY }] }}>
-          <Icon name={icon} size={size * 0.32} color={palette.ink} />
-        </View>
-      </View>
 
       {/* Lock roundel for unearned badges */}
       {!earned && size >= 40 && (

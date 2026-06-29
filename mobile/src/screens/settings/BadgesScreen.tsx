@@ -264,12 +264,12 @@ export default function BadgesScreen({ navigation }: Props) {
                   key={hero.id}
                   entering={ZoomIn.delay(120).springify().damping(14).stiffness(340).mass(0.9)}
                 >
-                  <BadgeMedallion metal={hero.metal} icon={hero.icon} size={132} earned fx="full" />
+                  <BadgeMedallion metal={hero.metal} icon={hero.icon} size={104} earned fx="full" />
                 </Animated.View>
               </FloatingView>
               {celebrating === hero.id && (
                 <UnlockBurst
-                  size={132}
+                  size={104}
                   colors={[heroPalette.sparkle, heroPalette.rimLight, Colors.white]}
                 />
               )}
@@ -328,7 +328,7 @@ export default function BadgesScreen({ navigation }: Props) {
                 <BadgeMedallion
                   metal={b.metal}
                   icon={b.icon}
-                  size={86}
+                  size={70}
                   earned={b.earned}
                   fx="sheen"
                   sheenDelayMs={(i % 4) * 700}
@@ -380,8 +380,8 @@ export default function BadgesScreen({ navigation }: Props) {
               </TouchableOpacity>
 
               <Animated.View entering={ZoomIn.delay(80).springify().damping(14).stiffness(340).mass(0.9)}>
-                <TiltMedallion size={140}>
-                  <BadgeMedallion metal={sel.metal} icon={sel.icon} size={140} earned={sel.earned} fx="full" />
+                <TiltMedallion size={112}>
+                  <BadgeMedallion metal={sel.metal} icon={sel.icon} size={112} earned={sel.earned} fx="full" />
                 </TiltMedallion>
               </Animated.View>
 
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
   heroChipTxt: {
     fontFamily: Fonts.uiBold, fontSize: 10.5, letterSpacing: 1.2, color: Colors.surface,
   },
-  heroStage: { width: 132, height: 132, marginBottom: Spacing.md },
+  heroStage: { width: 104, height: 104, marginBottom: Spacing.md },
   heroName: {
     fontFamily: Fonts.displayMedium, fontSize: 25, color: Colors.surface, letterSpacing: -0.3,
   },
