@@ -2,46 +2,45 @@
 // first load on GitHub Pages. Run with the export dir as argv[2]
 // (e.g. `node scripts/optimize-web-export.js dist/app`). Idempotent.
 //
-// Two changes, both in index.html:
-//   1. A brand-green pre-mount paint so the very first frame is the splash
-//      colour instead of a white flash (no "static screen" before the splash).
-//   2. <link rel="modulepreload"> for every JS chunk, so the browser fetches
-//      the lazy Root chunk in parallel with the entry bundle instead of waiting
-//      for the entry to execute and request it. Shaves the load-to-interactive
-//      gap on a cold visit.
+// Changes to index.html:
+//   1. Brand-green pre-mount paint applied as early as possible: an inline
+//      background on <html>/<body> (no stylesheet parse needed) plus a <style>
+//      injected as the FIRST node in <head>, so the first paint is the splash
+//      colour in the first frame — no white flash, no "static screen".
+//   2. <link rel="modulepreload"> for every JS chunk so the lazy Root chunk
+//      downloads in parallel with the entry bundle instead of after it executes.
 const fs = require('fs');
 const path = require('path');
 
 const dir = process.argv[2] || 'dist/app';
 const indexPath = path.join(dir, 'index.html');
 let html = fs.readFileSync(indexPath, 'utf8');
+const GREEN = '#2E9E57';
 
-// Derive the JS base path from the entry <script src="…"> already in the file.
+// 1a. Inline background on the root elements — painted before any CSS parses.
+if (!/<html[^>]*data-jap-paint/.test(html)) {
+  html = html.replace(/<html\b([^>]*)>/, `<html$1 data-jap-paint style="background-color:${GREEN}">`);
+  html = html.replace(/<body\b([^>]*)>/, `<body$1 style="background-color:${GREEN}">`);
+}
+
+// 1b. Pre-paint <style> as the very first child of <head>.
+if (!html.includes('jap-prepaint')) {
+  html = html.replace(
+    /<head\b([^>]*)>/,
+    `<head$1>\n    <style id="jap-prepaint">html,body{background-color:${GREEN}}#root{background-color:${GREEN}}</style>`,
+  );
+}
+
+// 2. modulepreload for every JS chunk (parallel fetch of the lazy Root chunk).
 const scriptMatch = html.match(/<script[^>]+src="([^"]+\/_expo\/static\/js\/web\/)[^"]+\.js"[^>]*>/);
 const jsBase = scriptMatch ? scriptMatch[1] : null;
-
-const links = [];
-
-if (jsBase) {
+if (jsBase && !html.includes('rel="modulepreload"')) {
   const jsDir = path.join(dir, '_expo', 'static', 'js', 'web');
   const files = fs.existsSync(jsDir) ? fs.readdirSync(jsDir).filter(f => f.endsWith('.js')) : [];
-  for (const f of files) {
-    links.push(`  <link rel="modulepreload" href="${jsBase}${f}">`);
-  }
+  const links = files.map(f => `  <link rel="modulepreload" href="${jsBase}${f}">`);
+  if (links.length) html = html.replace('</head>', links.join('\n') + '\n</head>');
+  console.log(`optimize-web-export: ${links.length} modulepreload hint(s)`);
 }
 
-let head = '';
-if (!html.includes('jap-prepaint')) {
-  head += '  <style id="jap-prepaint">html,body{background-color:#2E9E57}#root{background-color:#2E9E57}</style>\n';
-}
-if (links.length && !html.includes('rel="modulepreload"')) {
-  head += links.join('\n') + '\n';
-}
-
-if (head) {
-  html = html.replace('</head>', head + '</head>');
-  fs.writeFileSync(indexPath, html);
-  console.log(`optimize-web-export: injected pre-paint + ${links.length} modulepreload hint(s) into ${indexPath}`);
-} else {
-  console.log('optimize-web-export: already optimized, nothing to do');
-}
+fs.writeFileSync(indexPath, html);
+console.log(`optimize-web-export: done → ${indexPath}`);
