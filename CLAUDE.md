@@ -83,16 +83,27 @@ real (generated from `mobile/assets/logo*.png` — sources are only ~300px, so
 regenerate if higher-res exports appear). Release config done: bundle IDs
 `com.justapinch.app`, permission strings, EAS production profile.
 
-Badge system (2026-06-11): 12 achievement badges. Defs + progress live in
-`mobile/src/store/badges.ts` — most stats derive live from recipe/meal-plan
-data; shopping check-offs and AI saves use local cumulative counters
-(`bumpBadgeStat`, called from ShoppingScreen/AIGeneratorScreen). Earned state
-is local-only AsyncStorage (no Supabase table), once-earned-always-earned.
-UI: `BadgeMedallion` (layered SVG + sheen/twinkle FX driven by the `Ambient`
-motion tokens), `BadgesScreen` (hero showcase + grid + detail overlay with
+Badge system (2026-06-11; ladder expanded 2026-06-29): 21 achievement badges
+(20 core + the emerald "Full Plate" capstone, whose target auto-scales to
+CORE_BADGES.length). Defs + progress live in `mobile/src/store/badges.ts` —
+most stats derive live from recipe/meal-plan data (recipesSaved, urlImports,
+cooksFinished, distinctCooked, mealsPlanned, recipesBookmarked = isSaved,
+distinctTags); cumulative counters (`bumpBadgeStat`) cover ephemeral actions:
+itemsChecked (ShoppingScreen), aiGenerated (AIGeneratorScreen), recipesShared
+(RecipeDetailScreen Share + Share-to-Community) and photoScans (AddMenuScreen
+OCR). Earned state is local-only AsyncStorage (no Supabase table),
+once-earned-always-earned. UI: `BadgeMedallion` — earned badges render a
+photoreal PNG (`mobile/assets/badges/badge-{bronze,silver,gold,emerald}.png`,
+generated via Higgsfield, 512px) with a per-metal contrast-tinted emblem icon
+(`ART_EMBLEM` map) + the twinkle sparkle field; locked badges keep the
+engraved grey SVG (`stone` palette), which also remains the fallback if art is
+missing. The silver shield has a cut-through centre, so a `boss` disc fills it
+behind the icon. `BadgesScreen` (hero showcase + grid + detail overlay with
 how-to-earn copy), entry row in the Settings Account card. Metal palettes are
 `BadgeMetals` in the theme; don't add badge goals that aren't earnable via
 real UI actions (there is no rating or collection-creation UI, for example).
+ART_EMBLEM icon offsets were tuned by eye against the renders — nudge if a
+device check shows an icon off-centre (no simulator in cloud sessions).
 
 ## Verify before claiming anything works
 

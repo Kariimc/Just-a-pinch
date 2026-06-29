@@ -1,5 +1,5 @@
 import React, { useEffect, useId } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Image, StyleSheet } from 'react-native';
 import Svg, {
   Circle, Defs, Ellipse, LinearGradient, Path, Polygon,
   RadialGradient, Rect, Stop,
@@ -26,6 +26,7 @@ type Fx = 'full' | 'sheen' | 'none';
 interface Props {
   metal: BadgeMetal;
   icon: IconName;
+  id?: string;        // badge id → its photoreal art (earned state)
   size?: number;
   earned?: boolean;
   fx?: Fx;
@@ -40,14 +41,6 @@ const STAR_OUTER = '60,10 68.4,39.7 95.4,24.6 80.3,51.6 110,60 80.3,68.4 95.4,95
 // Inner star (75% scale): outer r=37.5, inner r=16.5
 const STAR_FACE = '60,22.5 66.3,44.8 86.6,33.5 75.2,53.7 97.5,60 75.2,66.3 86.6,86.6 66.3,75.2 60,97.5 53.7,75.2 33.5,86.6 44.8,66.3 22.5,60 44.8,53.7 33.5,33.5 53.7,44.8';
 
-// Icon translate from container center: fraction of size (+ = down, – = up)
-const ICON_TRANSLATE: Record<BadgeMetal, number> = {
-  bronze: 0.067,   // coin face cy=68, 8px below viewBox center
-  silver: 0,       // shield visual centre ≈ viewBox centre
-  gold: -0.14,     // inside cup: cup centre ~y=42, 18px above viewBox centre
-  emerald: 0,      // star centred at 60,60
-};
-
 // Sheen clip border-radius per shape (approximates the silhouette)
 const SHEEN_CLIP: Record<BadgeMetal, (s: number) => number> = {
   bronze: s => s * 0.5,
@@ -59,26 +52,37 @@ const SHEEN_CLIP: Record<BadgeMetal, (s: number) => number> = {
 // ─── 12 glitter twinkle positions ────────────────────────────────────────────
 
 const TWINKLES = [
-  { x: 0.14, y: 0.18, s: 0.12, delay: 0 },
-  { x: 0.78, y: 0.10, s: 0.14, delay: 600 },
-  { x: 0.88, y: 0.56, s: 0.10, delay: 1280 },
-  { x: 0.22, y: 0.82, s: 0.12, delay: 1950 },
-  { x: 0.04, y: 0.46, s: 0.09, delay: 2540 },
-  { x: 0.62, y: 0.04, s: 0.11, delay: 380 },
-  { x: 0.94, y: 0.30, s: 0.12, delay: 1050 },
-  { x: 0.70, y: 0.90, s: 0.10, delay: 1740 },
-  { x: 0.36, y: 0.94, s: 0.11, delay: 2200 },
-  { x: 0.06, y: 0.70, s: 0.09, delay: 2880 },
-  { x: 0.50, y: 0.06, s: 0.14, delay: 320 },
-  { x: 0.92, y: 0.74, s: 0.10, delay: 1600 },
+  { x: 0.14, y: 0.18, s: 0.15, delay: 0 },
+  { x: 0.80, y: 0.10, s: 0.17, delay: 520 },
+  { x: 0.90, y: 0.54, s: 0.12, delay: 1040 },
+  { x: 0.22, y: 0.82, s: 0.15, delay: 1560 },
+  { x: 0.05, y: 0.44, s: 0.10, delay: 2080 },
+  { x: 0.62, y: 0.05, s: 0.13, delay: 300 },
+  { x: 0.95, y: 0.30, s: 0.14, delay: 820 },
+  { x: 0.70, y: 0.90, s: 0.11, delay: 1340 },
+  { x: 0.36, y: 0.95, s: 0.13, delay: 1860 },
+  { x: 0.06, y: 0.70, s: 0.10, delay: 2380 },
+  { x: 0.50, y: 0.04, s: 0.17, delay: 180 },
+  { x: 0.93, y: 0.74, s: 0.11, delay: 700 },
+  { x: 0.30, y: 0.09, s: 0.10, delay: 1220 },
+  { x: 0.86, y: 0.86, s: 0.13, delay: 1740 },
+  { x: 0.10, y: 0.30, s: 0.11, delay: 2260 },
+  { x: 0.46, y: 0.88, s: 0.10, delay: 980 },
+  { x: 0.74, y: 0.38, s: 0.12, delay: 1480 },
+  { x: 0.18, y: 0.58, s: 0.11, delay: 460 },
 ];
 
 // ─── Particle FX ─────────────────────────────────────────────────────────────
 
 function Glint({ size, color }: { size: number; color: string }) {
   return (
-    <Svg width={size} height={size} viewBox="-6 -6 12 12">
-      <Path d="M0,-6 C0.9,-0.9 0.9,-0.9 6,0 C0.9,0.9 0.9,0.9 0,6 C-0.9,0.9 -0.9,0.9 -6,0 C-0.9,-0.9 -0.9,-0.9 0,-6" fill={color} />
+    <Svg width={size} height={size} viewBox="-10 -10 20 20">
+      {/* faint long diagonal flares for a camera-sparkle feel */}
+      <Path d="M0,-10 L0.6,-0.6 L10,0 L0.6,0.6 L0,10 L-0.6,0.6 L-10,0 L-0.6,-0.6 Z" fill={color} opacity={0.45} transform="rotate(45)" />
+      {/* main four-point star */}
+      <Path d="M0,-9 L1.5,-1.5 L9,0 L1.5,1.5 L0,9 L-1.5,1.5 L-9,0 L-1.5,-1.5 Z" fill={color} />
+      {/* white-hot core */}
+      <Circle cx={0} cy={0} r={1.9} fill={Colors.white} opacity={0.95} />
     </Svg>
   );
 }
@@ -99,8 +103,8 @@ function Twinkle({ x, y, s, delay, color }: { x: number; y: number; s: number; d
   const anim = useAnimatedStyle(() => ({
     opacity: t.value,
     transform: [
-      { scale: 0.3 + t.value * 0.7 },
-      { rotate: `${t.value * 135}deg` },
+      { scale: 0.2 + t.value * 1.0 },
+      { rotate: `${t.value * 180}deg` },
     ],
   }));
   return (
@@ -371,15 +375,71 @@ function EmeraldSvg({ uid, palette, size, pips }: { uid: string; palette: any; s
   );
 }
 
+// ─── Realistic badge art (earned state) ──────────────────────────────────────
+// Each earned badge has its own photoreal award render, keyed by badge id.
+// Locked badges keep the engraved stone SVG below; any id without art here
+// (e.g. while one is still being generated) also falls back to the SVG.
+// require() is static so the bundler includes them.
+const BADGE_ART: Record<string, number> = {
+  'first-pinch': require('../../assets/badges/badge-first-pinch.png'),
+  'first-flame': require('../../assets/badges/badge-first-flame.png'),
+  'week-ahead': require('../../assets/badges/badge-week-ahead.png'),
+  'web-forager': require('../../assets/badges/badge-web-forager.png'),
+  'keeper': require('../../assets/badges/badge-keeper.png'),
+  'snapshot': require('../../assets/badges/badge-snapshot.png'),
+  'shelf-starter': require('../../assets/badges/badge-shelf-starter.png'),
+  'list-legend': require('../../assets/badges/badge-list-legend.png'),
+  'spark-of-genius': require('../../assets/badges/badge-spark-of-genius.png'),
+  'seasoned-hand': require('../../assets/badges/badge-seasoned-hand.png'),
+  'tastemaker': require('../../assets/badges/badge-tastemaker.png'),
+  'curator': require('../../assets/badges/badge-curator.png'),
+  'well-seasoned': require('../../assets/badges/badge-well-seasoned.png'),
+  'meal-prepper': require('../../assets/badges/badge-meal-prepper.png'),
+  'the-archivist': require('../../assets/badges/badge-the-archivist.png'),
+  'pinch-master': require('../../assets/badges/badge-pinch-master.png'),
+  'master-importer': require('../../assets/badges/badge-master-importer.png'),
+  'century-shelf': require('../../assets/badges/badge-century-shelf.png'),
+  'iron-chef': require('../../assets/badges/badge-iron-chef.png'),
+  'the-explorer': require('../../assets/badges/badge-the-explorer.png'),
+  'full-plate': require('../../assets/badges/badge-full-plate.png'),
+};
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export default function BadgeMedallion({
-  metal, icon, size = 96, earned = false, fx = 'sheen', sheenDelayMs = 0,
+  metal, id, size = 96, earned = false, fx = 'sheen', sheenDelayMs = 0,
 }: Props) {
   const palette = BadgeMetals[earned ? metal : 'stone'];
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
   const pips = PIP_X[PIPS[metal]];
-  const iconTranslateY = ICON_TRANSLATE[metal] * size;
+
+  const art = earned && id ? BADGE_ART[id] : null;
+
+  // ── Earned: the photoreal render IS the badge (no overlaid icon) + sparkle ──
+  if (art) {
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          boxShadow: `0 ${size * 0.06}px ${size * 0.30}px 0 ${palette.glow}`,
+        } as any}
+      >
+        <Image source={art} style={{ width: size, height: size }} resizeMode="contain" />
+
+        {/* Sparkle field — full FX budget only (hero + detail surfaces) */}
+        {fx === 'full' && TWINKLES.map((t, i) => (
+          <Twinkle
+            key={i}
+            x={t.x * size} y={t.y * size} s={t.s * size}
+            delay={t.delay} color={palette.sparkle}
+          />
+        ))}
+      </View>
+    );
+  }
+
+  // ── Locked (or art missing): engraved stone/metal SVG fallback ─────────────
   const sheenClipRadius = SHEEN_CLIP[metal](size);
 
   const SvgFace = { bronze: BronzeSvg, silver: SilverSvg, gold: GoldSvg, emerald: EmeraldSvg }[metal];
@@ -393,13 +453,6 @@ export default function BadgeMedallion({
       } as any}
     >
       <SvgFace uid={uid} palette={palette} size={size} pips={pips} />
-
-      {/* Icon overlay, vertically offset to align with badge face centre */}
-      <View style={[StyleSheet.absoluteFill, styles.iconWrap]}>
-        <View style={{ opacity: earned ? 1 : 0.5, transform: [{ translateY: iconTranslateY }] }}>
-          <Icon name={icon} size={size * 0.32} color={palette.ink} />
-        </View>
-      </View>
 
       {/* Lock roundel for unearned badges */}
       {!earned && size >= 40 && (

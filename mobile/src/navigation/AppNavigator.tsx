@@ -5,7 +5,7 @@ import Animated, {
   SharedValue, useAnimatedStyle, useSharedValue,
   withDelay, withRepeat, withSequence, withSpring, withTiming,
 } from 'react-native-reanimated';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { navigationRef } from './navigationRef';
@@ -196,34 +196,98 @@ function TabButton(props: BottomTabBarButtonProps) {
   );
 }
 
-// The + button breathes: a soft ring pings outward every few seconds so the
-// primary action quietly advertises itself.
+// The + is the app's primary action, so it gets the richest treatment: a
+// gradient brand-green orb with a glass highlight and a slow breathing scale,
+// two staggered rings that quietly ping outward to advertise it, and a
+// one-shot burst + squash when tapped (fired from the Add tab's listener).
+const PLUS_W = 56;
+const PLUS_H = 40;
+
 function PlusButton() {
-  const p = useSharedValue(0);
+  const breath = useSharedValue(0); // continuous gentle breathing scale
+  const ping = useSharedValue(0);   // continuous outward ring
+  const react = useSharedValue(0);  // one-shot press burst + squash
 
   useEffect(() => {
-    p.value = withRepeat(
-      withDelay(2600, withSequence(
-        withTiming(1, { duration: 900, easing: Curves.enter }),
+    breath.value = withRepeat(
+      withTiming(1, { duration: 2600, easing: Curves.drift }), -1, true,
+    );
+    ping.value = withRepeat(
+      withDelay(2200, withSequence(
+        withTiming(1, { duration: 1800, easing: Curves.enter }),
         withTiming(0, { duration: 1 }),
       )),
-      -1,
-      false,
+      -1, false,
     );
-    return () => cancelAnimation(p);
-  }, [p]);
+    return () => { cancelAnimation(breath); cancelAnimation(ping); };
+  }, [breath, ping]);
 
-  const ping = useAnimatedStyle(() => ({
-    opacity: interpolate(p.value, [0, 0.12, 1], [0, 0.45, 0]),
-    transform: [{ scale: 0.9 + p.value * 0.55 }],
+  useEffect(() => {
+    const fire = () => {
+      react.value = 0;
+      react.value = withSequence(
+        withTiming(1, { duration: 240, easing: Curves.enter }),
+        withSpring(0, Springs.pop),
+      );
+    };
+    tabReactors.plus = fire;
+    return () => { if (tabReactors.plus === fire) delete tabReactors.plus; };
+  }, [react]);
+
+  // Lead ring + a second ring lagging behind it for layered depth.
+  const ring1 = useAnimatedStyle(() => ({
+    opacity: interpolate(ping.value, [0, 0.12, 1], [0, 0.36, 0]),
+    transform: [{ scale: 0.82 + ping.value * 0.72 }],
+  }));
+  const ring2 = useAnimatedStyle(() => {
+    const p = Math.max(0, interpolate(ping.value, [0.22, 1], [0, 1]));
+    return {
+      opacity: interpolate(p, [0, 0.12, 1], [0, 0.24, 0]),
+      transform: [{ scale: 0.82 + p * 0.5 }],
+    };
+  });
+  // Sharp burst ring that snaps out on press.
+  const burst = useAnimatedStyle(() => ({
+    opacity: interpolate(react.value, [0, 0.25, 1], [0, 0.55, 0]),
+    transform: [{ scale: 0.9 + react.value * 0.9 }],
+  }));
+  const orb = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: -react.value * 2 },
+      { scale: 1 + breath.value * 0.02 - react.value * 0.07 },
+    ],
+  }));
+  const glyph = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + react.value * 0.18 }],
   }));
 
   return (
     <View style={styles.plusWrap}>
-      <Animated.View style={[styles.plusPing, ping]} />
-      <View style={styles.plusBtn}>
-        <Icon name="plus" size={26} color="#fff" />
-      </View>
+      <Animated.View style={[styles.plusRing, ring1]} pointerEvents="none" />
+      <Animated.View style={[styles.plusRing, ring2]} pointerEvents="none" />
+      <Animated.View style={[styles.plusRing, burst]} pointerEvents="none" />
+      <Animated.View style={[styles.plusBtn, orb]}>
+        <Svg width={PLUS_W} height={PLUS_H} style={StyleSheet.absoluteFill}>
+          <Defs>
+            <LinearGradient id="plusOrb" x1="0" y1="0" x2="0.35" y2="1">
+              <Stop offset="0" stopColor="#43C275" />
+              <Stop offset="0.5" stopColor="#2E9E57" />
+              <Stop offset="1" stopColor="#1C763E" />
+            </LinearGradient>
+            <RadialGradient id="plusHi" cx="32%" cy="22%" r="64%">
+              <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.55" />
+              <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+            </RadialGradient>
+          </Defs>
+          <Rect x="0" y="0" width={PLUS_W} height={PLUS_H} rx="15" fill="url(#plusOrb)" />
+          <Rect x="0" y="0" width={PLUS_W} height={PLUS_H} rx="15" fill="url(#plusHi)" />
+          {/* crisp top rim highlight */}
+          <Rect x="4" y="2" width={PLUS_W - 8} height="2.5" rx="1.25" fill="#FFFFFF" opacity="0.4" />
+        </Svg>
+        <Animated.View style={glyph}>
+          <Icon name="plus" size={26} color="#fff" />
+        </Animated.View>
+      </Animated.View>
     </View>
   );
 }
@@ -280,6 +344,7 @@ function TabBar() {
         listeners={{
           tabPress: (e) => {
             e.preventDefault();
+            fireTabReaction('plus');
             (navigation as any).navigate('AddMenu');
           },
         }}
@@ -367,8 +432,9 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   tabPill: {
-    position: 'absolute', width: 48, height: 28,
+    position: 'absolute', width: 48, height: 30,
     borderRadius: Radius.pill, backgroundColor: Colors.accentSoft,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(46,158,87,0.20)',
   },
   // 24×24 wrapper so absolute-positioned overlays align 1:1 with SVG viewBox units.
   iconWrap: { width: 24, height: 24 },
@@ -388,24 +454,24 @@ const styles = StyleSheet.create({
     width: 2.5, height: 2.5, borderRadius: 1.5,
   },
   plusWrap: {
-    width: 50, height: 40, marginTop: -6,
+    width: 62, height: 44, marginTop: -8,
     alignItems: 'center', justifyContent: 'center',
   },
-  plusPing: {
-    position: 'absolute', width: 50, height: 40,
-    borderRadius: Radius.md, backgroundColor: Colors.accent,
+  plusRing: {
+    position: 'absolute', width: PLUS_W, height: PLUS_H,
+    borderRadius: 15, backgroundColor: Colors.accent,
   },
   plusBtn: {
-    width: 50,
-    height: 40,
-    borderRadius: Radius.md,
+    width: PLUS_W,
+    height: PLUS_H,
+    borderRadius: 15,
     backgroundColor: Colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: Colors.accent,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 9 },
+    shadowOpacity: 0.5,
+    shadowRadius: 13,
+    elevation: 9,
   },
 });

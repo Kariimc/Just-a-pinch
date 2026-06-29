@@ -338,7 +338,7 @@ export default function SettingsScreen({ navigation }: Props) {
               {badges?.latest.length ? (
                 badges.latest.map((b, i) => (
                   <View key={b.id} style={i > 0 && styles.badgeOverlap}>
-                    <BadgeMedallion metal={b.metal} icon={b.icon} size={32} earned fx="none" />
+                    <BadgeMedallion metal={b.metal} icon={b.icon} id={b.id} size={32} earned fx="none" />
                   </View>
                 ))
               ) : (

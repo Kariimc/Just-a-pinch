@@ -79,7 +79,12 @@ export default function AIGeneratorScreen({ navigation }: Props) {
 
   async function saveDraft(thenEdit: boolean) {
     if (!draft) return;
-    await saveRecipe(draft);
+    try {
+      await saveRecipe(draft);
+    } catch {
+      showToast("Couldn't save — please try again", 'info');
+      return;
+    }
     bumpBadgeStat('aiGenerated');
     showToast(`"${draft.title}" saved to your library`);
     if (thenEdit) navigation.replace('RecipeEditor', { recipeId: draft.id });
