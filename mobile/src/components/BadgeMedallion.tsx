@@ -26,6 +26,7 @@ type Fx = 'full' | 'sheen' | 'none';
 interface Props {
   metal: BadgeMetal;
   icon: IconName;
+  id?: string;        // badge id → its photoreal art (earned state)
   size?: number;
   earned?: boolean;
   fx?: Fx;
@@ -375,25 +376,43 @@ function EmeraldSvg({ uid, palette, size, pips }: { uid: string; palette: any; s
 }
 
 // ─── Realistic badge art (earned state) ──────────────────────────────────────
-// Photoreal renders sit behind the icon for earned badges; locked badges keep
-// the engraved stone SVG below. require() is static so the bundler includes them.
-const BADGE_ART: Record<BadgeMetal, number> = {
-  bronze: require('../../assets/badges/badge-bronze.png'),
-  silver: require('../../assets/badges/badge-silver.png'),
-  gold: require('../../assets/badges/badge-gold.png'),
-  emerald: require('../../assets/badges/badge-emerald.png'),
+// Each earned badge has its own photoreal award render, keyed by badge id.
+// Locked badges keep the engraved stone SVG below; any id without art here
+// (e.g. while one is still being generated) also falls back to the SVG.
+// require() is static so the bundler includes them.
+const BADGE_ART: Record<string, number> = {
+  'first-pinch': require('../../assets/badges/badge-first-pinch.png'),
+  'first-flame': require('../../assets/badges/badge-first-flame.png'),
+  'week-ahead': require('../../assets/badges/badge-week-ahead.png'),
+  'web-forager': require('../../assets/badges/badge-web-forager.png'),
+  'keeper': require('../../assets/badges/badge-keeper.png'),
+  'snapshot': require('../../assets/badges/badge-snapshot.png'),
+  'shelf-starter': require('../../assets/badges/badge-shelf-starter.png'),
+  'list-legend': require('../../assets/badges/badge-list-legend.png'),
+  'spark-of-genius': require('../../assets/badges/badge-spark-of-genius.png'),
+  'seasoned-hand': require('../../assets/badges/badge-seasoned-hand.png'),
+  'tastemaker': require('../../assets/badges/badge-tastemaker.png'),
+  'curator': require('../../assets/badges/badge-curator.png'),
+  'well-seasoned': require('../../assets/badges/badge-well-seasoned.png'),
+  'meal-prepper': require('../../assets/badges/badge-meal-prepper.png'),
+  'the-archivist': require('../../assets/badges/badge-the-archivist.png'),
+  'pinch-master': require('../../assets/badges/badge-pinch-master.png'),
+  'master-importer': require('../../assets/badges/badge-master-importer.png'),
+  'century-shelf': require('../../assets/badges/badge-century-shelf.png'),
+  'iron-chef': require('../../assets/badges/badge-iron-chef.png'),
+  'full-plate': require('../../assets/badges/badge-full-plate.png'),
 };
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export default function BadgeMedallion({
-  metal, size = 96, earned = false, fx = 'sheen', sheenDelayMs = 0,
+  metal, id, size = 96, earned = false, fx = 'sheen', sheenDelayMs = 0,
 }: Props) {
   const palette = BadgeMetals[earned ? metal : 'stone'];
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
   const pips = PIP_X[PIPS[metal]];
 
-  const art = earned ? BADGE_ART[metal] : null;
+  const art = earned && id ? BADGE_ART[id] : null;
 
   // ── Earned: the photoreal render IS the badge (no overlaid icon) + sparkle ──
   if (art) {

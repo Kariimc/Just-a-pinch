@@ -264,7 +264,7 @@ export default function BadgesScreen({ navigation }: Props) {
                   key={hero.id}
                   entering={ZoomIn.delay(120).springify().damping(14).stiffness(340).mass(0.9)}
                 >
-                  <BadgeMedallion metal={hero.metal} icon={hero.icon} size={104} earned fx="full" />
+                  <BadgeMedallion metal={hero.metal} icon={hero.icon} id={hero.id} size={104} earned fx="full" />
                 </Animated.View>
               </FloatingView>
               {celebrating === hero.id && (
@@ -328,6 +328,7 @@ export default function BadgesScreen({ navigation }: Props) {
                 <BadgeMedallion
                   metal={b.metal}
                   icon={b.icon}
+                  id={b.id}
                   size={70}
                   earned={b.earned}
                   fx="sheen"
@@ -381,7 +382,7 @@ export default function BadgesScreen({ navigation }: Props) {
 
               <Animated.View entering={ZoomIn.delay(80).springify().damping(14).stiffness(340).mass(0.9)}>
                 <TiltMedallion size={112}>
-                  <BadgeMedallion metal={sel.metal} icon={sel.icon} size={112} earned={sel.earned} fx="full" />
+                  <BadgeMedallion metal={sel.metal} icon={sel.icon} id={sel.id} size={112} earned={sel.earned} fx="full" />
                 </TiltMedallion>
               </Animated.View>
 
