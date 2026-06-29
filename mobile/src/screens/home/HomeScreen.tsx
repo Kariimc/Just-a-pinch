@@ -209,8 +209,9 @@ export default function HomeScreen() {
           onPress={() => navigation.navigate('Settings')}
         >
           {/* Glossy brand-green orb — same gradient + glass highlight as the
-              nav + button, so the profile button reads as part of one set. */}
-          <Svg width={44} height={44} style={StyleSheet.absoluteFill}>
+              nav + button. pointerEvents none so this decorative SVG never
+              swallows the tap meant for the button underneath it. */}
+          <Svg width={44} height={44} style={StyleSheet.absoluteFill} pointerEvents="none">
             <Defs>
               <LinearGradient id="avatarOrb" x1="0" y1="0" x2="0.35" y2="1">
                 <Stop offset="0" stopColor="#43C275" />

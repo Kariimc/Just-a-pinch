@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import Animated, {
   useSharedValue, useAnimatedStyle, withSequence, withSpring,
@@ -19,6 +19,12 @@ interface Props {
 const CREAM = '#F1E9D5';        // embossed title ink on the green cloth
 const CREAM_DIM = '#D8E4D2';
 
+// Realistic whimsical cookbook-cover art (Higgsfield) in the app's exact green
+// palette, used as the opaque hero background behind the title. If it ever
+// fails to load (offline / URL change), we fall back to the engraved vector
+// CookbookCover so the hero is never blank.
+const HF_COVER = 'https://d8j0ntlcm91z4.cloudfront.net/user_3F1n9RqGZCJVrB84dvcvAMuNMRC/hf_20260629_233642_210b92b3-e180-4e8b-9048-53eb06b8590d.png';
+
 // Possessive form of the family name for the cover:
 //   "Chiles" → "CHILES'"   (ends in s — trailing apostrophe only)
 //   "Smith"  → "SMITH'S"
@@ -33,6 +39,8 @@ export default function CookbookHero({ name, recipeCount, coverImageUri, onPress
   const cardScale = useSharedValue(1);
 
   const cardStyle = useAnimatedStyle(() => ({ transform: [{ scale: cardScale.value }] }));
+
+  const [bgFailed, setBgFailed] = useState(false);
 
   function handlePress() {
     cardScale.value = withSequence(
@@ -49,13 +57,23 @@ export default function CookbookHero({ name, recipeCount, coverImageUri, onPress
     <Animated.View style={[styles.card, Shadow.cardSoft, cardStyle]}>
       <TouchableOpacity activeOpacity={0.92} onPress={handlePress} style={styles.inner}>
 
-        {/* Background: the engraved cookbook cover (vector — crisp at any width,
-            themes with the app, bundles offline). A custom photo, if the user
-            picked one, replaces it under a dark scrim so the title stays legible. */}
+        {/* Background. Priority: user's custom photo → realistic Higgsfield
+            cookbook cover → engraved vector fallback. A soft green scrim sits
+            over the art so the cream title always reads high-contrast. */}
         {coverImageUri ? (
           <>
             <Image source={{ uri: coverImageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
             <View style={styles.photoScrim} />
+          </>
+        ) : !bgFailed ? (
+          <>
+            <Image
+              source={{ uri: HF_COVER }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="cover"
+              onError={() => setBgFailed(true)}
+            />
+            <View style={styles.coverScrim} />
           </>
         ) : (
           <CookbookCover style={StyleSheet.absoluteFill} />
@@ -101,6 +119,12 @@ const styles = StyleSheet.create({
   photoScrim: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(18,62,34,0.52)',
+  },
+  // Lighter scrim for the Higgsfield cover (already mostly green) — keeps the
+  // art opaque/visible while guaranteeing the cream title stays legible.
+  coverScrim: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(16,58,32,0.34)',
   },
   cameraBtn: {
     position: 'absolute',
