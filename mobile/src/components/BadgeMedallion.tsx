@@ -400,6 +400,7 @@ const BADGE_ART: Record<string, number> = {
   'master-importer': require('../../assets/badges/badge-master-importer.png'),
   'century-shelf': require('../../assets/badges/badge-century-shelf.png'),
   'iron-chef': require('../../assets/badges/badge-iron-chef.png'),
+  'the-explorer': require('../../assets/badges/badge-the-explorer.png'),
   'full-plate': require('../../assets/badges/badge-full-plate.png'),
 };
 
