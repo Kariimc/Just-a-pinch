@@ -1,5 +1,5 @@
 import React, { useEffect, useId } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Image, StyleSheet } from 'react-native';
 import Svg, {
   Circle, Defs, Ellipse, LinearGradient, Path, Polygon,
   RadialGradient, Rect, Stop,
@@ -382,6 +382,30 @@ function EmeraldSvg({ uid, palette, size, pips }: { uid: string; palette: any; s
   );
 }
 
+// ─── Realistic badge art (earned state) ──────────────────────────────────────
+// Photoreal renders sit behind the icon for earned badges; locked badges keep
+// the engraved stone SVG below. require() is static so the bundler includes them.
+const BADGE_ART: Record<BadgeMetal, number> = {
+  bronze: require('../../assets/badges/badge-bronze.png'),
+  silver: require('../../assets/badges/badge-silver.png'),
+  gold: require('../../assets/badges/badge-gold.png'),
+  emerald: require('../../assets/badges/badge-emerald.png'),
+};
+
+// Where the emblem icon sits on each render (fraction of the badge box), its
+// size, and a colour that contrasts that render's centre. `boss` draws an
+// opaque metal disc first, to fill a cut-through centre (the silver shield).
+// Tuned by eye against the 512px renders — safe to nudge.
+const ART_EMBLEM: Record<
+  BadgeMetal,
+  { cx: number; cy: number; icon: number; color: string; boss?: number }
+> = {
+  bronze:  { cx: 0.52, cy: 0.55, icon: 0.18, color: BadgeMetals.bronze.ink },
+  silver:  { cx: 0.52, cy: 0.52, icon: 0.18, color: BadgeMetals.silver.ink, boss: 0.40 },
+  gold:    { cx: 0.50, cy: 0.40, icon: 0.13, color: BadgeMetals.gold.ink },
+  emerald: { cx: 0.49, cy: 0.48, icon: 0.16, color: BadgeMetals.emerald.faceLight },
+};
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export default function BadgeMedallion({
@@ -390,6 +414,69 @@ export default function BadgeMedallion({
   const palette = BadgeMetals[earned ? metal : 'stone'];
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
   const pips = PIP_X[PIPS[metal]];
+
+  const art = earned ? BADGE_ART[metal] : null;
+
+  // ── Earned: photoreal render + contrast emblem icon + sparkle ──────────────
+  if (art) {
+    const em = ART_EMBLEM[metal];
+    const iconBox = size * em.icon;
+    const bossSize = em.boss ? size * em.boss : 0;
+    return (
+      <View
+        style={{
+          width: size,
+          height: size,
+          boxShadow: `0 ${size * 0.06}px ${size * 0.30}px 0 ${palette.glow}`,
+        } as any}
+      >
+        <Image source={art} style={{ width: size, height: size }} resizeMode="contain" />
+
+        {/* Opaque metal boss to fill a cut-through centre (silver shield) */}
+        {!!bossSize && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: em.cx * size - bossSize / 2,
+              top: em.cy * size - bossSize / 2,
+              width: bossSize, height: bossSize, borderRadius: bossSize / 2,
+              backgroundColor: palette.faceMid,
+              borderWidth: Math.max(1, size * 0.012), borderColor: palette.rimLight,
+              overflow: 'hidden',
+            }}
+          >
+            <View style={{ flex: 1, backgroundColor: palette.faceLight, opacity: 0.45 }} />
+          </View>
+        )}
+
+        {/* Emblem icon, contrast-tinted and positioned per render */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: em.cx * size - iconBox / 2,
+            top: em.cy * size - iconBox / 2,
+            width: iconBox, height: iconBox,
+            alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <Icon name={icon} size={iconBox} color={em.color} />
+        </View>
+
+        {/* Sparkle field — full FX budget only (hero + detail surfaces) */}
+        {fx === 'full' && TWINKLES.map((t, i) => (
+          <Twinkle
+            key={i}
+            x={t.x * size} y={t.y * size} s={t.s * size}
+            delay={t.delay} color={palette.sparkle}
+          />
+        ))}
+      </View>
+    );
+  }
+
+  // ── Locked (or art missing): engraved stone/metal SVG fallback ─────────────
   const iconTranslateY = ICON_TRANSLATE[metal] * size;
   const sheenClipRadius = SHEEN_CLIP[metal](size);
 
