@@ -185,6 +185,11 @@ export const BADGES: BadgeDef[] = [
 
 const COUNTERS_KEY = '@jap_badge_counters';
 const EARNED_KEY = '@jap_badges_earned';
+// Set true after the first ever progress computation on this device. Until then,
+// any already-qualifying badge is back-filled silently (the account earned it
+// before this device started tracking, so it must not pop an unlock panel). This
+// is what stops every fresh login from re-celebrating the whole shelf.
+const SEEDED_KEY = '@jap_badges_seeded';
 
 interface EarnedEntry {
   earnedAt: number;
@@ -222,13 +227,26 @@ export async function bumpBadgeStat(stat: CumulativeStat, by = 1): Promise<void>
   scheduleBadgeCheck();
 }
 
-export async function getBadgeProgress(): Promise<BadgeProgress[]> {
-  const [recipes, plan, counters, earnedMap] = await Promise.all([
+// A badge only pops an unlock panel the first time it is *actually gained*:
+//   • `announce` is true ONLY for a recompute triggered by a real user action
+//     (recipe save, meal-plan write or stat bump → scheduleBadgeCheck). That is
+//     the sole path allowed to queue an unlock.
+//   • The very first computation on a device (before SEEDED_KEY is set) silently
+//     back-fills every badge the account already qualifies for — these were
+//     earned before, so they must not pop. This kills the "every login
+//     re-celebrates the shelf" bug.
+//   • Plain reads (BadgesScreen, getBadgeSummary) after seeding never write a
+//     freshly-crossed badge, so they can't race ahead of the action recompute
+//     and swallow its unlock.
+export async function getBadgeProgress(announce = false): Promise<BadgeProgress[]> {
+  const [recipes, plan, counters, earnedMap, seeded] = await Promise.all([
     getRecipes(),
     getMealPlan(),
     readJson<Partial<Record<CumulativeStat, number>>>(COUNTERS_KEY, {}),
     readJson<Record<string, EarnedEntry>>(EARNED_KEY, {}),
+    readJson<boolean>(SEEDED_KEY, false),
   ]);
+  const firstSeed = !seeded;
 
   const stats: Record<Exclude<StatKey, 'badgesEarned'>, number> = {
     recipesSaved: recipes.length,
@@ -257,11 +275,17 @@ export async function getBadgeProgress(): Promise<BadgeProgress[]> {
     // Once earned, always earned — deleting recipes never revokes a badge.
     const earned = !!earnedMap[def.id] || current >= def.target;
     if (earned && !earnedMap[def.id]) {
-      // If a concurrent getBadgeProgress() call already announced this badge
-      // (it's in the session-level `announced` set), mark it notified:true
-      // immediately so this call's write doesn't overwrite it with false.
-      earnedMap[def.id] = { earnedAt: now, celebrated: false, notified: announced.has(def.id) };
-      dirty = true;
+      if (firstSeed) {
+        // Pre-existing achievement — record it, but never celebrate it.
+        earnedMap[def.id] = { earnedAt: now, celebrated: true, notified: true };
+        dirty = true;
+      } else if (announce && !announced.has(def.id)) {
+        // Genuine in-session crossing via a user action → queue an unlock.
+        earnedMap[def.id] = { earnedAt: now, celebrated: false, notified: false };
+        dirty = true;
+      }
+      // else: a read saw a fresh crossing post-seed — leave it unrecorded so the
+      // action-triggered recompute owns the announce (no race / no double-pop).
     }
     const entry = earnedMap[def.id];
     return {
@@ -274,18 +298,24 @@ export async function getBadgeProgress(): Promise<BadgeProgress[]> {
   });
 
   // Collect fresh unlocks — persist before notifying so a restart never
-  // re-shows a panel the user already saw (or missed due to a crash).
+  // re-shows a panel the user already saw (or missed due to a crash). Only the
+  // action path announces, and never during the initial silent seed.
   const toAnnounce: BadgeProgress[] = [];
-  for (const b of all) {
-    const entry = earnedMap[b.id];
-    if (entry?.notified === false && !announced.has(b.id)) {
-      announced.add(b.id);
-      entry.notified = true;
-      dirty = true;
-      toAnnounce.push(b);
+  if (announce && !firstSeed) {
+    for (const b of all) {
+      const entry = earnedMap[b.id];
+      if (entry?.notified === false && !announced.has(b.id)) {
+        announced.add(b.id);
+        entry.notified = true;
+        dirty = true;
+        toAnnounce.push(b);
+      }
     }
   }
 
+  if (firstSeed) {
+    try { await writeJson(SEEDED_KEY, true); } catch { /* ignore */ }
+  }
   if (dirty) {
     try { await writeJson(EARNED_KEY, earnedMap); } catch { /* ignore */ }
   }
@@ -304,7 +334,9 @@ export function scheduleBadgeCheck(): void {
   if (checkTimer) clearTimeout(checkTimer);
   checkTimer = setTimeout(() => {
     checkTimer = null;
-    getBadgeProgress().catch(() => {});
+    // Triggered by a storage mutation / stat bump → a genuine in-app action,
+    // so this is the one path allowed to announce a freshly-earned badge.
+    getBadgeProgress(true).catch(() => {});
   }, 500);
 }
 

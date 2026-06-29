@@ -1,20 +1,24 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeIn, LinearTransition } from 'react-native-reanimated';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList, Recipe } from '../../types';
-import { Colors, Radius, Fonts } from '../../theme';
+import { Colors, Radius, Fonts, Shadow } from '../../theme';
 import { getRecipes, saveRecipe } from '../../store/storage';
 import RecipeCard from '../../components/RecipeCard';
 import Chip from '../../components/Chip';
 import Icon from '../../components/Icon';
+import Tooltip from '../../components/Tooltip';
 import { GridCardSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import { showActionSheet } from '../../components/ActionSheet';
 import { showToast } from '../../components/Toast';
 import { fetchFoodPhotoFor } from '../../services/api';
+
+const COACH_SEEN_KEY = '@jap_library_coach_seen';
 
 const MEAL_FILTERS = ['All', 'Quick & Easy', 'Vegetarian', 'Breakfast', 'Brunch', 'Dinner', 'Snacks', 'Desserts', 'Baking', 'Comfort'];
 
@@ -46,10 +50,22 @@ export default function LibraryScreen() {
   const [filter, setFilter] = useState('All');
   const [sort, setSort] = useState<SortKey>('recent');
   const [backfilling, setBackfilling] = useState(false);
+  const [showCoach, setShowCoach] = useState(false);
 
   useFocusEffect(useCallback(() => {
     getRecipes().then(r => { setRecipes(r); setLoading(false); });
   }, []));
+
+  // First visit only: a small popover that names the toolbar buttons — the
+  // "Get photos" action especially isn't self-evident behind the ⋯ icon.
+  useEffect(() => {
+    AsyncStorage.getItem(COACH_SEEN_KEY).then(v => { if (!v) setShowCoach(true); });
+  }, []);
+
+  function dismissCoach() {
+    setShowCoach(false);
+    AsyncStorage.setItem(COACH_SEEN_KEY, '1').catch(() => {});
+  }
 
   const byTab = recipes.filter(r => {
     if (tab === 'saved') return !!r.sourceUrl;
@@ -120,20 +136,58 @@ export default function LibraryScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>My Recipes</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('Search')}>
+          <Tooltip label="Search recipes & ingredients" style={styles.iconBtn} onPress={() => navigation.navigate('Search')}>
             <Icon name="search" size={20} color={Colors.ink} />
-          </TouchableOpacity>
-          <TouchableOpacity
+          </Tooltip>
+          <Tooltip
+            label={mode === 'grid' ? 'Switch to list view' : 'Switch to grid view'}
             style={[styles.iconBtn, mode === 'list' && styles.iconBtnActive]}
             onPress={() => setMode(m => m === 'grid' ? 'list' : 'grid')}
           >
             <Icon name={mode === 'grid' ? 'list' : 'grid'} size={20} color={Colors.ink} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={openMoreMenu}>
+          </Tooltip>
+          <Tooltip label="Get photos & options" style={styles.iconBtn} onPress={openMoreMenu}>
             <Icon name="more" size={20} color={Colors.ink} />
-          </TouchableOpacity>
+          </Tooltip>
         </View>
       </View>
+
+      {/* One-time coach popover naming the toolbar buttons */}
+      {showCoach && (
+        <>
+          <Animated.View entering={FadeIn.duration(160)} style={styles.coachBackdrop}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={dismissCoach} />
+          </Animated.View>
+          <Animated.View entering={FadeInDown.springify().damping(18)} style={[styles.coach, { top: insets.top + 52 }]}>
+            <View style={styles.coachArrow} />
+            <Text style={styles.coachTitle}>Quick tour</Text>
+            <View style={styles.coachRow}>
+              <View style={styles.coachIcon}><Icon name="search" size={15} color={Colors.accentDeep} /></View>
+              <View style={styles.coachText}>
+                <Text style={styles.coachLabel}>Search</Text>
+                <Text style={styles.coachDesc}>Find any recipe or ingredient fast.</Text>
+              </View>
+            </View>
+            <View style={styles.coachRow}>
+              <View style={styles.coachIcon}><Icon name="grid" size={15} color={Colors.accentDeep} /></View>
+              <View style={styles.coachText}>
+                <Text style={styles.coachLabel}>View</Text>
+                <Text style={styles.coachDesc}>Toggle between grid and list layouts.</Text>
+              </View>
+            </View>
+            <View style={styles.coachRow}>
+              <View style={styles.coachIcon}><Icon name="more" size={15} color={Colors.accentDeep} /></View>
+              <View style={styles.coachText}>
+                <Text style={styles.coachLabel}>Get photos</Text>
+                <Text style={styles.coachDesc}>Auto-fill cover photos for recipes that are missing one.</Text>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.coachBtn} onPress={dismissCoach} activeOpacity={0.85}>
+              <Text style={styles.coachBtnTxt}>Got it</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </>
+      )}
 
       {/* Segmented tabs: All / Saved / Created */}
       <View style={styles.tabs}>
@@ -251,4 +305,37 @@ const styles = StyleSheet.create({
   sortTxt: { fontFamily: Fonts.uiBold, fontSize: 12.5, color: Colors.ink2 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 13, paddingBottom: 100 },
   listPad: { paddingBottom: 100 },
+
+  // First-visit coach popover
+  coachBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(20,40,28,0.18)', zIndex: 40 },
+  coach: {
+    position: 'absolute', right: 22, width: 274, zIndex: 41,
+    backgroundColor: Colors.surface, borderRadius: Radius.lg,
+    borderWidth: 1, borderColor: Colors.line,
+    paddingHorizontal: 16, paddingTop: 14, paddingBottom: 14,
+    ...Shadow.cardSoft,
+  },
+  coachArrow: {
+    position: 'absolute', top: -7, right: 18,
+    width: 14, height: 14, backgroundColor: Colors.surface,
+    borderLeftWidth: 1, borderTopWidth: 1, borderColor: Colors.line,
+    transform: [{ rotate: '45deg' }],
+  },
+  coachTitle: {
+    fontFamily: Fonts.uiBold, fontSize: 11, letterSpacing: 1.4,
+    textTransform: 'uppercase', color: Colors.accentDeep, marginBottom: 10,
+  },
+  coachRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 11 },
+  coachIcon: {
+    width: 28, height: 28, borderRadius: 14, marginTop: 1,
+    backgroundColor: Colors.accentSoft, alignItems: 'center', justifyContent: 'center',
+  },
+  coachText: { flex: 1 },
+  coachLabel: { fontFamily: Fonts.uiBold, fontSize: 13.5, color: Colors.ink },
+  coachDesc: { fontFamily: Fonts.uiRegular, fontSize: 12, color: Colors.ink2, lineHeight: 16, marginTop: 1 },
+  coachBtn: {
+    marginTop: 2, height: 38, borderRadius: Radius.md,
+    backgroundColor: Colors.accent, alignItems: 'center', justifyContent: 'center',
+  },
+  coachBtnTxt: { fontFamily: Fonts.uiBold, fontSize: 14, color: Colors.white },
 });

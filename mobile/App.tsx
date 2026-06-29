@@ -99,18 +99,27 @@ export default function App() {
     }
   }, [themeReady, fontsLoaded, fontError]);
 
-  if (!themeReady) return null;
-  if (!fontsLoaded && !fontError && Platform.OS !== 'web') return null;
+  // Brand-green holding screen for every pre-render gap (theme read, font load,
+  // and the lazy Root chunk download on web). It matches the in-app SplashScreen
+  // background exactly, so the very first paint is the splash colour instead of a
+  // white flash — no "static screen" before the splash. Colour is hardcoded (not
+  // a theme import) because this renders before the dark-theme flip is applied.
+  if (!themeReady) return <BootSplash />;
+  if (!fontsLoaded && !fontError && Platform.OS !== 'web') return <BootSplash />;
 
   return (
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <Suspense fallback={null}>
+          <Suspense fallback={<BootSplash />}>
             <Root />
           </Suspense>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>
   );
+}
+
+function BootSplash() {
+  return <View style={{ flex: 1, backgroundColor: '#2E9E57' }} />;
 }
