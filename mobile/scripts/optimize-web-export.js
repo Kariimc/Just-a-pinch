@@ -31,12 +31,16 @@ if (!html.includes('jap-prepaint')) {
   );
 }
 
-// 2. modulepreload for every JS chunk (parallel fetch of the lazy Root chunk).
+// 2. modulepreload the lazy Root (screens) chunk so it downloads in parallel
+//    with the entry bundle instead of after it executes. The entry chunks are
+//    already <script>-loaded, and other lazy chunks (e.g. the deferred Sentry
+//    SDK) are intentionally NOT preloaded — they're post-interactive and would
+//    only compete for the first-load bandwidth that matters for time-to-interactive.
 const scriptMatch = html.match(/<script[^>]+src="([^"]+\/_expo\/static\/js\/web\/)[^"]+\.js"[^>]*>/);
 const jsBase = scriptMatch ? scriptMatch[1] : null;
 if (jsBase && !html.includes('rel="modulepreload"')) {
   const jsDir = path.join(dir, '_expo', 'static', 'js', 'web');
-  const files = fs.existsSync(jsDir) ? fs.readdirSync(jsDir).filter(f => f.endsWith('.js')) : [];
+  const files = fs.existsSync(jsDir) ? fs.readdirSync(jsDir).filter(f => /^Root-.*\.js$/.test(f)) : [];
   const links = files.map(f => `  <link rel="modulepreload" href="${jsBase}${f}">`);
   if (links.length) html = html.replace('</head>', links.join('\n') + '\n</head>');
   console.log(`optimize-web-export: ${links.length} modulepreload hint(s)`);

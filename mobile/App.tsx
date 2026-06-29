@@ -8,10 +8,6 @@ import { getSettings } from './src/store/settingsStorage';
 import { applyDarkTheme } from './src/theme';
 import { initSentry, captureError } from './src/lib/sentry';
 
-// Start crash reporting before anything else renders, so module-load and early
-// runtime errors are captured. No-op until a DSN is configured.
-initSentry();
-
 import {
   Newsreader_400Regular,
   Newsreader_400Regular_Italic,
@@ -98,6 +94,11 @@ export default function App() {
       SplashScreen.hideAsync();
     }
   }, [themeReady, fontsLoaded, fontError]);
+
+  // Crash reporting starts AFTER the first render so its heavy SDK loads as a
+  // lazy chunk and never blocks first paint / time-to-interactive. The
+  // ErrorBoundary still catches anything thrown before it finishes loading.
+  useEffect(() => { void initSentry(); }, []);
 
   // Brand-green holding screen for every pre-render gap (theme read, font load,
   // and the lazy Root chunk download on web). It matches the in-app SplashScreen
