@@ -25,6 +25,7 @@ import { showActionSheet, confirmSheet } from '../../components/ActionSheet';
 import { Springs } from '../../theme/motion';
 import { hapticLight, hapticSuccess } from '../../lib/haptics';
 import { shareRecipe as shareToCommunity } from '../../lib/community';
+import { bumpBadgeStat } from '../../store/badges';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'RecipeDetail'>;
 type Tab = 'ingredients' | 'method' | 'nutrition';
@@ -145,7 +146,9 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
     ];
     if (recipe.sourceUrl) lines.push('', recipe.sourceUrl);
     try {
-      await Share.share({ message: lines.join('\n'), title: recipe.title });
+      const res = await Share.share({ message: lines.join('\n'), title: recipe.title });
+      // Only count a genuine share — not a dismissed share sheet.
+      if (res.action !== Share.dismissedAction) bumpBadgeStat('recipesShared');
     } catch {
       // user dismissed the share sheet
     }
@@ -161,6 +164,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
       onConfirm: async () => {
         try {
           await shareToCommunity(recipe, authorName || 'Anonymous');
+          bumpBadgeStat('recipesShared');
           showToast('Shared to the community!', 'people');
         } catch (e) {
           const msg = e instanceof Error ? e.message : 'Could not share';

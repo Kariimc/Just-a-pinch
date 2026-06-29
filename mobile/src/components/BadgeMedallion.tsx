@@ -59,26 +59,37 @@ const SHEEN_CLIP: Record<BadgeMetal, (s: number) => number> = {
 // ─── 12 glitter twinkle positions ────────────────────────────────────────────
 
 const TWINKLES = [
-  { x: 0.14, y: 0.18, s: 0.12, delay: 0 },
-  { x: 0.78, y: 0.10, s: 0.14, delay: 600 },
-  { x: 0.88, y: 0.56, s: 0.10, delay: 1280 },
-  { x: 0.22, y: 0.82, s: 0.12, delay: 1950 },
-  { x: 0.04, y: 0.46, s: 0.09, delay: 2540 },
-  { x: 0.62, y: 0.04, s: 0.11, delay: 380 },
-  { x: 0.94, y: 0.30, s: 0.12, delay: 1050 },
-  { x: 0.70, y: 0.90, s: 0.10, delay: 1740 },
-  { x: 0.36, y: 0.94, s: 0.11, delay: 2200 },
-  { x: 0.06, y: 0.70, s: 0.09, delay: 2880 },
-  { x: 0.50, y: 0.06, s: 0.14, delay: 320 },
-  { x: 0.92, y: 0.74, s: 0.10, delay: 1600 },
+  { x: 0.14, y: 0.18, s: 0.15, delay: 0 },
+  { x: 0.80, y: 0.10, s: 0.17, delay: 520 },
+  { x: 0.90, y: 0.54, s: 0.12, delay: 1040 },
+  { x: 0.22, y: 0.82, s: 0.15, delay: 1560 },
+  { x: 0.05, y: 0.44, s: 0.10, delay: 2080 },
+  { x: 0.62, y: 0.05, s: 0.13, delay: 300 },
+  { x: 0.95, y: 0.30, s: 0.14, delay: 820 },
+  { x: 0.70, y: 0.90, s: 0.11, delay: 1340 },
+  { x: 0.36, y: 0.95, s: 0.13, delay: 1860 },
+  { x: 0.06, y: 0.70, s: 0.10, delay: 2380 },
+  { x: 0.50, y: 0.04, s: 0.17, delay: 180 },
+  { x: 0.93, y: 0.74, s: 0.11, delay: 700 },
+  { x: 0.30, y: 0.09, s: 0.10, delay: 1220 },
+  { x: 0.86, y: 0.86, s: 0.13, delay: 1740 },
+  { x: 0.10, y: 0.30, s: 0.11, delay: 2260 },
+  { x: 0.46, y: 0.88, s: 0.10, delay: 980 },
+  { x: 0.74, y: 0.38, s: 0.12, delay: 1480 },
+  { x: 0.18, y: 0.58, s: 0.11, delay: 460 },
 ];
 
 // ─── Particle FX ─────────────────────────────────────────────────────────────
 
 function Glint({ size, color }: { size: number; color: string }) {
   return (
-    <Svg width={size} height={size} viewBox="-6 -6 12 12">
-      <Path d="M0,-6 C0.9,-0.9 0.9,-0.9 6,0 C0.9,0.9 0.9,0.9 0,6 C-0.9,0.9 -0.9,0.9 -6,0 C-0.9,-0.9 -0.9,-0.9 0,-6" fill={color} />
+    <Svg width={size} height={size} viewBox="-10 -10 20 20">
+      {/* faint long diagonal flares for a camera-sparkle feel */}
+      <Path d="M0,-10 L0.6,-0.6 L10,0 L0.6,0.6 L0,10 L-0.6,0.6 L-10,0 L-0.6,-0.6 Z" fill={color} opacity={0.45} transform="rotate(45)" />
+      {/* main four-point star */}
+      <Path d="M0,-9 L1.5,-1.5 L9,0 L1.5,1.5 L0,9 L-1.5,1.5 L-9,0 L-1.5,-1.5 Z" fill={color} />
+      {/* white-hot core */}
+      <Circle cx={0} cy={0} r={1.9} fill={Colors.white} opacity={0.95} />
     </Svg>
   );
 }
@@ -99,8 +110,8 @@ function Twinkle({ x, y, s, delay, color }: { x: number; y: number; s: number; d
   const anim = useAnimatedStyle(() => ({
     opacity: t.value,
     transform: [
-      { scale: 0.3 + t.value * 0.7 },
-      { rotate: `${t.value * 135}deg` },
+      { scale: 0.2 + t.value * 1.0 },
+      { rotate: `${t.value * 180}deg` },
     ],
   }));
   return (

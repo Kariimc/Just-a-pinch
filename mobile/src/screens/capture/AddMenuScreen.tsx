@@ -9,6 +9,7 @@ import { RootStackParamList, Recipe } from '../../types';
 import { Colors, Radius, Fonts } from '../../theme';
 import { importFromUrl, ocrImage, parseTextRecipe } from '../../services/api';
 import { saveRecipe } from '../../store/storage';
+import { bumpBadgeStat } from '../../store/badges';
 import { uid } from '../../utils/id';
 import BottomSheet from '../../components/BottomSheet';
 import FoodWatermark from '../../components/FoodWatermark';
@@ -141,6 +142,7 @@ export default function AddMenuScreen({ navigation }: Props) {
         savedAt: Date.now(), createdAt: Date.now(),
       };
       await saveRecipe(recipe);
+      bumpBadgeStat('photoScans');
       hapticSuccess();
       setImporting(false);
       showToast(`"${recipe.title}" saved to your library`);

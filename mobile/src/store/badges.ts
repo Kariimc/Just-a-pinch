@@ -12,13 +12,15 @@ import { notifyBadgeUnlock } from '../lib/badgeUnlockBus';
 export type BadgeMetal = Exclude<keyof typeof BadgeMetals, 'stone'>;
 
 type DerivedStat =
-  | 'recipesSaved'   // library size
-  | 'urlImports'     // recipes with a sourceUrl
-  | 'cooksFinished'  // sum of cookedCount (Cooking Mode finishes)
-  | 'distinctCooked' // recipes cooked at least once
-  | 'mealsPlanned';  // meal plan entries
+  | 'recipesSaved'      // library size
+  | 'urlImports'        // recipes with a sourceUrl
+  | 'cooksFinished'     // sum of cookedCount (Cooking Mode finishes)
+  | 'distinctCooked'    // recipes cooked at least once
+  | 'mealsPlanned'      // meal plan entries
+  | 'recipesBookmarked' // recipes kept via the bookmark toggle (isSaved)
+  | 'distinctTags';     // distinct tags/categories across the library
 
-export type CumulativeStat = 'itemsChecked' | 'aiGenerated';
+export type CumulativeStat = 'itemsChecked' | 'aiGenerated' | 'recipesShared' | 'photoScans';
 
 type StatKey = DerivedStat | CumulativeStat | 'badgesEarned';
 
@@ -74,6 +76,18 @@ const CORE_BADGES: BadgeDef[] = [
     howTo: 'Found something tasty online? Tap +, choose to save from a link, and paste the URL — Just a Pinch pulls in the ingredients and steps for you. Import 3 recipes this way.',
   },
   {
+    id: 'keeper', name: 'Keeper', metal: 'bronze', icon: 'heart',
+    epithet: 'One worth coming back to.',
+    goal: 'Bookmark a recipe', target: 1, stat: 'recipesBookmarked',
+    howTo: 'Open any recipe and tap the bookmark to keep it close. Bookmark your first to earn this — your shortlist of keepers starts here.',
+  },
+  {
+    id: 'snapshot', name: 'Snapshot', metal: 'bronze', icon: 'camera',
+    epithet: 'Straight off the recipe card.',
+    goal: 'Scan a recipe from a photo', target: 1, stat: 'photoScans',
+    howTo: 'Tap +, choose the photo option, then snap or pick a picture of a recipe card or cookbook page. Just a Pinch reads it into a full recipe. Scan one to earn this.',
+  },
+  {
     id: 'shelf-starter', name: 'Shelf Starter', metal: 'silver', icon: 'book',
     epithet: 'A proper shelf takes shape.',
     goal: 'Save 10 recipes', target: 10, stat: 'recipesSaved',
@@ -104,6 +118,30 @@ const CORE_BADGES: BadgeDef[] = [
     howTo: 'Every time you finish a recipe in Cooking Mode it counts as one cook — repeats included. Stack up 10 finished cooks.',
   },
   {
+    id: 'tastemaker', name: 'Tastemaker', metal: 'silver', icon: 'share',
+    epithet: 'Good food is meant to be passed on.',
+    goal: 'Share 5 recipes', target: 5, stat: 'recipesShared',
+    howTo: 'Open a recipe, tap Share, and send it to a friend — or share it to the community. Share 5 recipes in all to earn this.',
+  },
+  {
+    id: 'curator', name: 'Curator', metal: 'silver', icon: 'bookmark',
+    epithet: 'A shortlist with taste.',
+    goal: 'Bookmark 10 recipes', target: 10, stat: 'recipesBookmarked',
+    howTo: 'Keep bookmarking the recipes you love most. Once 10 are saved to your bookmarks, this badge is yours.',
+  },
+  {
+    id: 'well-seasoned', name: 'Well Seasoned', metal: 'silver', icon: 'tag',
+    epithet: 'A little of everything.',
+    goal: 'Collect 6 different tags', target: 6, stat: 'distinctTags',
+    howTo: 'Save recipes across a range of categories — breakfast, dinner, vegetarian, dessert and beyond. Once your library spans 6 different tags, you’ve earned this.',
+  },
+  {
+    id: 'meal-prepper', name: 'Meal Prepper', metal: 'silver', icon: 'calendar',
+    epithet: 'Three weeks ahead and counting.',
+    goal: 'Plan 21 meals', target: 21, stat: 'mealsPlanned',
+    howTo: 'Keep filling in the Plan tab — breakfasts, lunches, dinners and snacks all count. Reach 21 planned meals to lock this in.',
+  },
+  {
     id: 'the-archivist', name: 'The Archivist', metal: 'gold', icon: 'grid',
     epithet: 'Keeper of the family canon.',
     goal: 'Save 25 recipes', target: 25, stat: 'recipesSaved',
@@ -114,6 +152,24 @@ const CORE_BADGES: BadgeDef[] = [
     epithet: 'The kitchen answers to you.',
     goal: 'Finish 25 cooks', target: 25, stat: 'cooksFinished',
     howTo: 'The long game: 25 finished cooks in Cooking Mode. Weeknight repeats count, so keep showing up to the stove.',
+  },
+  {
+    id: 'master-importer', name: 'Master Importer', metal: 'gold', icon: 'download',
+    epithet: 'The whole web, in your cookbook.',
+    goal: 'Import 15 recipes from links', target: 15, stat: 'urlImports',
+    howTo: 'Paste recipe links from anywhere on the web and let Just a Pinch pull them in. Import 15 in total to earn the importer’s crown.',
+  },
+  {
+    id: 'century-shelf', name: 'Century Shelf', metal: 'gold', icon: 'book',
+    epithet: 'A library to be proud of.',
+    goal: 'Save 50 recipes', target: 50, stat: 'recipesSaved',
+    howTo: 'Every recipe counts — links, photos, AI creations and hand-written classics alike. Grow your library to 50 saved recipes.',
+  },
+  {
+    id: 'iron-chef', name: 'Iron Chef', metal: 'gold', icon: 'bolt',
+    epithet: 'The stove never stood a chance.',
+    goal: 'Finish 50 cooks', target: 50, stat: 'cooksFinished',
+    howTo: 'The grand marathon of the kitchen: finish 50 cooks in Cooking Mode. Weeknight repeats absolutely count — keep showing up.',
   },
 ];
 
@@ -180,8 +236,12 @@ export async function getBadgeProgress(): Promise<BadgeProgress[]> {
     cooksFinished: recipes.reduce((n, r) => n + (r.cookedCount ?? 0), 0),
     distinctCooked: recipes.filter(r => (r.cookedCount ?? 0) > 0).length,
     mealsPlanned: plan.length,
+    recipesBookmarked: recipes.filter(r => !!r.isSaved).length,
+    distinctTags: new Set(recipes.flatMap(r => r.tags ?? [])).size,
     itemsChecked: counters.itemsChecked ?? 0,
     aiGenerated: counters.aiGenerated ?? 0,
+    recipesShared: counters.recipesShared ?? 0,
+    photoScans: counters.photoScans ?? 0,
   };
 
   // Full Plate needs to know how many of the others are earned this pass.
