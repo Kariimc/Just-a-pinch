@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.justapinch.app",
-      "versionCode": 2,
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#1E7A41",
         "foregroundImage": "./assets/android-icon-foreground.png",
