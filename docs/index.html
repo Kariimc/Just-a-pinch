@@ -5,11 +5,13 @@
   <title>Bundled Page</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #faf9f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-    #__bundler_loading { position: fixed; bottom: 20px; right: 20px; font: 13px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; color: #666; background: #fff; padding: 8px 14px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); z-index: 10000; }
-    #__bundler_thumbnail { position: fixed; inset: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #faf9f5; z-index: 9999; }
-    #__bundler_thumbnail svg { width: 100%; height: 100%; object-fit: contain; }
-    #__bundler_placeholder { color: #999; font-size: 14px; }
+    /* Dark first paint matches the landing page's own background (#060E09) so
+       there's no cream flash before the bundle renders. */
+    html, body { background: #060E09; }
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    /* Hide the bundler's pre-render "launching screen" (thumbnail preview +
+       loading pill) — users should only ever see the real page. */
+    #__bundler_loading, #__bundler_thumbnail, #__bundler_placeholder { display: none !important; }
   </style>
   <style id="jap-mobile-fixes">
     html, body { max-width: 100%; overflow-x: hidden; }

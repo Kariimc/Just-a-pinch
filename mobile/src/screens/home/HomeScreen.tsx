@@ -3,6 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   RefreshControl,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   FadeInDown, cancelAnimation, interpolate, useAnimatedStyle, useSharedValue,
@@ -28,6 +29,9 @@ import Tappable from '../../components/Tappable';
 import Sheen from '../../components/Sheen';
 import Skeleton, { RecipeCardSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
+import { showToast } from '../../components/Toast';
+
+const COVER_TIP_KEY = '@jap_cover_tip_seen';
 
 const QUICK_FILTERS = [
   'Quick & Easy', 'Vegetarian', 'Breakfast', 'Brunch', 'Dinner',
@@ -152,6 +156,17 @@ export default function HomeScreen() {
     // in-app action only ever celebrates a genuinely new badge (never the
     // ones the account already had on login). Read path → never announces.
     void getBadgeProgress();
+
+    // One-time tip: the cookbook cover can be swapped for your own photo.
+    // Only once the hero is actually showing (recipes exist) and no custom
+    // cover is set yet.
+    if (r.length > 0 && !s.coverImageUri) {
+      AsyncStorage.getItem(COVER_TIP_KEY).then(seen => {
+        if (seen) return;
+        AsyncStorage.setItem(COVER_TIP_KEY, '1').catch(() => {});
+        setTimeout(() => showToast('Tip: tap the camera on your family cookbook to use your own cover photo', 'sparkle'), 1400);
+      }).catch(() => {});
+    }
   }
 
   useFocusEffect(useCallback(() => { load(); }, [user?.id]));
