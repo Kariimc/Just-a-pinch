@@ -166,9 +166,11 @@ function TabGlyph({ name, color, focused }: { name: IconName; color: string; foc
     return () => { if (tabReactors[name] === fire) delete tabReactors[name]; };
   }, [name, react]);
 
-  const pill = useAnimatedStyle(() => ({
-    opacity: Math.min(f.value, 1),
-    transform: [{ scaleX: 0.6 + f.value * 0.4 }, { scaleY: 0.8 + f.value * 0.2 }],
+  // Active state is shown by the glyph lifting + tinting and a small dot beneath
+  // it — no filled pill bubble behind the icon (it read as a clunky green blob).
+  const dot = useAnimatedStyle(() => ({
+    opacity: f.value,
+    transform: [{ scale: 0.4 + f.value * 0.6 }],
   }));
 
   const glyph = useAnimatedStyle(() => ({
@@ -180,13 +182,13 @@ function TabGlyph({ name, color, focused }: { name: IconName; color: string; foc
 
   return (
     <View style={styles.tabGlyphWrap}>
-      <Animated.View style={[styles.tabPill, pill]} />
       <Animated.View style={glyph}>
         {name === 'home' && <HomeGlyph color={color} f={f} react={react} />}
         {name === 'book' && <BookGlyph color={color} f={f} react={react} />}
         {name === 'calendar' && <CalendarGlyph color={color} f={f} react={react} />}
         {name === 'cart' && <CartGlyph color={color} f={f} react={react} />}
       </Animated.View>
+      <Animated.View style={[styles.tabDot, dot]} pointerEvents="none" />
     </View>
   );
 }
@@ -289,15 +291,21 @@ function PlusButton() {
               <Stop offset="0.5" stopColor="#2E9E57" />
               <Stop offset="1" stopColor="#1C763E" />
             </LinearGradient>
-            <RadialGradient id="plusHi" cx="32%" cy="22%" r="64%">
-              <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.55" />
+            <RadialGradient id="plusHi" cx="34%" cy="20%" r="70%">
+              <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.42" />
               <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
             </RadialGradient>
+            {/* Soft top-down sheen — replaces the old hard rim line so the top
+                edge reads as a smooth gloss, not a crisp white stripe. */}
+            <LinearGradient id="plusTop" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.30" />
+              <Stop offset="0.45" stopColor="#FFFFFF" stopOpacity="0.05" />
+              <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+            </LinearGradient>
           </Defs>
-          <Rect x="0" y="0" width={PLUS_W} height={PLUS_H} rx="15" fill="url(#plusOrb)" />
-          <Rect x="0" y="0" width={PLUS_W} height={PLUS_H} rx="15" fill="url(#plusHi)" />
-          {/* crisp top rim highlight */}
-          <Rect x="4" y="2" width={PLUS_W - 8} height="2.5" rx="1.25" fill="#FFFFFF" opacity="0.4" />
+          <Rect x="0" y="0" width={PLUS_W} height={PLUS_H} rx="16" fill="url(#plusOrb)" />
+          <Rect x="0" y="0" width={PLUS_W} height={PLUS_H} rx="16" fill="url(#plusTop)" />
+          <Rect x="0" y="0" width={PLUS_W} height={PLUS_H} rx="16" fill="url(#plusHi)" />
         </Svg>
         <Animated.View style={glyph}>
           <Icon name="plus" size={26} color="#fff" />
@@ -448,13 +456,13 @@ const styles = StyleSheet.create({
   },
   tabBtn: { alignItems: 'center', justifyContent: 'center' },
   tabGlyphWrap: {
-    width: 52, height: 28,
+    width: 52, height: 32,
     alignItems: 'center', justifyContent: 'center',
   },
-  tabPill: {
-    position: 'absolute', width: 48, height: 30,
-    borderRadius: Radius.pill, backgroundColor: Colors.accentSoft,
-    borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(46,158,87,0.20)',
+  tabDot: {
+    position: 'absolute', bottom: -2,
+    width: 5, height: 5, borderRadius: 2.5,
+    backgroundColor: Colors.accentDeep,
   },
   // 24×24 wrapper so absolute-positioned overlays align 1:1 with SVG viewBox units.
   iconWrap: { width: 24, height: 24 },

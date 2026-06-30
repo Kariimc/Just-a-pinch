@@ -209,8 +209,9 @@ export default function HomeScreen() {
           onPress={() => navigation.navigate('Settings')}
         >
           {/* Glossy brand-green orb — same gradient + glass highlight as the
-              nav + button, so the profile button reads as part of one set. */}
-          <Svg width={44} height={44} style={StyleSheet.absoluteFill}>
+              nav + button. pointerEvents none so this decorative SVG never
+              swallows the tap meant for the button underneath it. */}
+          <Svg width={44} height={44} style={StyleSheet.absoluteFill} pointerEvents="none">
             <Defs>
               <LinearGradient id="avatarOrb" x1="0" y1="0" x2="0.35" y2="1">
                 <Stop offset="0" stopColor="#43C275" />
@@ -439,7 +440,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: Colors.accent, opacity: 0.07,
     bottom: -120, right: -120,
   },
-  appbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
+  // position+zIndex so the header (and the profile button) always sits above the
+  // ambient backdrop / any decorative layer — guards the tap target on web.
+  appbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, position: 'relative', zIndex: 30 },
   subGreet: { fontFamily: Fonts.uiRegular, fontSize: 14, color: Colors.ink2 },
   nameGreet: { fontFamily: Fonts.displayMedium, fontSize: 30, letterSpacing: -0.3, color: Colors.ink },
   avatar: {

@@ -11,7 +11,6 @@ import { getRecipes, saveRecipe } from '../../store/storage';
 import RecipeCard from '../../components/RecipeCard';
 import Chip from '../../components/Chip';
 import Icon from '../../components/Icon';
-import Tooltip from '../../components/Tooltip';
 import { GridCardSkeleton } from '../../components/Skeleton';
 import EmptyState from '../../components/EmptyState';
 import { showActionSheet } from '../../components/ActionSheet';
@@ -136,19 +135,27 @@ export default function LibraryScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>My Recipes</Text>
         <View style={styles.headerActions}>
-          <Tooltip label="Search recipes & ingredients" style={styles.iconBtn} onPress={() => navigation.navigate('Search')}>
+          <TouchableOpacity
+            style={styles.iconBtn} accessibilityRole="button" hitSlop={8}
+            accessibilityLabel="Search recipes and ingredients"
+            onPress={() => navigation.navigate('Search')}
+          >
             <Icon name="search" size={20} color={Colors.ink} />
-          </Tooltip>
-          <Tooltip
-            label={mode === 'grid' ? 'Switch to list view' : 'Switch to grid view'}
-            style={[styles.iconBtn, mode === 'list' && styles.iconBtnActive]}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.iconBtn, mode === 'list' && styles.iconBtnActive]} accessibilityRole="button" hitSlop={8}
+            accessibilityLabel={mode === 'grid' ? 'Switch to list view' : 'Switch to grid view'}
             onPress={() => setMode(m => m === 'grid' ? 'list' : 'grid')}
           >
             <Icon name={mode === 'grid' ? 'list' : 'grid'} size={20} color={Colors.ink} />
-          </Tooltip>
-          <Tooltip label="Get photos & options" style={styles.iconBtn} onPress={openMoreMenu}>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconBtn} accessibilityRole="button" hitSlop={8}
+            accessibilityLabel="Get photos and more options"
+            onPress={openMoreMenu}
+          >
             <Icon name="more" size={20} color={Colors.ink} />
-          </Tooltip>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -280,7 +287,7 @@ export default function LibraryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.paper, paddingHorizontal: 22 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, position: 'relative', zIndex: 30 },
   title: { fontFamily: Fonts.displayMedium, fontSize: 30, letterSpacing: -0.3, color: Colors.ink },
   headerActions: { flexDirection: 'row', gap: 9 },
   iconBtn: {
