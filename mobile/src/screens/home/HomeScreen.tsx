@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
   },
   // position+zIndex so the header (and the profile button) always sits above the
   // ambient backdrop / any decorative layer — guards the tap target on web.
-  appbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, position: 'relative', zIndex: 10 },
+  appbar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, position: 'relative', zIndex: 30 },
   subGreet: { fontFamily: Fonts.uiRegular, fontSize: 14, color: Colors.ink2 },
   nameGreet: { fontFamily: Fonts.displayMedium, fontSize: 30, letterSpacing: -0.3, color: Colors.ink },
   avatar: {

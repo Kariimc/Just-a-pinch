@@ -287,7 +287,7 @@ export default function LibraryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.paper, paddingHorizontal: 22 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, position: 'relative', zIndex: 10 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, position: 'relative', zIndex: 30 },
   title: { fontFamily: Fonts.displayMedium, fontSize: 30, letterSpacing: -0.3, color: Colors.ink },
   headerActions: { flexDirection: 'row', gap: 9 },
   iconBtn: {
