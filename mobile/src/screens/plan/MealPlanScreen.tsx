@@ -32,6 +32,9 @@ export default function MealPlanScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(new Date());
   const [defaultServings, setDefaultServings] = useState(2);
+  const [confirmingAdd, setConfirmingAdd] = useState(false);
+  const [autoFilling, setAutoFilling] = useState(false);
+  const [generatingList, setGeneratingList] = useState(false);
 
   // Picker sheet state
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -58,11 +61,16 @@ export default function MealPlanScreen() {
   }
 
   async function load() {
-    const [e, r, p] = await Promise.all([getMealPlan(), getRecipes(), getProfile()]);
-    setEntries(e);
-    setRecipes(r);
-    if (p?.householdSize) setDefaultServings(p.householdSize);
-    setLoading(false);
+    try {
+      const [e, r, p] = await Promise.all([getMealPlan(), getRecipes(), getProfile()]);
+      setEntries(e);
+      setRecipes(r);
+      if (p?.householdSize) setDefaultServings(p.householdSize);
+    } catch {
+      showToast('Could not load your meal plan', 'wifi');
+    } finally {
+      setLoading(false);
+    }
   }
 
   useFocusEffect(useCallback(() => { load(); }, []));
@@ -118,84 +126,101 @@ export default function MealPlanScreen() {
   }
 
   async function confirmAdd() {
-    if (!pickerRecipe) return;
-    const entry: MealPlanEntry = {
-      id: uid(),
-      recipeId: pickerRecipe.id,
-      date: dateKey(pickerDay),
-      mealType: pickerMeal,
-      servings: pickerServings,
-    };
-    await saveMealEntry(entry);
-    hapticSuccess();
-    setPickerVisible(false);
-    setPickerRecipe(null);
-    await load();
-    showToast(`${pickerRecipe.title} planned for ${pickerMeal}`);
-    if (presetRecipeId) navigation.goBack();
+    if (!pickerRecipe || confirmingAdd) return;
+    setConfirmingAdd(true);
+    try {
+      const entry: MealPlanEntry = {
+        id: uid(),
+        recipeId: pickerRecipe.id,
+        date: dateKey(pickerDay),
+        mealType: pickerMeal,
+        servings: pickerServings,
+      };
+      await saveMealEntry(entry);
+      hapticSuccess();
+      setPickerVisible(false);
+      setPickerRecipe(null);
+      await load();
+      showToast(`${pickerRecipe.title} planned for ${pickerMeal}`);
+      if (presetRecipeId) navigation.goBack();
+    } finally {
+      setConfirmingAdd(false);
+    }
   }
 
   async function autoFillWeek() {
+    if (autoFilling) return;
     const pool = recipes.length ? recipes : [];
     if (!pool.length) { showToast('Add some recipes first', 'info'); return; }
-    const dinnerPool = pool.filter(r => r.tags.includes('dinner'));
-    const usable = dinnerPool.length >= 3 ? dinnerPool : pool;
-    let added = 0;
-    for (const d of days) {
-      const key = dateKey(d);
-      const hasDinner = entries.some(e => e.date === key && e.mealType === 'dinner');
-      if (hasDinner) continue;
-      const pick = usable[Math.floor(Math.random() * usable.length)];
-      await saveMealEntry({
-        id: uid(), recipeId: pick.id, date: key, mealType: 'dinner', servings: defaultServings,
-      });
-      added++;
+    setAutoFilling(true);
+    try {
+      const dinnerPool = pool.filter(r => r.tags.includes('dinner'));
+      const usable = dinnerPool.length >= 3 ? dinnerPool : pool;
+      let added = 0;
+      for (const d of days) {
+        const key = dateKey(d);
+        const hasDinner = entries.some(e => e.date === key && e.mealType === 'dinner');
+        if (hasDinner) continue;
+        const pick = usable[Math.floor(Math.random() * usable.length)];
+        await saveMealEntry({
+          id: uid(), recipeId: pick.id, date: key, mealType: 'dinner', servings: defaultServings,
+        });
+        added++;
+      }
+      await load();
+      hapticSuccess();
+      showToast(added ? `Planned ${added} dinner${added === 1 ? '' : 's'} this week` : 'Week is already full');
+    } finally {
+      setAutoFilling(false);
     }
-    await load();
-    hapticSuccess();
-    showToast(added ? `Planned ${added} dinner${added === 1 ? '' : 's'} this week` : 'Week is already full');
   }
 
   async function generateShoppingList() {
+    if (generatingList) return;
     const weekKeys = new Set(days.map(dateKey));
     const weekEntries = entries.filter(e => weekKeys.has(e.date));
     if (!weekEntries.length) { showToast('Nothing planned this week yet', 'info'); return; }
 
-    const existing = await getShoppingItems();
-    const merged = new Map<string, ShoppingItem>();
+    setGeneratingList(true);
+    try {
+      const existing = await getShoppingItems();
+      const merged = new Map<string, ShoppingItem>();
 
-    for (const entry of weekEntries) {
-      const recipe = getRecipe(entry.recipeId);
-      if (!recipe) continue;
-      for (const ing of recipe.ingredients) {
-        const scale = recipe.servings > 0 ? entry.servings / recipe.servings : 1;
-        const amount = parseQuantity(ing.quantity);
-        const mapKey = `${ing.name.trim().toLowerCase()}|${ing.unit.trim().toLowerCase()}`;
-        const prev = merged.get(mapKey);
-        if (prev) {
-          const prevAmount = parseQuantity(prev.quantity);
-          if (prevAmount !== null && amount !== null) {
-            prev.quantity = formatQuantity(prevAmount + amount * scale);
+      for (const entry of weekEntries) {
+        const recipe = getRecipe(entry.recipeId);
+        if (!recipe) continue;
+        for (const ing of recipe.ingredients) {
+          const scale = recipe.servings > 0 ? entry.servings / recipe.servings : 1;
+          const amount = parseQuantity(ing.quantity);
+          const mapKey = `${ing.name.trim().toLowerCase()}|${ing.unit.trim().toLowerCase()}`;
+          const prev = merged.get(mapKey);
+          if (prev) {
+            const prevAmount = parseQuantity(prev.quantity);
+            if (prevAmount !== null && amount !== null) {
+              prev.quantity = formatQuantity(prevAmount + amount * scale);
+            }
+            if (!prev.recipeIds?.includes(recipe.id)) prev.recipeIds?.push(recipe.id);
+          } else {
+            merged.set(mapKey, {
+              id: uid(),
+              name: ing.name,
+              quantity: amount !== null ? formatQuantity(amount * scale) : ing.quantity,
+              unit: ing.unit,
+              category: categorizeIngredient(ing.name),
+              checked: false,
+              recipeIds: [recipe.id],
+            });
           }
-          if (!prev.recipeIds?.includes(recipe.id)) prev.recipeIds?.push(recipe.id);
-        } else {
-          merged.set(mapKey, {
-            id: uid(),
-            name: ing.name,
-            quantity: amount !== null ? formatQuantity(amount * scale) : ing.quantity,
-            unit: ing.unit,
-            category: categorizeIngredient(ing.name),
-            checked: false,
-            recipeIds: [recipe.id],
-          });
         }
       }
-    }
 
-    const newItems = [...merged.values()];
-    await saveShoppingItems([...existing, ...newItems]);
-    hapticSuccess();
-    showToast(`${newItems.length} ingredients added to your list`, 'cart');
+      const newItems = [...merged.values()];
+      await saveShoppingItems([...existing, ...newItems]);
+      hapticSuccess();
+      showToast(`${newItems.length} ingredients added to your list`, 'cart');
+    } finally {
+      setGeneratingList(false);
+    }
   }
 
   const label = selectedDay.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
@@ -233,7 +258,7 @@ export default function MealPlanScreen() {
           <TouchableOpacity style={styles.iconBtn} onPress={() => shiftWeek(1)}>
             <Icon name="fwd" size={18} color={Colors.ink} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={generateShoppingList}>
+          <TouchableOpacity style={styles.iconBtn} onPress={generateShoppingList} disabled={generatingList}>
             <Icon name="cart" size={20} color={Colors.ink} />
           </TouchableOpacity>
         </View>
@@ -265,7 +290,7 @@ export default function MealPlanScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.dayHeader}>
           <Text style={styles.dayTitle}>{label}</Text>
-          <TouchableOpacity onPress={autoFillWeek}>
+          <TouchableOpacity onPress={autoFillWeek} disabled={autoFilling}>
             <Text style={styles.autoFill}>Auto-fill week</Text>
           </TouchableOpacity>
         </View>
@@ -375,7 +400,7 @@ export default function MealPlanScreen() {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.confirmBtn} onPress={confirmAdd}>
+            <TouchableOpacity style={styles.confirmBtn} onPress={confirmAdd} disabled={confirmingAdd}>
               <Text style={styles.confirmTxt}>Add to {pickerMeal}</Text>
             </TouchableOpacity>
           </>

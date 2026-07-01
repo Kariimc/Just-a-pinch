@@ -23,11 +23,16 @@ export default function ResetPasswordScreen() {
     setError('');
     if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
     setLoading(true);
-    const { error: updateError } = await supabase.auth.updateUser({ password });
-    setLoading(false);
-    if (updateError) { setError(updateError.message); return; }
-    showToast('Password updated', 'check');
-    clearRecovery();
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) { setError(updateError.message); return; }
+      showToast('Password updated', 'check');
+      clearRecovery();
+    } catch {
+      setError('Could not reach the server. Check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

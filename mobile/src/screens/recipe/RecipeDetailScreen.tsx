@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Image,
   Platform, Share,
@@ -44,6 +44,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   const scrollY = useSharedValue(0);
   const bookmarkScale = useSharedValue(1);
   const servingsScale = useSharedValue(1);
+  const bookmarkBusy = useRef(false);
 
   const onScroll = useAnimatedScrollHandler(e => { scrollY.value = e.contentOffset.y; });
 
@@ -111,13 +112,18 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   }
 
   async function toggleSaved() {
-    if (!recipe) return;
+    if (!recipe || bookmarkBusy.current) return;
+    bookmarkBusy.current = true;
     hapticLight();
     bookmarkScale.value = withSequence(withSpring(1.3, Springs.pop), withSpring(1, Springs.glide));
     const updated = { ...recipe, isSaved: !recipe.isSaved };
     setRecipe(updated);
-    await saveRecipe(updated);
-    showToast(updated.isSaved ? 'Saved to your library' : 'Removed from saved', 'bookmark');
+    try {
+      await saveRecipe(updated);
+      showToast(updated.isSaved ? 'Saved to your library' : 'Removed from saved', 'bookmark');
+    } finally {
+      bookmarkBusy.current = false;
+    }
   }
 
   function confirmDelete() {

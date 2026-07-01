@@ -128,6 +128,7 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
   }
 
   async function handleSave() {
+    if (saving) return;
     if (!title.trim()) { showToast('Please add a recipe title'); return; }
     setSaving(true);
 
@@ -181,7 +182,7 @@ export default function RecipeEditorScreen({ route, navigation }: Props) {
             <Text style={styles.cancelTxt}>Cancel</Text>
           </TouchableOpacity>
           <Text style={styles.appbarTitle}>{editId ? 'Edit recipe' : 'New recipe'}</Text>
-          <TouchableOpacity onPress={handleSave}>
+          <TouchableOpacity onPress={handleSave} disabled={saving}>
             <Text style={styles.saveTxt}>Save</Text>
           </TouchableOpacity>
         </View>
