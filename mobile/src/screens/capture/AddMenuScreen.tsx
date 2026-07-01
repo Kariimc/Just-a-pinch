@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, TextInput,
   ActivityIndicator, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, Recipe } from '../../types';
 import { Colors, Radius, Fonts } from '../../theme';
@@ -36,6 +37,14 @@ export default function AddMenuScreen({ navigation }: Props) {
   const [importing, setImporting] = useState(false);
   const [importStep, setImportStep] = useState<string[]>([]);
   const [ocrChooser, setOcrChooser] = useState(false);
+
+  // When navigating to AIGenerator or RecipeEditor the sheet is hidden so it
+  // doesn't flash during the transition. Restore it when the user comes back so
+  // the screen never returns with a blank/white face.
+  useFocusEffect(useCallback(() => {
+    setSheetVisible(true);
+    setOcrChooser(false);
+  }, []));
 
   // Routes a server quota response to the paywall; otherwise toasts the message.
   function handleCaptureError(e: any, fallback: string) {
