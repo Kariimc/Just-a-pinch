@@ -26,22 +26,27 @@ export default function LoginScreen({ navigation }: Props) {
     setError('');
     if (!email || !password) { setError('Please enter email and password'); return; }
     setLoading(true);
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (signInError) {
-      const m = signInError.message.toLowerCase();
-      if (m.includes('not confirmed')) {
-        setError('Confirm your email first — check your inbox for the link.');
-      } else if (m.includes('invalid')) {
-        setError("Email or password doesn't match. Try again.");
-      } else {
-        // Surface the real reason (network, rate limit, etc.) instead of guessing
-        setError(signInError.message);
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) {
+        const m = signInError.message.toLowerCase();
+        if (m.includes('not confirmed')) {
+          setError('Confirm your email first — check your inbox for the link.');
+        } else if (m.includes('invalid')) {
+          setError("Email or password doesn't match. Try again.");
+        } else {
+          // Surface the real reason (network, rate limit, etc.) instead of guessing
+          setError(signInError.message);
+        }
+        return;
       }
-      return;
+      await setOnboarded();
+      navigation.replace('Main');
+    } catch {
+      setError('Could not reach the server. Check your connection and try again.');
+    } finally {
+      setLoading(false);
     }
-    await setOnboarded();
-    navigation.replace('Main');
   }
 
   async function handleForgotPassword() {

@@ -90,7 +90,10 @@ export default function ShoppingScreen() {
   const fillStyle = useAnimatedStyle(() => ({ width: fillWidth.value }));
 
   useFocusEffect(useCallback(() => {
-    getShoppingItems().then(i => { setItems(i); setLoading(false); });
+    getShoppingItems()
+      .then(i => setItems(i))
+      .catch(() => showToast('Could not load your shopping list', 'wifi'))
+      .finally(() => setLoading(false));
   }, []));
 
   // Animate the progress bar whenever items change.

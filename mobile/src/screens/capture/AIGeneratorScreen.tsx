@@ -31,6 +31,7 @@ export default function AIGeneratorScreen({ navigation }: Props) {
   const [generating, setGenerating] = useState(false);
   const [draft, setDraft] = useState<Recipe | null>(null);
   const [genError, setGenError] = useState('');
+  const [savingDraft, setSavingDraft] = useState(false);
 
   function cycle<T>(options: T[], current: T): T {
     return options[(options.indexOf(current) + 1) % options.length];
@@ -78,11 +79,13 @@ export default function AIGeneratorScreen({ navigation }: Props) {
   }
 
   async function saveDraft(thenEdit: boolean) {
-    if (!draft) return;
+    if (!draft || savingDraft) return;
+    setSavingDraft(true);
     try {
       await saveRecipe(draft);
     } catch {
       showToast("Couldn't save — please try again", 'info');
+      setSavingDraft(false);
       return;
     }
     bumpBadgeStat('aiGenerated');
@@ -164,9 +167,9 @@ export default function AIGeneratorScreen({ navigation }: Props) {
               {draft.nutrition ? ` · ${draft.nutrition.calories} kcal` : ''}
             </Text>
             <View style={styles.draftActions}>
-              <Button label="Redo" variant="ghost" small onPress={handleGenerate} style={{ flex: 1 }} leadingIcon={<Icon name="refresh" size={15} color={Colors.ink} />} />
-              <Button label="Edit" variant="ghost" small onPress={() => saveDraft(true)} style={{ flex: 1 }} leadingIcon={<Icon name="pencil" size={15} color={Colors.ink} />} />
-              <Button label="Save" small onPress={() => saveDraft(false)} style={{ flex: 1 }} />
+              <Button label="Redo" variant="ghost" small onPress={handleGenerate} disabled={savingDraft} style={{ flex: 1 }} leadingIcon={<Icon name="refresh" size={15} color={Colors.ink} />} />
+              <Button label="Edit" variant="ghost" small onPress={() => saveDraft(true)} disabled={savingDraft} style={{ flex: 1 }} leadingIcon={<Icon name="pencil" size={15} color={Colors.ink} />} />
+              <Button label="Save" small onPress={() => saveDraft(false)} loading={savingDraft} disabled={savingDraft} style={{ flex: 1 }} />
             </View>
           </View>
         </View>

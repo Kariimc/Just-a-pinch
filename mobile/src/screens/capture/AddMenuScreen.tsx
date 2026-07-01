@@ -38,12 +38,17 @@ export default function AddMenuScreen({ navigation }: Props) {
   const [importStep, setImportStep] = useState<string[]>([]);
   const [ocrChooser, setOcrChooser] = useState(false);
 
-  // When navigating to AIGenerator or RecipeEditor the sheet is hidden so it
-  // doesn't flash during the transition. Restore it when the user comes back so
-  // the screen never returns with a blank/white face.
+  // When navigating away (to AIGenerator, RecipeEditor, RecipeDetail) the sheet
+  // is hidden and url/text capture modes are entered so nothing flashes during
+  // the transition. Restore every one of those modes to its default when the
+  // user comes back so the screen never returns showing a stale input view.
   useFocusEffect(useCallback(() => {
     setSheetVisible(true);
     setOcrChooser(false);
+    setUrlMode(false);
+    setTextMode(false);
+    setUrl('');
+    setPastedText('');
   }, []));
 
   // Routes a server quota response to the paywall; otherwise toasts the message.
