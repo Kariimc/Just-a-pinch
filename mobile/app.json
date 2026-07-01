@@ -4,13 +4,13 @@
     "slug": "just-a-pinch",
     "owner": "kariimc",
     "scheme": "justapinch",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.justapinch.app",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Just a Pinch uses the camera to scan recipe cards and take photos of your dishes.",
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.justapinch.app",
-      "versionCode": 4,
+      "versionCode": 5,
       "adaptiveIcon": {
         "backgroundColor": "#1E7A41",
         "foregroundImage": "./assets/android-icon-foreground.png",
